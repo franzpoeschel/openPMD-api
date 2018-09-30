@@ -303,4 +303,91 @@ namespace openPMD
         os << dt;
         return buf.str();
     }
+
+    std::vector<Datatype> openPMD_Datatypes{
+           Datatype::CHAR ,
+           Datatype::UCHAR,
+           Datatype::SHORT,
+           Datatype::INT,
+           Datatype::LONG,
+           Datatype::LONGLONG,
+           Datatype::USHORT,
+           Datatype::UINT,
+           Datatype::ULONG,
+           Datatype::ULONGLONG,
+           Datatype::FLOAT,
+           Datatype::DOUBLE,
+           Datatype::LONG_DOUBLE,
+           Datatype::STRING,
+           Datatype::VEC_CHAR,
+           Datatype::VEC_SHORT,
+           Datatype::VEC_INT,
+           Datatype::VEC_LONG,
+           Datatype::VEC_LONGLONG,
+           Datatype::VEC_UCHAR,
+           Datatype::VEC_USHORT,
+           Datatype::VEC_UINT,
+           Datatype::VEC_ULONG,
+           Datatype::VEC_ULONGLONG,
+           Datatype::VEC_FLOAT,
+           Datatype::VEC_DOUBLE,
+           Datatype::VEC_LONG_DOUBLE,
+           Datatype::VEC_STRING,
+           Datatype::ARR_DBL_7,
+           Datatype::BOOL,
+           Datatype::DATATYPE,
+           Datatype::UNDEFINED
+   };
+
+
+    Datatype basicDatatype( Datatype dt )
+    {
+        return switchType<Datatype>(dt, detail::BasicDatatype{}, dt);
+    }
+
+
+    Datatype toVectorType( Datatype dt )
+    {
+        auto initializer = []() {
+            std::map<Datatype, Datatype> res;
+            for (Datatype d: openPMD_Datatypes) {
+                if (d == Datatype::ARR_DBL_7)
+                    continue;
+                Datatype basic = basicDatatype(d);
+                if (basic == d)
+                    continue;
+                res[basic] = d;
+            }
+            return res;
+        };
+        static auto map (initializer());
+        std::cout << "mappy map map" << std::endl;
+        for (auto const & pair : map) {
+            std::cout << pair.first << "\t-> " << pair.second << std::endl;
+        }
+        std::cout << "searching for " << dt << std::endl;
+        auto it = map.find(dt);
+        if (it != map.end()) {
+            return it->second;
+        } else {
+            throw std::runtime_error("toVectorType: passed non-basic type");
+        }
+    }
+
+
+    namespace detail {
+        template< typename T >
+        Datatype BasicDatatype::operator()( Datatype )
+        {
+            static auto res = BasicDatatypeHelper<T>{}.m_dt;
+            return res;
+        }
+
+
+        template< int n >
+        Datatype BasicDatatype::operator()( Datatype dt )
+        {
+            return dt;
+        }
+    }
 }
