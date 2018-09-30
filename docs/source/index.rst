@@ -108,4 +108,3 @@ Utilities
    :hidden:
 
    utilities/benchmark.rst
-
