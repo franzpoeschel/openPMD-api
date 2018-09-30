@@ -87,5 +87,27 @@ remove_directory(std::string const& path);
  */
 bool
 remove_file(std::string const& path);
+
+// /** Opens the file identified by the given path.
+//  * 
+//  * @param   path    Absolute or relative path to the file to create.
+//  * @param   accessType  The access type. 
+//  *              If it is `CREATE` a new file is created and opened in write mode. 
+//  *              If it is `READ_WRITE`, an existing file is opened in read-write mode.
+//  *              If it is `READ_ONLY`, an existing file is opened in read-only mode.
+//  * @return  A file handle if the file was successfully opened or created,
+//  *       a nullpointer otherwise.
+//  */
+// FILEHANDLE
+// open_file(std::string const& path, AccessType);
+
+// /** Closes the file identified by the file handle.
+//  * 
+//  * @param   fileHandle  The filehandle of the file to close.
+//  * @return  True if closing was successful, false otherwise.
+//  */
+// bool
+// close_file(FILEHANDLE);
+
 } // auxiliary
 } // openPMD
