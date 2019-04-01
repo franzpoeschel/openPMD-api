@@ -5,6 +5,7 @@
 
 #include <catch2/catch.hpp>
 
+#define openPMD_HAVE_MPI 1
 #if openPMD_HAVE_MPI
 #   include <mpi.h>
 
@@ -134,7 +135,7 @@ void write_test_zero_extent(std::string file_ending) {
     //TODO read back, verify
 }
 
-TEST_CASE( "hdf5_write_test_zero_extent", "[parallel]" )
+TEST_CASE( "write_test_zero_extent", "[parallel]" )
 {
     for ( auto const & p : backends )
     {
@@ -148,59 +149,6 @@ TEST_CASE( "none", "[parallel]" )
 #endif
 
 #if openPMD_HAVE_HDF5 && openPMD_HAVE_MPI
-TEST_CASE( "hdf5_write_test_zero_extent", "[parallel][hdf5]" )
-{
-    int mpi_s{-1};
-    int mpi_r{-1};
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_s);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_r);
-    uint64_t size = static_cast<uint64_t>(mpi_s);
-    uint64_t rank = static_cast<uint64_t>(mpi_r);
-    Series o = Series("../samples/parallel_write_zero_extent.h5", AccessType::CREATE, MPI_COMM_WORLD);
-
-    ParticleSpecies& e = o.iterations[1].particles["e"];
-
-    /* every rank n writes n consecutive cells, increasing values
-     * rank 0 does a zero-extent write
-     * two ranks will result in {1}
-     * three ranks will result in {1, 2, 3}
-     * four ranks will result in {1, 2, 3, 4, 5, 6} */
-    uint64_t num_cells = ((size-1)*(size-1) + (size-1))/2; /* (n^2 + n) / 2 */
-    if( num_cells == 0u )
-    {
-        std::cerr << "Test can only be run with at least two ranks" << std::endl;
-        return;
-    }
-
-    std::vector< double > position_global(num_cells);
-    double pos{1.};
-    std::generate(position_global.begin(), position_global.end(), [&pos]{ return pos++; });
-    std::shared_ptr< double > position_local(new double[rank], [](double *p) { delete[] p;});
-    uint64_t offset;
-    if( rank != 0 )
-        offset = ((rank-1)*(rank-1) + (rank-1))/2;
-    else
-        offset = 0;
-
-    e["position"]["x"].resetDataset(Dataset(determineDatatype(position_local), {num_cells}));
-
-    std::vector< uint64_t > positionOffset_global(num_cells);
-    uint64_t posOff{1};
-    std::generate(positionOffset_global.begin(), positionOffset_global.end(), [&posOff]{ return posOff++; });
-    std::shared_ptr< uint64_t > positionOffset_local(new uint64_t[rank], [](uint64_t *p) { delete[] p;});
-
-    e["positionOffset"]["x"].resetDataset(Dataset(determineDatatype(positionOffset_local), {num_cells}));
-
-    for( uint64_t i = 0; i < rank; ++i )
-    {
-        position_local.get()[i] = position_global[offset + i];
-        positionOffset_local.get()[i] = positionOffset_global[offset + i];
-    }
-    e["position"]["x"].storeChunk(position_local, {offset}, {rank});
-    e["positionOffset"]["x"].storeChunk(positionOffset_local, {offset}, {rank});
-
-    //TODO read back, verify
-}
 TEST_CASE( "git_hdf5_sample_content_test", "[parallel][hdf5]" )
 {
     int mpi_rank{-1};
