@@ -73,7 +73,6 @@ class Writable
     friend class ADIOS2IOHandlerImpl;
     friend class HDF5IOHandlerImpl;
     friend class ParallelHDF5IOHandlerImpl;
-    friend class AbstractIOHandlerImplCommon<AbstractFilePosition>;
     friend class AbstractIOHandlerImplCommon<ADIOS2FilePosition>;
     friend class JSONIOHandlerImpl;
     friend struct test::TestHelper;

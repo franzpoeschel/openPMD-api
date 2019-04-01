@@ -1,4 +1,4 @@
-/* Copyright 2017-2018 Fabian Koller and Franz Pöschel
+/* Copyright 2017-2019 Fabian Koller and Franz Pöschel
  *
  * This file is part of openPMD-api.
  *
@@ -26,19 +26,16 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include <openPMD/IO/AbstractIOHandlerImpl.hpp>
 #include <openPMD/IO/AbstractIOHandlerImplCommon.hpp>
 
 #include <array>
 #include <future>
-#include <memory>
+#include <memory> // shared_ptr
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
-#include <utility>
+#include <utility> // pair
 #include <vector>
 
 

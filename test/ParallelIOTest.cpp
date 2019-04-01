@@ -80,12 +80,6 @@ TEST_CASE( "write_test", "[parallel]")
 }
 
 
-#else
-
-TEST_CASE( "none", "[parallel]" )
-{ }
-#endif
-
 inline
 void write_test_zero_extent(std::string file_ending) {
     int mpi_s{-1};
@@ -147,6 +141,11 @@ TEST_CASE( "hdf5_write_test_zero_extent", "[parallel]" )
         write_test_zero_extent( std::get<0>(p) );
     }
 }
+#else
+
+TEST_CASE( "none", "[parallel]" )
+{ }
+#endif
 
 #if openPMD_HAVE_HDF5 && openPMD_HAVE_MPI
 TEST_CASE( "hdf5_write_test_zero_extent", "[parallel][hdf5]" )
