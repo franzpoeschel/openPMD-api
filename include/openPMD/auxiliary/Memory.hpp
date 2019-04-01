@@ -24,10 +24,8 @@
 #include "openPMD/Datatype.hpp"
 
 #include <functional>
-#include<iostream>
 #include <memory>
 #include <utility>
-#include <algorithm>
 
 
 namespace openPMD
