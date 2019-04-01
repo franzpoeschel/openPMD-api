@@ -28,7 +28,6 @@
 #   include <sys/stat.h>
 #   include <sys/types.h>
 #   include <dirent.h>
-#   include <stdio.h>
 #endif
 
 #include <stdexcept>
