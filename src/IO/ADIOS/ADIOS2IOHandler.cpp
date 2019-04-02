@@ -67,6 +67,22 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler,
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
 : AbstractIOHandlerImplCommon( handler ), m_ADIOS{}
 {
+    try
+    {
+        m_zfp = m_ADIOS.DefineOperator( "zfp", "zfp" );
+    }
+    catch ( std::invalid_argument const & )
+    {
+        // m_zfp stays a "false" operator
+    }
+    try
+    {
+        m_sz = m_ADIOS.DefineOperator( "sz", "sz" );
+    }
+    catch ( std::invalid_argument const & )
+    {
+        // m_sz stays a "false" operator
+    }
 }
 
 ADIOS2IOHandlerImpl::~ADIOS2IOHandlerImpl( )
@@ -188,8 +204,22 @@ void ADIOS2IOHandlerImpl::createDataset(
         auto filePos = setAndGetFilePosition( writable, name );
         filePos->gd = ADIOS2FilePosition::GD::DATASET;
         auto varName = filePositionToString( filePos );
+        // we use a unique_ptr to circumvent the fact that std::optional
+        // is only available beginning with c++17
+        std::unique_ptr< adios2::Operator > compression;
+        if ( parameters.compression == "zfp" )
+        {
+            compression = std::unique_ptr< adios2::Operator >{
+                new adios2::Operator( this->m_zfp )};
+        }
+        else if ( parameters.compression == "sz" )
+        {
+            compression = std::unique_ptr< adios2::Operator >{
+                new adios2::Operator( this->m_sz )};
+        }
         switchType( parameters.dtype, detail::VariableDefiner( ),
-                    getFileData( file ).m_IO, varName, parameters.extent );
+                    getFileData( file ).m_IO, varName,
+                    std::unique_ptr< adios2::Operator >( ), parameters.extent );
         writable->written = true;
         m_dirty.emplace( file );
     }
@@ -829,17 +859,16 @@ namespace detail
     template < typename T >
     void VariableDefiner::
     operator( )( adios2::IO & IO, const std::string & name,
+                 std::unique_ptr< adios2::Operator > compression,
                  const adios2::Dims & shape, const adios2::Dims & start,
                  const adios2::Dims & count, const bool constantDims )
     {
-        DatasetHelper< T >::defineVariable( IO, name, shape, start, count,
-                                            constantDims );
+        DatasetHelper< T >::defineVariable( IO, name, std::move( compression ),
+                                            shape, start, count, constantDims );
     }
 
-    template < int n >
-    void VariableDefiner::
-    operator( )( adios2::IO &, const std::string &, const adios2::Dims &,
-                 const adios2::Dims &, const adios2::Dims &, bool )
+    template < int n, typename... Params >
+    void VariableDefiner::operator( )( adios2::IO &, Params &&... )
     {
         throw std::runtime_error( "Defining a variable with undefined type." );
     }
@@ -1051,14 +1080,22 @@ namespace detail
     void DatasetHelper<
         T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
         defineVariable( adios2::IO & IO, const std::string & name,
+                        std::unique_ptr< adios2::Operator > compression,
                         const adios2::Dims & shape, const adios2::Dims & start,
                         const adios2::Dims & count, const bool constantDims )
     {
-        if ( !IO.DefineVariable< T >( name, shape, start, count,
-                                      constantDims ) )
+        adios2::Variable< T > var =
+            IO.DefineVariable< T >( name, shape, start, count, constantDims );
+        if ( !var )
         {
             throw std::runtime_error(
                 "Internal error: Could not create Variable '" + name + "'." );
+        }
+        // check whether the unique_ptr has an element
+        // and whether the held operator is valid
+        if ( compression && *compression )
+        {
+            var.AddOperation( *compression );
         }
     }
 
