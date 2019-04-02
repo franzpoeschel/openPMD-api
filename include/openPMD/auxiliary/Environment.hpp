@@ -19,7 +19,7 @@ namespace auxiliary
             {
                 return std::stoi( env_string );
             }
-            catch ( std::invalid_argument )
+            catch ( std::invalid_argument const & )
             {
                 return defaultValue;
             }
