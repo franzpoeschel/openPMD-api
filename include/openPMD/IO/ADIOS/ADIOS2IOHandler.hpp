@@ -186,6 +186,8 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+    adios2::Operator m_zfp;
+    adios2::Operator m_sz;
     /*
      * We need to give names to IO objects. These names are irrelevant
      * within this application, since:
@@ -351,17 +353,14 @@ namespace detail
 
         template < typename T >
         void operator( )( adios2::IO & IO, const std::string & name,
+                          std::unique_ptr< adios2::Operator > compression,
                           const adios2::Dims & shape = adios2::Dims( ),
                           const adios2::Dims & start = adios2::Dims( ),
                           const adios2::Dims & count = adios2::Dims( ),
                           bool constantDims = false );
 
-        template < int n >
-        void operator( )( adios2::IO & IO, const std::string & name,
-                          const adios2::Dims & shape = adios2::Dims( ),
-                          const adios2::Dims & start = adios2::Dims( ),
-                          const adios2::Dims & count = adios2::Dims( ),
-                          bool constantDims = false );
+        template < int n, typename... Params >
+        void operator( )( adios2::IO & IO, Params &&... );
     };
 
     template < typename T > struct ToDatatypeHelper
@@ -528,11 +527,11 @@ namespace detail
         void readDataset( BufferedGet &, adios2::IO &, adios2::Engine &,
                           std::string const & fileName );
 
-        static void defineVariable( adios2::IO & IO, const std::string & name,
-                                    const adios2::Dims & shape,
-                                    const adios2::Dims & start,
-                                    const adios2::Dims & count,
-                                    bool constantDims );
+        static void
+        defineVariable( adios2::IO & IO, const std::string & name,
+                        std::unique_ptr< adios2::Operator > compression,
+                        const adios2::Dims & shape, const adios2::Dims & start,
+                        const adios2::Dims & count, bool constantDims );
 
         void writeDataset( BufferedPut &, adios2::IO &, adios2::Engine & );
     };
