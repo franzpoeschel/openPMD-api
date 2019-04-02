@@ -88,8 +88,8 @@ class ADIOS2IOHandlerImpl
 
 public:
     // ADIOS2 does not natively support boolean values
-    // In order to use them for attributes in the least,
-    // we use a representation that will allow us to use it
+    // Since we need them for attributes,
+    // we represent booleans as a uint8_t
     using bool_representation = uint8_t;
     static_assert(
         sizeof( bool ) == 1,
