@@ -23,6 +23,7 @@
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2FilePosition.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
+#include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include <iostream>
@@ -269,25 +270,25 @@ void ADIOS2IOHandlerImpl::openDataset(
 void ADIOS2IOHandlerImpl::deleteFile(
     Writable *, const Parameter< Operation::DELETE_FILE > & )
 {
-    throw std::runtime_error("ADIOS2 backend does not support deletion.");
+    throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
 void ADIOS2IOHandlerImpl::deletePath(
     Writable *, const Parameter< Operation::DELETE_PATH > & )
 {
-    throw std::runtime_error("ADIOS2 backend does not support deletion.");
+    throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
 void ADIOS2IOHandlerImpl::deleteDataset(
     Writable *, const Parameter< Operation::DELETE_DATASET > & )
 {
-    throw std::runtime_error("ADIOS2 backend does not support deletion.");
+    throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
 void ADIOS2IOHandlerImpl::deleteAttribute(
     Writable *, const Parameter< Operation::DELETE_ATT > & )
 {
-    throw std::runtime_error("ADIOS2 backend does not support deletion.");
+    throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
 void ADIOS2IOHandlerImpl::writeDataset(
@@ -1180,6 +1181,39 @@ namespace detail
             throw std::runtime_error(
                 "Internal error: Failed declaring ADIOS2 IO object for file " +
                 m_file );
+        }
+        else
+        {
+            // read parameters from environment
+            if ( 1 ==
+                 auxiliary::getEnvNum( "OPENPMD_ADIOS_HAVE_METADATA_FILE", 1 ) )
+            {
+                m_IO.SetParameter( "CollectiveMetadata", "On" );
+            }
+            else
+            {
+                m_IO.SetParameter( "CollectiveMetadata", "Off" );
+            }
+            if ( 1 ==
+                 auxiliary::getEnvNum( "OPENPMD_ADIOS_HAVE_PROFILING", 1 ) )
+            {
+                m_IO.SetParameter( "Profile", "On" );
+            }
+            else
+            {
+                m_IO.SetParameter( "Profile", "Off" );
+            }
+#if openPMD_HAVE_MPI
+            {
+                auto num_substreams =
+                    auxiliary::getEnvNum( "OPENPMD_ADIOS_NUM_SUBSTREAMS", 0 );
+                if ( 0 != num_substreams )
+                {
+                    m_IO.SetParameter( "SubStreams",
+                                       std::to_string( num_substreams ) );
+                }
+            }
+#endif
         }
     }
 
