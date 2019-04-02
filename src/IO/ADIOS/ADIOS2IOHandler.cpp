@@ -269,21 +269,25 @@ void ADIOS2IOHandlerImpl::openDataset(
 void ADIOS2IOHandlerImpl::deleteFile(
     Writable *, const Parameter< Operation::DELETE_FILE > & )
 {
+    throw std::runtime_error("ADIOS2 backend does not support deletion.");
 }
 
 void ADIOS2IOHandlerImpl::deletePath(
     Writable *, const Parameter< Operation::DELETE_PATH > & )
 {
+    throw std::runtime_error("ADIOS2 backend does not support deletion.");
 }
 
 void ADIOS2IOHandlerImpl::deleteDataset(
     Writable *, const Parameter< Operation::DELETE_DATASET > & )
 {
+    throw std::runtime_error("ADIOS2 backend does not support deletion.");
 }
 
 void ADIOS2IOHandlerImpl::deleteAttribute(
     Writable *, const Parameter< Operation::DELETE_ATT > & )
 {
+    throw std::runtime_error("ADIOS2 backend does not support deletion.");
 }
 
 void ADIOS2IOHandlerImpl::writeDataset(
