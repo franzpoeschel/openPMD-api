@@ -98,6 +98,7 @@ Backends
 
    backends/json
    backends/adios1
+   backends/adios2
 
 *********
 Utilities
