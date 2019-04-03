@@ -677,10 +677,10 @@ namespace detail {
 
     struct BasicDatatype {
         template <typename T>
-        Datatype operator()(Datatype);
+        Datatype operator()();
 
         template <int n>
-        Datatype operator()(Datatype);
+        Datatype operator()();
     };
 }
 
