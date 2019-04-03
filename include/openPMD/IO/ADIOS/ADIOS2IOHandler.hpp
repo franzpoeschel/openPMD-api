@@ -24,11 +24,11 @@
 
 #include "ADIOS2FilePosition.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/AbstractIOHandlerImpl.hpp"
+#include "openPMD/IO/AbstractIOHandlerImplCommon.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/backend/Writable.hpp"
-#include <openPMD/IO/AbstractIOHandlerImpl.hpp>
-#include <openPMD/IO/AbstractIOHandlerImplCommon.hpp>
 
 #include <array>
 #include <future>
@@ -41,6 +41,7 @@
 
 #if openPMD_HAVE_ADIOS2
 #include <adios2.h>
+#include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #endif
 
 #if openPMD_HAVE_MPI
@@ -87,10 +88,6 @@ class ADIOS2IOHandlerImpl
 
 
 public:
-    // ADIOS2 does not natively support boolean values
-    // Since we need them for attributes,
-    // we represent booleans as a uint8_t
-    using bool_representation = uint8_t;
     static_assert(
         sizeof( bool ) == 1,
         "ADIOS2 backend needs a platform with boolean size equals one byte." );
@@ -165,17 +162,7 @@ public:
     listAttributes( Writable *,
                     Parameter< Operation::LIST_ATTS > & parameters ) override;
 
-    /**
-     * @brief Convert openPMD datatype to ADIOS2 type.
-     */
-    static std::string toADIOS2Type( Datatype dt );
 
-    /**
-     * @brief Convert ADIOS2 datatype to openPMD type.
-     * @param dt
-     * @return
-     */
-    static Datatype fromADIOS2Type( std::string const & dt );
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -238,8 +225,7 @@ private:
      * (possibly the empty string, representing no variable)
      * and the actual name.
      */
-    std::pair< std::string, std::string >
-    nameOfAttribute( Writable * writable, std::string attribute );
+    std::string nameOfAttribute( Writable * writable, std::string attribute );
 
     /*
      * Figure out whether the Writable corresponds with a
@@ -299,8 +285,7 @@ namespace detail
     struct AttributeReader
     {
         template < typename T >
-        void operator( )( adios2::IO & IO,
-                          std::pair< std::string, std::string > name,
+        void operator( )( adios2::IO & IO, std::string name,
                           std::shared_ptr< Attribute::resource > resource );
 
         template < int n, typename... Params > void operator( )( Params &&... );
@@ -363,34 +348,6 @@ namespace detail
         void operator( )( adios2::IO & IO, Params &&... );
     };
 
-    template < typename T > struct ToDatatypeHelper
-    {
-        static std::string type( );
-    };
-
-    template < typename T > struct ToDatatypeHelper< std::vector< T > >
-    {
-        static std::string type( );
-    };
-
-    template < typename T, size_t n >
-    struct ToDatatypeHelper< std::array< T, n > >
-    {
-        static std::string type( );
-    };
-
-    template <> struct ToDatatypeHelper< bool >
-    {
-        static std::string type( );
-    };
-
-    struct ToDatatype
-    {
-        template < typename T > std::string operator( )( );
-
-
-        template < int n > std::string operator( )( );
-    };
 
 
     // Helper structs to help distinguish valid attribute/variable
@@ -407,13 +364,11 @@ namespace detail
         using Attr = adios2::Attribute< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO,
-                                     std::pair< std::string, std::string > name,
+        static Attr createAttribute( adios2::IO & IO, std::string name,
                                      BasicType value );
 
         static void
-        readAttribute( adios2::IO & IO,
-                       std::pair< std::string, std::string > name,
+        readAttribute( adios2::IO & IO, std::string name,
                        std::shared_ptr< Attribute::resource > resource );
     };
 
@@ -422,13 +377,11 @@ namespace detail
         using Attr = adios2::Attribute< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO,
-                                     std::pair< std::string, std::string > name,
+        static Attr createAttribute( adios2::IO & IO, std::string name,
                                      const std::vector< T > & value );
 
         static void
-        readAttribute( adios2::IO & IO,
-                       std::pair< std::string, std::string > name,
+        readAttribute( adios2::IO & IO, std::string name,
                        std::shared_ptr< Attribute::resource > resource );
     };
 
@@ -438,29 +391,25 @@ namespace detail
         using Attr = adios2::Attribute< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO,
-                                     std::pair< std::string, std::string > name,
+        static Attr createAttribute( adios2::IO & IO, std::string name,
                                      const std::array< T, n > & value );
 
         static void
-        readAttribute( adios2::IO & IO,
-                       std::pair< std::string, std::string > name,
+        readAttribute( adios2::IO & IO, std::string name,
                        std::shared_ptr< Attribute::resource > resource );
     };
 
     template <> struct AttributeTypes< bool >
     {
-        using rep = ADIOS2IOHandlerImpl::bool_representation;
+        using rep = detail::bool_representation;
         using Attr = adios2::Attribute< rep >;
         using BasicType = rep;
 
-        static Attr createAttribute( adios2::IO & IO,
-                                     std::pair< std::string, std::string > name,
+        static Attr createAttribute( adios2::IO & IO, std::string name,
                                      bool value );
 
         static void
-        readAttribute( adios2::IO & IO,
-                       std::pair< std::string, std::string > name,
+        readAttribute( adios2::IO & IO, std::string name,
                        std::shared_ptr< Attribute::resource > resource );
 
 
@@ -555,7 +504,6 @@ namespace detail
         template < typename... Params > void writeDataset( Params &&... );
     };
 
-
     // Other datatypes used in the ADIOS2IOHandler implementation
 
 
@@ -590,7 +538,7 @@ namespace detail
     struct BufferedAttributeRead : BufferedAction
     {
         Parameter< Operation::READ_ATT > param;
-        std::pair< std::string, std::string > name;
+        std::string name;
 
         void run( BufferedActions & ) override;
     };
