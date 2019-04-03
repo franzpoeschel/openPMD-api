@@ -342,7 +342,7 @@ namespace openPMD
 
     Datatype basicDatatype( Datatype dt )
     {
-        return switchType<Datatype>(dt, detail::BasicDatatype{}, dt);
+        return switchType<Datatype>(dt, detail::BasicDatatype{});
     }
 
 
@@ -351,7 +351,9 @@ namespace openPMD
         auto initializer = []() {
             std::map<Datatype, Datatype> res;
             for (Datatype d: openPMD_Datatypes) {
-                if (d == Datatype::ARR_DBL_7)
+                if (d == Datatype::ARR_DBL_7
+                        || d == Datatype::UNDEFINED
+                        || d == Datatype::DATATYPE)
                     continue;
                 Datatype basic = basicDatatype(d);
                 if (basic == d)
@@ -361,11 +363,6 @@ namespace openPMD
             return res;
         };
         static auto map (initializer());
-        std::cout << "mappy map map" << std::endl;
-        for (auto const & pair : map) {
-            std::cout << pair.first << "\t-> " << pair.second << std::endl;
-        }
-        std::cout << "searching for " << dt << std::endl;
         auto it = map.find(dt);
         if (it != map.end()) {
             return it->second;
@@ -377,7 +374,7 @@ namespace openPMD
 
     namespace detail {
         template< typename T >
-        Datatype BasicDatatype::operator()( Datatype )
+        Datatype BasicDatatype::operator()()
         {
             static auto res = BasicDatatypeHelper<T>{}.m_dt;
             return res;
@@ -385,9 +382,9 @@ namespace openPMD
 
 
         template< int n >
-        Datatype BasicDatatype::operator()( Datatype dt )
+        Datatype BasicDatatype::operator()()
         {
-            return dt;
+            throw std::runtime_error( "basicDatatype: received unknown datatype." );
         }
     }
 }
