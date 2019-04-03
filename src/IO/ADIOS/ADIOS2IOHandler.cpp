@@ -290,8 +290,8 @@ void ADIOS2IOHandlerImpl::openDataset(
     pos->gd = ADIOS2FilePosition::GD::DATASET;
     auto file = refreshFileFromParent( writable );
     auto varName = filePositionToString( pos );
-    *parameters.dtype =
-        fromADIOS2Type( getFileData( file ).m_IO.VariableType( varName ) );
+    *parameters.dtype = detail::fromADIOS2Type(
+        getFileData( file ).m_IO.VariableType( varName ) );
     switchType( *parameters.dtype, detail::DatasetOpener( this ), file, varName,
                 parameters );
     writable->written = true;
@@ -502,78 +502,27 @@ void ADIOS2IOHandlerImpl::listAttributes(
     VERIFY_ALWAYS( writable->written,
                    "Internal error: Writable not marked "
                    "written during attribute writing" );
-    std::string attributePrefix = nameOfAttribute( writable, "" ).first;
     auto file = refreshFileFromParent( writable );
     auto pos = setAndGetFilePosition( writable );
+    auto attributePrefix = filePositionToString( pos );
+    if ( attributePrefix == "/" )
+    {
+        attributePrefix = "";
+    }
     auto & ba = getFileData( file );
     ba.getEngine( ); // make sure that the attributes are present
     auto attrs = ba.m_IO.AvailableAttributes( attributePrefix );
-    if ( pos->gd == ADIOS2FilePosition::GD::DATASET )
+    for ( auto & pair : attrs )
     {
-        for ( auto & pair : attrs )
+        auto attr = auxiliary::removeSlashes( pair.first );
+        if ( attr.find_last_of( '/' ) == std::string::npos )
         {
-            auto & attr = pair.first;
-            if ( attr.find_last_of( '/' ) == std::string::npos )
-            {
-                parameters.attributes->push_back( std::move( attr ) );
-            }
-        }
-    }
-    else
-    {
-        std::string stripPrefix = filePositionToString( pos );
-        if ( !auxiliary::ends_with( stripPrefix, '/' ) )
-        {
-            stripPrefix += '/';
-        }
-        for ( auto & pair : attrs )
-        {
-            if ( auxiliary::starts_with( pair.first, stripPrefix ) )
-            {
-                auto attr = auxiliary::replace_first( std::move( pair.first ),
-                                                      stripPrefix, "" );
-                if ( attr.find_last_of( '/' ) == std::string::npos )
-                {
-                    parameters.attributes->push_back( std::move( attr ) );
-                }
-            }
+            parameters.attributes->push_back( std::move( attr ) );
         }
     }
 }
 
-std::string ADIOS2IOHandlerImpl::toADIOS2Type( Datatype dt )
-{
-    return switchType< std::string >( dt, detail::ToDatatype( ) );
-}
 
-Datatype ADIOS2IOHandlerImpl::fromADIOS2Type( std::string const & dt )
-{
-    static std::map< std::string, Datatype > map{
-        {"string", Datatype::STRING},
-        {"char", Datatype::CHAR},
-        {"signed char", Datatype::CHAR},
-        {"unsigned char", Datatype::UCHAR},
-        {"short", Datatype::SHORT},
-        {"unsigned short", Datatype::USHORT},
-        {"int", Datatype::INT},
-        {"unsigned int", Datatype::UINT},
-        {"long int", Datatype::LONG},
-        {"unsigned long int", Datatype::ULONG},
-        {"long long int", Datatype::LONGLONG},
-        {"unsigned long long int", Datatype::ULONGLONG},
-        {"float", Datatype::FLOAT},
-        {"double", Datatype::DOUBLE},
-        {"long double", Datatype::LONG_DOUBLE}};
-    auto it = map.find( dt );
-    if ( it != map.end( ) )
-    {
-        return it->second;
-    }
-    else
-    {
-        return Datatype::UNDEFINED;
-    }
-}
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
 {
@@ -622,27 +571,12 @@ std::string ADIOS2IOHandlerImpl::nameOfVariable( Writable * writable )
     return filePositionToString( setAndGetFilePosition( writable ) );
 }
 
-std::pair< std::string, std::string >
-ADIOS2IOHandlerImpl::nameOfAttribute( Writable * writable,
-                                      std::string attribute )
+std::string ADIOS2IOHandlerImpl::nameOfAttribute( Writable * writable,
+                                                  std::string attribute )
 {
     auto pos = setAndGetFilePosition( writable );
-    auto file = refreshFileFromParent( writable );
-    std::string variable;
-    std::string attrInAdios;
-    switch ( pos->gd )
-    {
-    case ADIOS2FilePosition::GD::GROUP:
-        variable = "";
-        attrInAdios = filePositionToString(
-            extendFilePosition( pos, auxiliary::removeSlashes( attribute ) ) );
-        break;
-    case ADIOS2FilePosition::GD::DATASET:
-        variable = nameOfVariable( writable );
-        attrInAdios = auxiliary::removeSlashes( attribute );
-        break;
-    }
-    return std::make_pair( std::move( variable ), std::move( attrInAdios ) );
+    return filePositionToString(
+        extendFilePosition( pos, auxiliary::removeSlashes( attribute ) ) );
 }
 
 ADIOS2FilePosition::GD
@@ -764,7 +698,7 @@ namespace detail
 
     template < typename T >
     void AttributeReader::
-    operator( )( adios2::IO & IO, std::pair< std::string, std::string > name,
+    operator( )( adios2::IO & IO, std::string name,
                  std::shared_ptr< Attribute::resource > resource )
     {
         AttributeTypes< T >::readAttribute( IO, name, resource );
@@ -788,26 +722,20 @@ namespace detail
                        "Cannot write attribute in read-only mode." );
         auto pos = impl->setAndGetFilePosition( writable );
         auto file = impl->refreshFileFromParent( writable );
-        auto pair = impl->nameOfAttribute( writable, parameters.name );
+        auto fullName = impl->nameOfAttribute( writable, parameters.name );
+        auto prefix = impl->filePositionToString( pos );
 
         adios2::IO IO = impl->getFileData( file ).m_IO;
         impl->m_dirty.emplace( std::move( file ) );
 
-        std::map< std::string, adios2::Params > attrMap =
-            IO.AvailableAttributes( pair.first );
-        impl->workaroundDatatypeOfAttribute( IO, pair.first, pair.second );
-        auto it = attrMap.find( pair.second );
-        if ( it != attrMap.end( ) )
+        std::string t = IO.AttributeType( fullName );
+        if ( !t.empty( ) ) // an attribute is present <=> it has a type
         {
-            auto name = auxiliary::ends_with( pair.first, '/' ) ||
-                    auxiliary::starts_with( pair.second, '/' )
-                ? pair.first + pair.second
-                : pair.first + '/' + pair.second;
-            IO.RemoveAttribute( name );
+            IO.RemoveAttribute( fullName );
         }
         typename AttributeTypes< T >::Attr attr =
             AttributeTypes< T >::createAttribute(
-                IO, pair, variantSrc::get< T >( parameters.resource ) );
+                IO, fullName, variantSrc::get< T >( parameters.resource ) );
         VERIFY_ALWAYS( attr, "Failed creating attribute." )
     }
 
@@ -873,69 +801,32 @@ namespace detail
         throw std::runtime_error( "Defining a variable with undefined type." );
     }
 
-    template < typename T > std::string ToDatatypeHelper< T >::type( )
-    {
-        return adios2::GetType< T >( );
-    }
+
 
     template < typename T >
-    std::string ToDatatypeHelper< std::vector< T > >::type( )
+    typename AttributeTypes< T >::Attr
+    AttributeTypes< T >::createAttribute( adios2::IO & IO, std::string name,
+                                          const T value )
     {
-        return
-
-            adios2::GetType< T >( );
-    }
-
-    template < typename T, size_t n >
-    std::string ToDatatypeHelper< std::array< T, n > >::type( )
-    {
-        return
-
-            adios2::GetType< T >( );
-    }
-
-    std::string ToDatatypeHelper< bool >::type( )
-    {
-        return ToDatatypeHelper<
-            ADIOS2IOHandlerImpl::bool_representation >::type( );
-    }
-
-    template < typename T > std::string ToDatatype::operator( )( )
-    {
-        return ToDatatypeHelper< T >::type( );
-    }
-
-    template < int n > std::string ToDatatype::operator( )( )
-    {
-        return "";
-    }
-
-    template < typename T >
-    typename AttributeTypes< T >::Attr AttributeTypes< T >::createAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
-        const T value )
-    {
-        auto attr = IO.DefineAttribute( name.second, value, name.first );
+        auto attr = IO.DefineAttribute( name, value );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed defining attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed defining attribute '" + name + "'." );
         }
         return attr;
     }
 
     template < typename T >
     void AttributeTypes< T >::readAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
+        adios2::IO & IO, std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name.second, name.first );
+        auto attr = IO.InquireAttribute< BasicType >( name );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed reading attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed reading attribute '" + name + "'." );
         }
         *resource = attr.Data( )[0];
     }
@@ -943,31 +834,27 @@ namespace detail
     template < typename T >
     typename AttributeTypes< std::vector< T > >::Attr
     AttributeTypes< std::vector< T > >::createAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
-        const std::vector< T > & value )
+        adios2::IO & IO, std::string name, const std::vector< T > & value )
     {
-        auto attr = IO.DefineAttribute( name.second, value.data( ),
-                                        value.size( ), name.first );
+        auto attr = IO.DefineAttribute( name, value.data( ), value.size( ) );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed defining attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed defining attribute '" + name + "'." );
         }
         return attr;
     }
 
     template < typename T >
     void AttributeTypes< std::vector< T > >::readAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
+        adios2::IO & IO, std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name.second, name.first );
+        auto attr = IO.InquireAttribute< BasicType >( name );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed reading attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed reading attribute '" + name + "'." );
         }
         *resource = attr.Data( );
     }
@@ -975,31 +862,27 @@ namespace detail
     template < typename T, size_t n >
     typename AttributeTypes< std::array< T, n > >::Attr
     AttributeTypes< std::array< T, n > >::createAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
-        const std::array< T, n > & value )
+        adios2::IO & IO, std::string name, const std::array< T, n > & value )
     {
-        auto attr =
-            IO.DefineAttribute( name.second, value.data( ), n, name.first );
+        auto attr = IO.DefineAttribute( name, value.data( ), n );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed defining attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed defining attribute '" + name + "'." );
         }
         return attr;
     }
 
     template < typename T, size_t n >
     void AttributeTypes< std::array< T, n > >::readAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
+        adios2::IO & IO, std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name.second, name.first );
+        auto attr = IO.InquireAttribute< BasicType >( name );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed reading attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed reading attribute '" + name + "'." );
         }
         auto data = attr.Data( );
         std::array< T, n > res;
@@ -1011,24 +894,22 @@ namespace detail
     }
 
     typename AttributeTypes< bool >::Attr
-    AttributeTypes< bool >::createAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
-        const bool value )
+    AttributeTypes< bool >::createAttribute( adios2::IO & IO, std::string name,
+                                             const bool value )
     {
-        return AttributeTypes< rep >::createAttribute( IO, name,
-                                                       toRep( value ) );
+        return AttributeTypes< bool_representation >::createAttribute(
+            IO, name, toRep( value ) );
     }
 
     void AttributeTypes< bool >::readAttribute(
-        adios2::IO & IO, std::pair< std::string, std::string > name,
+        adios2::IO & IO, std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name.second, name.first );
+        auto attr = IO.InquireAttribute< BasicType >( name );
         if ( !attr )
         {
             throw std::runtime_error(
-                "Internal error: Failed reading attribute '" + name.first +
-                "/" + name.second + "'." );
+                "Internal error: Failed reading attribute '" + name + "'." );
         }
         *resource = fromRep( attr.Data( )[0] );
     }
@@ -1184,22 +1065,13 @@ namespace detail
 
     void BufferedAttributeRead::run( BufferedActions & ba )
     {
-        auto attrInfo = ba.m_impl.workaroundDatatypeOfAttribute(
-            ba.m_IO, name.first, name.second );
+        auto type = attributeInfo( ba.m_IO, name );
 
-        if ( !attrInfo )
+        if ( type == Datatype::UNDEFINED )
         {
-            throw std::runtime_error( "Requested attribute (" + name.first +
-                                      "/" + name.second +
+            throw std::runtime_error( "Requested attribute (" + name +
                                       ") not found in backend." );
         }
-
-        Datatype basicDt = ba.m_impl.fromADIOS2Type( attrInfo->first );
-        Datatype type = attrInfo->second == 1
-            ? basicDt
-            : attrInfo->second == 7 && basicDt == Datatype::DOUBLE
-                ? Datatype::ARR_DBL_7
-                : toVectorType( basicDt );
 
         *param.dtype = type;
         switchType( type, detail::AttributeReader{}, ba.m_IO, name,
