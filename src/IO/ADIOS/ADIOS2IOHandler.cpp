@@ -1128,7 +1128,6 @@ namespace detail
 
     BufferedActions::~BufferedActions( )
     {
-        m_engine->EndStep( );
         if ( m_engine )
         {
             m_engine->Close( );
@@ -1145,7 +1144,6 @@ namespace detail
             {
                 throw std::runtime_error( "Failed opening ADIOS2 Engine." );
             }
-            m_engine->BeginStep( );
         }
         return *m_engine;
     }
