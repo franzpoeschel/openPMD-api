@@ -58,14 +58,14 @@ namespace openPMD
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler,
                                           MPI_Comm communicator )
 : AbstractIOHandlerImplCommon( handler ), m_comm{communicator},
-  m_ADIOS{communicator}
+  m_ADIOS{communicator, ADIOS2_DEBUG_MODE}
 {
 }
 
 #endif // openPMD_HAVE_MPI
 
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
-: AbstractIOHandlerImplCommon( handler ), m_ADIOS{}
+: AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
 {
     try
     {
