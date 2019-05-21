@@ -84,6 +84,8 @@ class ADIOS2IOHandlerImpl
     friend struct detail::WriteDataset;
     friend struct detail::BufferedActions;
     friend struct detail::BufferedAttributeRead;
+    
+    static constexpr bool ADIOS2_DEBUG_MODE = false;
 
 
 public:
