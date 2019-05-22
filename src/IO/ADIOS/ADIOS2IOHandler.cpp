@@ -277,16 +277,8 @@ void ADIOS2IOHandlerImpl::openPath(
     /* ADIOS has no concept for explicitly creating paths.
      * They are implicitly created with the paths of variables/attributes. */
 
-    if ( writable->abstractFilePosition )
-    {
-        *writable->abstractFilePosition = ADIOS2FilePosition(
-            prefix + infix + suffix, ADIOS2FilePosition::GD::GROUP );
-    }
-    else
-    {
-        writable->abstractFilePosition = std::make_shared< ADIOS2FilePosition >(
-            prefix + infix + suffix, ADIOS2FilePosition::GD::GROUP );
-    }
+    writable->abstractFilePosition = std::make_shared< ADIOS2FilePosition >(
+        prefix + infix + suffix, ADIOS2FilePosition::GD::GROUP );
     writable->written = true;
 }
 
