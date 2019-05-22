@@ -60,12 +60,21 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler,
 : AbstractIOHandlerImplCommon( handler ), m_comm{communicator},
   m_ADIOS{communicator, ADIOS2_DEBUG_MODE}
 {
+    init( );
+}
+
+#else
+  
+ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
+: AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
+{
+    init( );
 }
 
 #endif // openPMD_HAVE_MPI
 
-ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
-: AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
+void 
+ADIOS2IOHandlerImpl::init( )
 {
     try
     {
@@ -1202,12 +1211,14 @@ ADIOS2IOHandler::ADIOS2IOHandler( std::string path, openPMD::AccessType at,
 {
 }
 
-#endif // openPMD_HAVE_MPI
-
+#else 
+                                                    
 ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at )
 : AbstractIOHandler( std::move( path ), at ), m_impl{this}
 {
 }
+
+#endif // openPMD_HAVE_MPI
 
 ADIOS2IOHandler::~ADIOS2IOHandler( )
 {
@@ -1227,12 +1238,15 @@ ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at,
 : AbstractIOHandler( std::move( path ), at, comm )
 {
 }
-#endif
+
+#else
 
 ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at )
 : AbstractIOHandler( std::move( path ), at )
 {
 }
+
+#endif
 
 std::future< void > ADIOS2IOHandler::flush( )
 {

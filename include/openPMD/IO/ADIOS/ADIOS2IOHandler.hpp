@@ -94,13 +94,17 @@ public:
         sizeof( bool ) == 1,
         "ADIOS2 backend needs a platform with boolean size equals one byte." );
 
-    explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
 
 #if openPMD_HAVE_MPI
 
     ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm );
 
     MPI_Comm m_comm;
+    
+#else
+    
+    explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
+    
 #endif // openPMD_HAVE_MPI
 
     ~ADIOS2IOHandlerImpl( ) override;
@@ -177,6 +181,9 @@ private:
     adios2::ADIOS m_ADIOS;
     adios2::Operator m_zfp;
     adios2::Operator m_sz;
+    
+    void init( );
+    
     /*
      * We need to give names to IO objects. These names are irrelevant
      * within this application, since:
@@ -607,11 +614,13 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm );
+    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm = MPI_COMM_SELF );
 
-#endif
+#else
 
     ADIOS2IOHandler( std::string path, AccessType );
+    
+#endif
 
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler
