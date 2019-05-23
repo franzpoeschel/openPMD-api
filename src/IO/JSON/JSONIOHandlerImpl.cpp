@@ -25,6 +25,7 @@
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/JSON/JSONIOHandlerImpl.hpp"
+#include <algorithm>
 
 
 namespace openPMD
@@ -1236,7 +1237,8 @@ namespace openPMD
             return false;
         }
         auto i = j.find( "data" );
-        return i != j.end( ) && i.value( ).is_array();
+        return i != j.end( ) && 
+                ( i.value( ).is_array() || i.value( ).is_null( ) );
     }
 
 
@@ -1263,21 +1265,27 @@ namespace openPMD
 
         try
         {
-            auto datasetExtent = getExtent( j["data"] );
-            VERIFY_ALWAYS( datasetExtent.size( ) ==
-                           parameters.extent
-                               .size( ),
-                "Read/Write request does not fit the dataset's dimension" );
-            for( unsigned int dimension = 0;
-                dimension <
-                parameters.extent
-                    .size( );
-                dimension++ )
+            if ( std::all_of( 
+                    parameters.extent.begin(),
+                    parameters.extent.end(),
+                    []( Extent::value_type i ) { return i > 0; } ) )
             {
-                VERIFY_ALWAYS( parameters.offset[dimension] +
-                               parameters.extent[dimension] <=
-                               datasetExtent[dimension],
-                    "Read/Write request exceeds the dataset's size" );
+                auto datasetExtent = getExtent( j["data"] );
+                VERIFY_ALWAYS( datasetExtent.size( ) ==
+                               parameters.extent
+                                   .size( ),
+                    "Read/Write request does not fit the dataset's dimension" );
+                for( unsigned int dimension = 0;
+                    dimension <
+                    parameters.extent
+                        .size( );
+                    dimension++ )
+                {
+                    VERIFY_ALWAYS( parameters.offset[dimension] +
+                                   parameters.extent[dimension] <=
+                                   datasetExtent[dimension],
+                        "Read/Write request exceeds the dataset's size" );
+                }
             }
             Datatype
                 dt = stringToDatatype( j["datatype"].get< std::string >( ) );

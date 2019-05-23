@@ -28,6 +28,7 @@
 #include "openPMD/auxiliary/StringManip.hpp"
 #include <iostream>
 #include <string>
+#include <algorithm>
 
 namespace openPMD
 {
@@ -637,19 +638,23 @@ ADIOS2IOHandlerImpl::verifyDataset( Offset const & offset,
     // TODO leave this check to ADIOS?
     adios2::Dims shape = var.Shape( );
     auto actualDim = shape.size( );
+    if ( std::all_of( shape.begin(), shape.end(),
+            []( adios2::Dims::value_type i ){ return i > 0; } ) )
     {
-        auto requiredDim = extent.size( );
-        VERIFY_ALWAYS( requiredDim == actualDim,
-                       "Trying to access a dataset with wrong dimensionality "
-                       "(trying to access dataset with dimensionality " +
-                           std::to_string( requiredDim ) +
-                           ", but has dimensionality " +
-                           std::to_string( actualDim ) + ")" )
-    }
-    for ( unsigned int i = 0; i < actualDim; i++ )
-    {
-        VERIFY_ALWAYS( offset[i] + extent[i] <= shape[i],
-                       "Dataset access out of bounds." )
+        {
+            auto requiredDim = extent.size( );
+            VERIFY_ALWAYS( requiredDim == actualDim,
+                           "Trying to access a dataset with wrong dimensionality "
+                           "(trying to access dataset with dimensionality " +
+                               std::to_string( requiredDim ) +
+                               ", but has dimensionality " +
+                               std::to_string( actualDim ) + ")" )
+        }
+        for ( unsigned int i = 0; i < actualDim; i++ )
+        {
+            VERIFY_ALWAYS( offset[i] + extent[i] <= shape[i],
+                           "Dataset access out of bounds." )
+        }
     }
     var.SetSelection( {offset, extent} );
     return var;

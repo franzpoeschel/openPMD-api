@@ -34,6 +34,7 @@
 #include <type_traits>
 #include <vector>
 #include <array>
+#include <algorithm>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected
@@ -254,7 +255,11 @@ RecordComponent::loadChunk(std::shared_ptr< T > data, Offset o, Extent e, double
                                      + " - DS: " + std::to_string(dse[i])
                                      + " - Chunk: " + std::to_string(offset[i] + extent[i])
                                      + ")");
-    if( !data )
+    if( !data && 
+        !std::any_of(
+            e.begin(), 
+            e.end(), 
+            []( Extent::value_type i ){ return i == 0; } ) )
         throw std::runtime_error("Unallocated pointer passed during chunk loading.");
 
     if( *m_isConstant )
@@ -284,7 +289,11 @@ RecordComponent::storeChunk(std::shared_ptr<T> data, Offset o, Extent e)
 {
     if( *m_isConstant )
         throw std::runtime_error("Chunks can not be written for a constant RecordComponent.");
-    if( !data )
+    if( !data && 
+        !std::any_of(
+            e.begin(), 
+            e.end(), 
+            []( Extent::value_type i ){ return i == 0; } ) )
         throw std::runtime_error("Unallocated pointer passed during chunk store.");
     Datatype dtype = determineDatatype(data);
     if( dtype != getDatatype() )
