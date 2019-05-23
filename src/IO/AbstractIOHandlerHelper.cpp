@@ -75,8 +75,10 @@ namespace openPMD
                 throw std::runtime_error("openPMD-api built without ADIOS1 support");
                 return std::make_shared< DummyIOHandler >(path, accessType);
 #   endif
+#if openPMD_HAVE_ADIOS2 && !openPMD_HAVE_MPI
             case Format::ADIOS2:
                 return std::make_shared<ADIOS2IOHandler>(path, accessType);
+#endif
             case Format::JSON:
                 return std::make_shared< JSONIOHandler >(path, accessType);
             default:

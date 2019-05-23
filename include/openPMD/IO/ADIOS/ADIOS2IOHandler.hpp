@@ -614,7 +614,7 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm = MPI_COMM_SELF );
+    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm );
 
 #else
 

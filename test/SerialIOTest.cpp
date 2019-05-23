@@ -29,7 +29,7 @@ std::vector<std::tuple<std::string, bool>> getBackends() {
 #if openPMD_HAVE_ADIOS1
     res.emplace_back("bp", true);
 #endif
-#if openPMD_HAVE_ADIOS2
+#if openPMD_HAVE_ADIOS2 && ! openPMD_HAVE_MPI
     res.emplace_back("bp", true);
 #endif
 #if openPMD_HAVE_HDF5
