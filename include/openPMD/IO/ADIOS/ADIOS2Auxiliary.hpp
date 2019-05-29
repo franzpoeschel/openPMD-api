@@ -13,8 +13,8 @@ namespace detail
 {
     // ADIOS2 does not natively support boolean values
     // Since we need them for attributes,
-    // we represent booleans as a uint8_t
-    using bool_representation = uint8_t;
+    // we represent booleans as unsigned chars
+    using bool_representation = unsigned char;
 
     template < typename T > struct ToDatatypeHelper
     {

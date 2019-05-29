@@ -367,7 +367,9 @@ namespace openPMD
         if (it != map.end()) {
             return it->second;
         } else {
-            throw std::runtime_error("toVectorType: passed non-basic type");
+            std::cerr << "Encountered non-basice type " << dt << ", aborting."
+                    << std::endl;
+            throw std::runtime_error("toVectorType: passed non-basic type.");
         }
     }
 
