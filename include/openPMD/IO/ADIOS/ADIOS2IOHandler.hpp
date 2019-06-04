@@ -100,11 +100,10 @@ public:
 
     MPI_Comm m_comm;
     
-#else
+#endif // openPMD_HAVE_MPI
     
     explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
     
-#endif // openPMD_HAVE_MPI
 
     ~ADIOS2IOHandlerImpl( ) override;
 
@@ -615,12 +614,10 @@ public:
 
     ADIOS2IOHandler( std::string path, AccessType, MPI_Comm );
 
-#else
+#endif
 
     ADIOS2IOHandler( std::string path, AccessType );
     
-#endif
-
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler
 } // namespace openPMD
