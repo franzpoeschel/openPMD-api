@@ -26,10 +26,7 @@ std::vector<std::tuple<std::string, bool>> getBackends() {
 #if openPMD_HAVE_JSON
     res.emplace_back("json", false);
 #endif
-#if openPMD_HAVE_ADIOS1
-    res.emplace_back("bp", true);
-#endif
-#if openPMD_HAVE_ADIOS2 && ! openPMD_HAVE_MPI
+#if openPMD_HAVE_ADIOS1 || openPMD_HAVE_ADIOS2
     res.emplace_back("bp", true);
 #endif
 #if openPMD_HAVE_HDF5
