@@ -5,7 +5,7 @@ ADIOS2 Backend
 
 openPMD supports writing to and reading from ADIOS2 ``.bp`` files.
 For this, the installed copy of openPMD must have been built with support for the ADIOS2 backend.
-To build openPMD with support for ADIOS, use the CMake option ``-DopenPMD_USE_ADIOS2=ON``.
+To build openPMD with support for ADIOS2, use the CMake option ``-DopenPMD_USE_ADIOS2=ON``.
 For further information, check out the :ref:`installation guide <install>`,
 :ref:`build dependencies <development-dependencies>` and the :ref:`build options <development-buildoptions>`.
 
@@ -20,16 +20,16 @@ We currently leverage the default ADIOS2 transport parameters, i.e. ``POSIX`` on
 Backend-Specific Controls
 -------------------------
 
-The following environment variables control ADIOS1 I/O behavior at runtime.
+The following environment variables control ADIOS2 I/O behavior at runtime.
 Fine-tuning these is especially useful when running at large scale.
 
-==================================== ======= ===================================================================
-environment variable                 default description
-==================================== ======= ===================================================================
-``OPENPMD_ADIOS_HAVE_PROFILING``     ``1``   Turns on/off profiling information right after a run.
-``OPENPMD_ADIOS_HAVE_METADATA_FILE`` ``1``   Online creation of the adios journal file (``1``: yes, ``0``: no).
-``OPENPMD_ADIOS_NUM_SUBSTREAMS``     ``0``   Number of files to be created, 0 indicates maximum number possible.
-==================================== ======= ===================================================================
+===================================== ======= ===================================================================
+environment variable                  default description
+===================================== ======= ===================================================================
+``OPENPMD_ADIOS2_HAVE_PROFILING``      ``1``   Turns on/off profiling information right after a run.
+``OPENPMD_ADIOS2_HAVE_METADATA_FILE``  ``1``   Online creation of the adios journal file (``1``: yes, ``0``: no).
+``OPENPMD_ADIOS2_NUM_SUBSTREAMS``      ``0``   Number of files to be created, 0 indicates maximum number possible.
+===================================== ======= ===================================================================
 
 Please refer to the `ADIOS2 manual, section 5.1 <https://media.readthedocs.org/pdf/adios2/latest/adios2.pdf>`_ for details.
 
