@@ -1095,7 +1095,8 @@ namespace detail
         {
             // read parameters from environment
             if ( 1 ==
-                 auxiliary::getEnvNum( "OPENPMD_ADIOS_HAVE_METADATA_FILE", 1 ) )
+                 auxiliary::getEnvNum( 
+                    "OPENPMD_ADIOS2_HAVE_METADATA_FILE", 1 ) )
             {
                 m_IO.SetParameter( "CollectiveMetadata", "On" );
             }
@@ -1104,7 +1105,7 @@ namespace detail
                 m_IO.SetParameter( "CollectiveMetadata", "Off" );
             }
             if ( 1 ==
-                 auxiliary::getEnvNum( "OPENPMD_ADIOS_HAVE_PROFILING", 1 ) )
+                 auxiliary::getEnvNum( "OPENPMD_ADIOS2_HAVE_PROFILING", 1 ) )
             {
                 m_IO.SetParameter( "Profile", "On" );
             }
@@ -1115,7 +1116,7 @@ namespace detail
 #if openPMD_HAVE_MPI
             {
                 auto num_substreams =
-                    auxiliary::getEnvNum( "OPENPMD_ADIOS_NUM_SUBSTREAMS", 0 );
+                    auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
                 if ( 0 != num_substreams )
                 {
                     m_IO.SetParameter( "SubStreams",
