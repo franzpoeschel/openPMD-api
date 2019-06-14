@@ -29,7 +29,7 @@
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/backend/Writable.hpp"
-
+#include "openPMD/Streaming.hpp"
 #include <array>
 #include <future>
 #include <memory> // shared_ptr
@@ -37,6 +37,7 @@
 #include <unordered_map>
 #include <utility> // pair
 #include <vector>
+#include <future>
 
 
 #if openPMD_HAVE_ADIOS2
@@ -163,7 +164,8 @@ public:
     listAttributes( Writable *,
                     Parameter< Operation::LIST_ATTS > & parameters ) override;
 
-
+    void
+    advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -561,6 +563,8 @@ namespace detail
         detail::DatasetReader m_readDataset;
         detail::AttributeReader m_attributeReader;
         ADIOS2IOHandlerImpl & m_impl;
+        // Does the engine currently have an active step?
+        bool duringStep = false;
 
 
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
@@ -573,6 +577,8 @@ namespace detail
 
 
         void flush( );
+        
+        std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
