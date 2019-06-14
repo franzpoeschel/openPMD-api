@@ -87,8 +87,6 @@ public:
     Writable(Attributable* = nullptr);
     virtual ~Writable();
 
-    auxiliary::ConsumingFuture< AdvanceStatus >
-    advance( AdvanceMode );
 
 OPENPMD_private:
     std::shared_ptr< AbstractFilePosition > abstractFilePosition;
