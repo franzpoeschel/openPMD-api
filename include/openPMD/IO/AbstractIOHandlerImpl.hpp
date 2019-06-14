@@ -123,7 +123,7 @@ public:
    * @param 
    * @param 
    */
-  virtual void advance(Writable*, Parameter< Operation::ADVANCE > const&) 
+  virtual void advance(Writable*, Parameter< Operation::ADVANCE > &) 
   {} // TODO remove default implementation
    
 
