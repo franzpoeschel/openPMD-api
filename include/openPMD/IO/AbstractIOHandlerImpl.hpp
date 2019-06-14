@@ -104,6 +104,9 @@ public:
                     case O::LIST_ATTS:
                         listAttributes(i.writable, *dynamic_cast< Parameter< O::LIST_ATTS >* >(i.parameter.get()));
                         break;
+                    case O::ADVANCE:
+                        advance(i.writable, *dynamic_cast< Parameter< O::ADVANCE >* >(i.parameter.get()));
+                        break;
                 }
             } catch (unsupported_data_error&)
             {
@@ -114,6 +117,15 @@ public:
         }
         return std::future< void >();
     }
+
+  /**
+   * 
+   * @param 
+   * @param 
+   */
+  virtual void advance(Writable*, Parameter< Operation::ADVANCE > const&) 
+  {} // TODO remove default implementation
+   
 
   /** Create a new file in physical storage, possibly overriding an existing file.
    *

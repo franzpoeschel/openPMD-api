@@ -23,6 +23,7 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerHelper.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/auxiliary/Future.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -30,6 +31,8 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <memory>
+#include <future>
 
 #if defined(__GNUC__)
 #   if (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
@@ -372,6 +375,25 @@ Series::flush()
     IOHandler->flush();
 }
 
+std::unique_ptr< std::future< AdvanceStatus > >
+Series::advance( AdvanceMode mode )
+{
+    switch( *m_iterationEncoding )
+    {
+        case IterationEncoding::fileBased:
+            throw std::runtime_error(
+                "Advancing not yet implemented in file-based mode" );
+        case IterationEncoding::groupBased:
+            flushGroupBased();
+            auxiliary::ConsumingFuture< AdvanceStatus > future =
+                advance( mode, *m_name );
+            future(); // run the future
+            return std::unique_ptr< std::future< AdvanceStatus > >(
+                new auxiliary::ConsumingFuture< AdvanceStatus >(
+                    std::move( future ) ) );
+    }
+}
+
 std::unique_ptr< Series::ParsedInput >
 Series::parseInput( std::string filepath )
 {
@@ -547,9 +569,7 @@ Series::flushFileBased()
             written = false;
             iterations.written = false;
 
-            std::stringstream iteration("");
-            iteration << std::setw(*m_filenamePadding) << std::setfill('0') << i.first;
-            std::string filename = *m_filenamePrefix + iteration.str() + *m_filenamePostfix;
+            std::string filename = iterationFilename( i.first );
 
             dirty |= i.second.dirty;
             i.second.flushFileBased(filename, i.first);
@@ -862,6 +882,49 @@ Series::read()
     }
 
     readAttributes();
+}
+
+std::string
+Series::iterationFilename( uint64_t i )
+{
+    std::stringstream iteration( "" );
+    iteration << std::setw( *m_filenamePadding ) << std::setfill( '0' )
+              << i;
+    return *m_filenamePrefix + iteration.str() + *m_filenamePostfix;
+}
+
+auxiliary::ConsumingFuture< AdvanceStatus >
+Series::advance( AdvanceMode mode, std::string file )
+{
+    Parameter< Operation::ADVANCE > param;
+    param.mode = mode;
+    param.file = std::move( file );
+    IOTask task( this, param );
+    IOHandler->enqueue( task );
+    // this flush will
+    // (1) flush all actions that are still queued up
+    // (2) finally run the advance task
+
+    auto first_future = IOHandler->flush();
+    auto param_ptr = std::make_shared< Parameter< Operation::ADVANCE > >(
+        std::move( param ) );
+    std::packaged_task< AdvanceStatus() > ptask( [param_ptr]() {
+        if( param_ptr->task )
+        {
+            auto future = param_ptr->task->get_future();
+            future.wait();
+            return future.get();
+        }
+        else
+        {
+            throw std::runtime_error(
+                "Internal error (Writable::advance()):"
+                " backend has not properly finished the ADVANCE task." );
+        }
+    } );
+
+    return auxiliary::chain_futures< void, AdvanceStatus >(
+        std::move( first_future ), std::move( ptask ) );
 }
 
 Format

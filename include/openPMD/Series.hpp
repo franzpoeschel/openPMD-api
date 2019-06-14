@@ -28,12 +28,14 @@
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/IterationEncoding.hpp"
+#include "openPMD/Streaming.hpp"
 
 #if openPMD_HAVE_MPI
 #   include <mpi.h>
 #endif
 
 #include <string>
+#include <future>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -245,6 +247,8 @@ public:
      */
     void
     flush();
+    
+    std::unique_ptr< std::future< AdvanceStatus > > advance( AdvanceMode );
 
     Container< Iteration, uint64_t > iterations;
 
@@ -260,6 +264,9 @@ public:
     void readGroupBased();
     void readBase();
     void read();
+    std::string iterationFilename(uint64_t i);
+    auxiliary::ConsumingFuture< AdvanceStatus >
+    advance( AdvanceMode, std::string file );
 
     static constexpr char const * const OPENPMD = "1.1.0";
     static constexpr char const * const BASEPATH = "/data/%T/";
