@@ -23,12 +23,14 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/Dataset.hpp"
+#include "openPMD/Streaming.hpp"
 
 #include <memory>
 #include <map>
 #include <vector>
 #include <string>
 #include <utility>
+#include <future>
 
 #if _MSC_VER
 #   define EXPORT __declspec( dllexport )
@@ -74,7 +76,9 @@ enum class EXPORT Operation
     DELETE_ATT,
     WRITE_ATT,
     READ_ATT,
-    LIST_ATTS
+    LIST_ATTS,
+
+    ADVANCE
 };  //Operation
 
 struct EXPORT AbstractParameter
@@ -452,6 +456,30 @@ struct EXPORT Parameter< Operation::LIST_ATTS > : public AbstractParameter
 
     std::shared_ptr< std::vector< std::string > > attributes
             = std::make_shared< std::vector< std::string > >();
+};
+
+template<>
+struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & p ) :
+        AbstractParameter(),
+        mode( p.mode ),
+        task( p.task )
+    {
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::ADVANCE >( *this ) );
+    }
+
+    // input parameter
+    AdvanceMode mode;
+    // output parameter
+    std::shared_ptr< std::packaged_task< AdvanceStatus() > > task;
 };
 
 

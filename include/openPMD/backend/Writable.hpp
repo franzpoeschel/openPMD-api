@@ -22,6 +22,10 @@
 
 #include <string>
 #include <memory>
+#include <future>
+#include "openPMD/Streaming.hpp"
+#include "openPMD/auxiliary/Future.hpp"
+
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -82,6 +86,9 @@ class Writable
 public:
     Writable(Attributable* = nullptr);
     virtual ~Writable();
+
+    auxiliary::ConsumingFuture< AdvanceStatus >
+    advance( AdvanceMode );
 
 OPENPMD_private:
     std::shared_ptr< AbstractFilePosition > abstractFilePosition;
