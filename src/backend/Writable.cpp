@@ -20,6 +20,7 @@
  */
 #include <openPMD/IO/AbstractIOHandler.hpp>
 #include <openPMD/backend/Writable.hpp>
+#include "openPMD/IO/IOTask.hpp"
 
 
 namespace openPMD
@@ -34,5 +35,38 @@ Writable::Writable(Attributable* a)
 { }
 
 Writable::~Writable() = default;
+
+auxiliary::ConsumingFuture< AdvanceStatus >
+Writable::advance( AdvanceMode mode )
+{
+    Parameter< Operation::ADVANCE > param;
+    param.mode = mode;
+    IOTask task( this, param );
+    IOHandler->enqueue( task );
+    // this flush will
+    // (1) flush all actions that are still queued up
+    // (2) finally run the advance task
+
+    auto first_future = IOHandler->flush();
+    auto param_ptr = std::make_shared< Parameter< Operation::ADVANCE > >(
+        std::move( param ) );
+    std::packaged_task< AdvanceStatus() > ptask( [param_ptr]() {
+        if( param_ptr->task )
+        {
+            auto future = param_ptr->task->get_future();
+            future.wait();
+            return future.get();
+        }
+        else
+        {
+            throw std::runtime_error(
+                "Internal error (Writable::advance()):"
+                " backend has not properly finished the ADVANCE task." );
+        }
+    } );
+
+    return auxiliary::chain_futures< void, AdvanceStatus >(
+        std::move( first_future ), std::move( ptask ) );
+}
 
 } // openPMD
