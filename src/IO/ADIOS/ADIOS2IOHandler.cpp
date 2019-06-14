@@ -512,6 +512,17 @@ void ADIOS2IOHandlerImpl::listAttributes(
     }
 }
 
+void
+ADIOS2IOHandlerImpl::advance(
+    Writable * writable,
+    Parameter< Operation::ADVANCE > & parameters )
+{
+    auto file = refreshFileFromParent( writable );
+    auto & ba = getFileData( file );
+    parameters.task = std::make_shared< std::packaged_task< AdvanceStatus() > >(
+        ba.advance( parameters.mode ) );
+}
+
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
 {
     switch ( m_handler->accessTypeBackend )
@@ -1130,6 +1141,10 @@ namespace detail
         }
         if( m_engine )
         {
+            if (duringStep)
+            {
+                m_engine->EndStep();
+            }
             m_engine->Close();
         }
     }
@@ -1224,6 +1239,10 @@ namespace detail
     void BufferedActions::flush( )
     {
         auto & eng = getEngine( );
+        if ( !duringStep )
+        {
+            eng.BeginStep();
+        }
         {
             for ( auto const & ba : m_buffer )
             {
@@ -1231,6 +1250,7 @@ namespace detail
             }
             // Flush() does not necessarily perform
             // deferred actions....
+#if 0
             switch ( m_mode )
             {
             case adios2::Mode::Write:
@@ -1247,8 +1267,24 @@ namespace detail
             default:
                 break;
             }
+#endif
         }
         m_buffer.clear( );
+    }
+    
+    std::packaged_task< AdvanceStatus() >
+    BufferedActions::advance( AdvanceMode mode )
+    {
+        /*
+         * This also forces a Engine::BeginStep() if no step
+         * is currently active, ensuring that the next step
+         * will start.
+         */
+        flush();
+        getEngine().EndStep();
+        duringStep = false;
+        return std::packaged_task< AdvanceStatus() >(
+            []() { return AdvanceStatus::OK; } );
     }
 
     void BufferedActions::drop( )
