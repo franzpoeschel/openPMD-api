@@ -1166,6 +1166,9 @@ namespace detail
                 }
             }
 #endif
+            // TODO, temporary
+            // allow setting this from the front-end
+            m_IO.SetEngine( "SST" );
         }
     }
 
