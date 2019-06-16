@@ -465,7 +465,6 @@ struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
     Parameter( Parameter const & p ) :
         AbstractParameter(),
         mode( p.mode ),
-        file( p.file ),
         task( p.task )
     {
     }
@@ -479,7 +478,6 @@ struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
 
     // input parameters
     AdvanceMode mode;
-    std::string file;
     // output parameter
     std::shared_ptr< std::packaged_task< AdvanceStatus() > > task;
 };
