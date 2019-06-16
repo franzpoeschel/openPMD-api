@@ -889,11 +889,11 @@ Series::iterationFilename( uint64_t i )
 }
 
 auxiliary::ConsumingFuture< AdvanceStatus >
-Series::advance( AdvanceMode mode, std::string file )
+Series::advance( AdvanceMode mode, std::string )
+// file parameter maybe for an open_file command later on
 {
     Parameter< Operation::ADVANCE > param;
     param.mode = mode;
-    param.file = std::move( file );
     IOTask task( this, param );
     IOHandler->enqueue( task );
     // this flush will
