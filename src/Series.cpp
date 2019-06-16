@@ -892,8 +892,53 @@ auxiliary::ConsumingFuture< AdvanceStatus >
 Series::advance( AdvanceMode mode, std::string )
 // file parameter maybe for an open_file command later on
 {
+    // resolve AdvanceMode
+    AccessType at = IOHandler->accessTypeFrontend;
+    AdvanceMode actualMode;
+    switch( mode )
+    {
+        case AdvanceMode::AUTO:
+            switch( at )
+            {
+                case AccessType::READ_WRITE:
+                    throw std::runtime_error(
+                        "Series::advance(): Please specify "
+                        "advance mode explicitly." );
+                case AccessType::READ_ONLY:
+                    actualMode = AdvanceMode::READ;
+                    break;
+                case AccessType::CREATE:
+                    actualMode = AdvanceMode::WRITE;
+                    break;
+            }
+            break;
+        case AdvanceMode::READ:
+            if( at == AccessType::CREATE )
+            {
+                throw std::runtime_error(
+                    "Cannot use advance mode 'read' in combination with "
+                    "access type 'create'" );
+            }
+            else
+            {
+                actualMode = AdvanceMode::READ;
+            }
+            break;
+        case AdvanceMode::WRITE:
+            if( at == AccessType::READ_ONLY )
+            {
+                throw std::runtime_error(
+                    "Cannot use advance mode 'write' in combination with "
+                    "access type 'read only'" );
+            }
+            else
+            {
+                actualMode = AdvanceMode::WRITE;
+            }
+            break;
+    }
     Parameter< Operation::ADVANCE > param;
-    param.mode = mode;
+    param.mode = actualMode;
     IOTask task( this, param );
     IOHandler->enqueue( task );
     // this flush will
