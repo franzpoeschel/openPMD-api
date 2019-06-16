@@ -1196,6 +1196,7 @@ namespace detail
         if ( !duringStep )
         {
             eng.BeginStep();
+            duringStep = true;
         }
         {
             for ( auto const & ba : m_buffer )
@@ -1204,7 +1205,6 @@ namespace detail
             }
             // Flush() does not necessarily perform
             // deferred actions....
-#if 0
             switch ( m_mode )
             {
             case adios2::Mode::Write:
@@ -1221,7 +1221,6 @@ namespace detail
             default:
                 break;
             }
-#endif
         }
         m_buffer.clear( );
     }
@@ -1229,16 +1228,34 @@ namespace detail
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
-        /*
-         * This also forces a Engine::BeginStep() if no step
-         * is currently active, ensuring that the next step
-         * will start.
-         */
-        flush();
-        getEngine().EndStep();
-        duringStep = false;
-        return std::packaged_task< AdvanceStatus() >(
-            []() { return AdvanceStatus::OK; } );
+        switch (mode) {
+        case AdvanceMode::WRITE:
+            /*
+             * This also forces a Engine::BeginStep() if no step
+             * is currently active, ensuring that the next step
+             * will start.
+             */
+            flush();
+            getEngine().EndStep();
+            duringStep = false;
+            return std::packaged_task< AdvanceStatus() >(
+                []() { return AdvanceStatus::OK; } );
+        case AdvanceMode::READ:
+            
+            if ( duringStep )
+            {
+                flush();
+                getEngine().EndStep();
+            }
+            getEngine().BeginStep();
+            duringStep = true;
+            return std::packaged_task< AdvanceStatus() >(
+                []() { return AdvanceStatus::OK; } );
+        case AdvanceMode::AUTO:
+            throw std::runtime_error(
+                    "Internal error: Advance mode should be explicitly"
+                    " chosen by the front-end.");
+        }
     }
 
     void BufferedActions::drop( )
