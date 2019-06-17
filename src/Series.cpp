@@ -98,23 +98,27 @@ struct Series::ParsedInput
 #if openPMD_HAVE_MPI
 Series::Series(std::string const& filepath,
                AccessType at,
-               MPI_Comm comm)
+               MPI_Comm comm,
+               options_t options)
         : iterations{Container< Iteration, uint64_t >()},
           m_iterationEncoding{std::make_shared< IterationEncoding >()}
 {
     auto input = parseInput(filepath);
-    auto handler = createIOHandler(input->path, at, input->format, comm);
+    auto handler = createIOHandler(
+        input->path, at, input->format, comm, std::move(options));
     init(handler, std::move(input));
 }
 #endif
 
 Series::Series(std::string const& filepath,
-               AccessType at)
+               AccessType at,
+               options_t options)
         : iterations{Container< Iteration, uint64_t >()},
           m_iterationEncoding{std::make_shared< IterationEncoding >()}
 {
     auto input = parseInput(filepath);
-    auto handler = createIOHandler(input->path, at, input->format);
+    auto handler = createIOHandler(
+        input->path, at, input->format, std::move(options));
     init(handler, std::move(input));
 }
 
@@ -387,6 +391,16 @@ Series::advance( AdvanceMode mode )
                 new auxiliary::ConsumingFuture< AdvanceStatus >(
                     std::move( future ) ) );
     }
+}
+
+void Series::setOptions( AbstractIOHandler::options_t options )
+{
+    IOHandler->setOptions( std::move( options ) );
+}
+
+void Series::setOption( std::string key, std::string value )
+{
+    IOHandler->setOption( std::move( key ), std::move( value ) );
 }
 
 std::unique_ptr< Series::ParsedInput >

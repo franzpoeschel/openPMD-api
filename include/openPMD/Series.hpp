@@ -35,6 +35,7 @@
 
 #include <string>
 #include <future>
+#include <map>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -56,14 +57,18 @@ class Series : public Attributable
     friend class Iteration;
 
 public:
+    using options_t = AbstractIOHandler::options_t;
 #if openPMD_HAVE_MPI
     Series(std::string const& filepath,
            AccessType at,
-           MPI_Comm comm);
+           MPI_Comm comm,
+           options_t options = {});
 #endif
     Series(std::string const& filepath,
-           AccessType at);
+           AccessType at,
+           options_t options = {});
     ~Series();
+    
 
     /**
      * @return  String representing the current enforced version of the <A HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file">openPMD standard</A>.
@@ -235,6 +240,9 @@ public:
     /** Execute all required remaining IO operations to write or read data.
      */
     void flush();
+    
+    void setOptions( options_t options );
+    void setOption( std::string key, std::string value );
     
     std::unique_ptr< std::future< AdvanceStatus > > advance( 
         AdvanceMode = AdvanceMode::AUTO );

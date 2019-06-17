@@ -33,7 +33,7 @@
 #include <queue>
 #include <stdexcept>
 #include <string>
-
+#include <map>
 
 namespace openPMD
 {
@@ -67,17 +67,27 @@ public:
 class AbstractIOHandler
 {
 public:
+    using options_t = std::map< std::string, std::string >;
 #if openPMD_HAVE_MPI
-    AbstractIOHandler(std::string path, AccessType at, MPI_Comm)
+    AbstractIOHandler(
+        std::string path, 
+        AccessType at, 
+        MPI_Comm,
+        options_t options = {} )
         : directory{std::move(path)},
           accessTypeBackend{at},
-          accessTypeFrontend{at}
+          accessTypeFrontend{at},
+          m_options{options}
     { }
 #endif
-    AbstractIOHandler(std::string path, AccessType at)
+    AbstractIOHandler(
+        std::string path, 
+        AccessType at,
+        options_t options = {} )
         : directory{std::move(path)},
           accessTypeBackend{at},
-          accessTypeFrontend{at}
+          accessTypeFrontend{at},
+          m_options{options}
     { }
     virtual ~AbstractIOHandler() = default;
 
@@ -95,11 +105,25 @@ public:
      * @return  Future indicating the completion state of the operation for backends that decide to implement this operation asynchronously.
      */
     virtual std::future< void > flush() = 0;
+    
+    virtual void setOptions( options_t options)
+    {
+        for ( auto & pair : options )
+        {
+            m_options.emplace( std::move( pair ) );
+        }
+    }
+    
+    virtual void setOption( std::string key, std::string value )
+    {
+        m_options.emplace( std::move( key ), std::move( value ) );
+    }
 
     std::string const directory;
     AccessType const accessTypeBackend;
     AccessType const accessTypeFrontend;
     std::queue< IOTask > m_work;
+    options_t m_options;
 }; // AbstractIOHandler
 
 } // namespace openPMD
