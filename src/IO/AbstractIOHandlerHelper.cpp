@@ -36,7 +36,8 @@ namespace openPMD
         std::string path,
         AccessType accessTypeBackend,
         Format format,
-        MPI_Comm comm
+        MPI_Comm comm,
+        AbstractIOHandler::options_t options
     )
     {
         switch( format )
@@ -51,7 +52,7 @@ namespace openPMD
                 return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
 #   endif
             case Format::ADIOS2:
-                return std::make_shared<ADIOS2IOHandler>(path, accessTypeBackend, comm);
+                return std::make_shared<ADIOS2IOHandler>(path, accessTypeBackend, comm, std::move(options));
             default:
                 return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
         }
@@ -61,7 +62,8 @@ namespace openPMD
     createIOHandler(
         std::string path,
         AccessType accessType,
-        Format format
+        Format format,
+        AbstractIOHandler::options_t options
     )
     {
         switch( format )
@@ -77,7 +79,8 @@ namespace openPMD
 #   endif
 #if openPMD_HAVE_ADIOS2
             case Format::ADIOS2:
-                return std::make_shared<ADIOS2IOHandler>(path, accessType);
+                return std::make_shared<ADIOS2IOHandler>(
+                        path, accessType, std::move(options));
 #endif
             case Format::JSON:
                 return std::make_shared< JSONIOHandler >(path, accessType);

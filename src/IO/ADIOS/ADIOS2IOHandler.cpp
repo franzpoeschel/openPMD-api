@@ -70,6 +70,10 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
     : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ ADIOS2_DEBUG_MODE }
 {
+    for( auto & pair : m_handler->m_options )
+    {
+        notifyOption( pair.first, pair.second, false );
+    }
 }
 
 ADIOS2IOHandlerImpl::~ADIOS2IOHandlerImpl( )
@@ -506,6 +510,34 @@ ADIOS2IOHandlerImpl::advance(
         ba.advance( parameters.mode ) );
 }
 
+void
+ADIOS2IOHandlerImpl::notifyOption(
+    std::string const & key,
+    std::string const & value,
+    bool setAfterConstruction )
+{
+    if( key == "EngineType" )
+    {
+        if( setAfterConstruction )
+        {
+            std::cerr << "Warning: setting 'EngineType' = '" << value
+                      << "' after construction time. "
+                         "This will not apply for ADIOS2 engines that "
+                         "data has been written to or read from nor will"
+                         "it override previously chosen engine types."
+                      << std::endl;
+            for( auto & pair : m_fileData )
+            {
+                pair.second->m_IO.SetEngine( value );
+            }
+        }
+    }
+    else
+    {
+        std::cerr << "ADIOS2 backend: unknown configuration option '" << key
+                  << "'. Ignoring." << std::endl;
+    }
+}
 
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
@@ -1146,9 +1178,12 @@ namespace detail
                 }
             }
 #endif
-            // TODO, temporary
-            // allow setting this from the front-end
-            m_IO.SetEngine( "SST" );
+            
+            auto it = impl.m_handler->m_options.find( "EngineType" );
+            if( it != impl.m_handler->m_options.end() )
+            {
+                m_IO.SetEngine( it->second );
+            }
         }
     }
 
@@ -1173,6 +1208,7 @@ namespace detail
     {
         if ( !m_engine )
         {
+            std::cout << "initializing engine " << m_file << std::endl;
             m_engine = std::unique_ptr< adios2::Engine >(
                 new adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
             if ( !m_engine )
@@ -1267,18 +1303,26 @@ namespace detail
 
 #if openPMD_HAVE_MPI
 
-ADIOS2IOHandler::ADIOS2IOHandler( std::string path, openPMD::AccessType at,
-                                  MPI_Comm comm )
-: AbstractIOHandler( std::move( path ), at, comm ), m_impl{this, comm
+ADIOS2IOHandler::ADIOS2IOHandler(
+    std::string path,
+    openPMD::AccessType at,
+    MPI_Comm comm,
+    AbstractIOHandler::options_t options ) :
+    AbstractIOHandler( std::move( path ), at, comm, std::move( options ) ),
+    m_impl{ this, comm
 
-                                                    }
+    }
 {
 }
 
-#endif 
-                                                    
-ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at )
-: AbstractIOHandler( std::move( path ), at ), m_impl{this}
+#endif
+
+ADIOS2IOHandler::ADIOS2IOHandler(
+    std::string path,
+    AccessType at,
+    AbstractIOHandler::options_t options ) :
+    AbstractIOHandler( std::move( path ), at, std::move( options ) ),
+    m_impl{ this }
 {
 }
 
@@ -1291,6 +1335,21 @@ ADIOS2IOHandler::~ADIOS2IOHandler( )
 std::future< void > ADIOS2IOHandler::flush( )
 {
     return m_impl.flush( );
+}
+
+void ADIOS2IOHandler::setOptions( options_t options)
+{
+    for ( auto & pair : options )
+    {
+        m_impl.notifyOption( pair.first, pair.second );
+        m_options.emplace( std::move( pair ) );
+    }
+}
+
+void ADIOS2IOHandler::setOption( std::string key, std::string value )
+{
+    m_impl.notifyOption( key, value );
+    m_options.emplace( std::move( key ), std::move( value ) );
 }
 
 #else // openPMD_HAVE_ADIOS2

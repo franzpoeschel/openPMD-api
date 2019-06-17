@@ -166,6 +166,12 @@ public:
 
     void
     advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
+    
+    void 
+    notifyOption( 
+        std::string const & key, 
+        std::string const & value,
+        bool setAfterConstruction = true );
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -609,12 +615,19 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm );
+    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm,
+        AbstractIOHandler::options_t options );
 
 #endif
 
     ADIOS2IOHandler( std::string path, AccessType );
 
     std::future< void > flush( ) override;
+    
+    void
+    setOptions( AbstractIOHandler::options_t options ) override;
+    
+    void 
+    setOption( std::string key, std::string value ) override;
 }; // ADIOS2IOHandler
 } // namespace openPMD
