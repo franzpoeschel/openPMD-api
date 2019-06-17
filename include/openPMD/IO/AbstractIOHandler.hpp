@@ -30,11 +30,11 @@
 #endif
 
 #include <future>
+#include <map>
 #include <memory>
 #include <queue>
 #include <stdexcept>
 #include <string>
-
 
 namespace openPMD
 {
@@ -69,17 +69,18 @@ class AbstractIOHandler
 {
 public:
 #if openPMD_HAVE_MPI
-    AbstractIOHandler(std::string path, AccessType at, MPI_Comm)
-        : directory{std::move(path)},
-          accessTypeBackend{at},
-          accessTypeFrontend{at}
+    AbstractIOHandler( std::string path, AccessType at, MPI_Comm )
+        : directory{ std::move( path ) }
+        , accessTypeBackend{ at }
+        , accessTypeFrontend{ at }
     { }
 #endif
-    AbstractIOHandler(std::string path, AccessType at)
-        : directory{std::move(path)},
-          accessTypeBackend{at},
-          accessTypeFrontend{at}
-    { }
+    AbstractIOHandler( std::string path, AccessType at )
+        : directory{ std::move( path ) }
+        , accessTypeBackend{ at }
+        , accessTypeFrontend{ at }
+    {
+    }
     virtual ~AbstractIOHandler() = default;
 
     /** Add provided task to queue according to FIFO.

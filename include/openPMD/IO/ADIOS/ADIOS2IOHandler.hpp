@@ -20,7 +20,12 @@
  */
 #pragma once
 
-#include "openPMD/config.hpp"
+#include <array>
+#include <future>
+#include <memory> // shared_ptr
+#include <string>
+#include <utility> // pair
+#include <vector>
 
 #include "ADIOS2FilePosition.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
@@ -29,14 +34,9 @@
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/backend/Writable.hpp"
-
-#include <array>
-#include <future>
-#include <memory> // shared_ptr
-#include <string>
+#include "openPMD/config.hpp"
+#include <nlohmann/json.hpp>
 #include <unordered_map>
-#include <utility> // pair
-#include <vector>
 
 
 #if openPMD_HAVE_ADIOS2
@@ -93,16 +93,16 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm );
+    ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm, nlohmann::json config );
 
     MPI_Comm m_comm;
 
-#endif // openPMD_HAVE_MPI
+#    endif // openPMD_HAVE_MPI
 
-    explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
+    explicit ADIOS2IOHandlerImpl( AbstractIOHandler *, nlohmann::json config );
 
 
-    ~ADIOS2IOHandlerImpl( ) override;
+    ~ADIOS2IOHandlerImpl() override;
 
     std::future< void > flush( ) override;
 
@@ -163,7 +163,11 @@ public:
     listAttributes( Writable *,
                     Parameter< Operation::LIST_ATTS > & parameters ) override;
 
-
+    void
+    notifyOption(
+        std::string const & key,
+        std::string const & value,
+        bool setAfterConstruction = true );
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -174,6 +178,33 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+    // data is held by m_handler
+    nlohmann::json m_config;
+    static nlohmann::json nullvalue;
+
+    void
+    init( nlohmann::json config );
+
+    template< typename Key >
+    nlohmann::json &
+    config( Key && key, nlohmann::json & cfg )
+    {
+        if( cfg.is_object() && cfg.contains( key ) )
+        {
+            return cfg[ key ];
+        }
+        else
+        {
+            return nullvalue;
+        }
+    }
+
+    template< typename Key >
+    nlohmann::json &
+    config( Key && key )
+    {
+        return config< Key >( std::forward< Key >( key ), m_config );
+    }
 
     /*
      * We need to give names to IO objects. These names are irrelevant
@@ -258,6 +289,11 @@ private:
 
 namespace detail
 {
+    constexpr char const * str_adios2 = "adios2";
+    constexpr char const * const str_engine = "engine";
+    constexpr char const * str_type = "type";
+    constexpr char const * str_params = "parameters";
+
     // Helper structs for calls to the switchType function
 
     struct DatasetReader
@@ -565,7 +601,10 @@ namespace detail
 
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
-        ~BufferedActions( );
+        ~BufferedActions();
+
+        void
+        configure_IO( ADIOS2IOHandlerImpl & impl );
 
         adios2::Engine & getEngine( );
 
@@ -603,11 +642,16 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandler( std::string path, AccessType, MPI_Comm );
+    ADIOS2IOHandler(
+        std::string path,
+        AccessType,
+        MPI_Comm,
+        nlohmann::json options );
 
 #endif
 
-    ADIOS2IOHandler( std::string path, AccessType );
+    ADIOS2IOHandler( std::string path, AccessType,
+        nlohmann::json options);
 
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler

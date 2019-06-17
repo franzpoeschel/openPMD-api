@@ -56,16 +56,24 @@ class Series : public Attributable
 
 public:
 #if openPMD_HAVE_MPI
-    Series(std::string const& filepath,
-           AccessType at,
-           MPI_Comm comm);
+    Series(
+        std::string const & filepath,
+        AccessType at,
+        MPI_Comm comm,
+        std::string const & options = "{}" );
 #endif
-    Series(std::string const& filepath,
-           AccessType at);
+
+    Series(
+        std::string const & filepath,
+        AccessType at,
+        std::string const & options = "{}" );
     ~Series();
 
+
     /**
-     * @return  String representing the current enforced version of the <A HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file">openPMD standard</A>.
+     * @return  String representing the current enforced version of the <A
+     * HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file">openPMD
+     * standard</A>.
      */
     std::string openPMD() const;
     /** Set the version of the enforced <A HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file">openPMD standard</A>.
@@ -226,19 +234,21 @@ public:
     std::string name() const;
     /** Set the pattern for file names.
      *
-     * @param   name    String of the pattern for file names. Must include iteration regex <CODE>\%T</CODE> for fileBased data.
+     * @param   name    String of the pattern for file names. Must include
+     * iteration regex <CODE>\%T</CODE> for fileBased data.
      * @return  Reference to modified series.
      */
-    Series& setName(std::string const& name);
+    Series &
+    setName( std::string const & name );
 
     /** Execute all required remaining IO operations to write or read data.
      */
-    void flush();
+    void
+    flush();
 
     Container< Iteration, uint64_t > iterations;
 
-OPENPMD_private:
-    struct ParsedInput;
+    OPENPMD_private : struct ParsedInput;
     std::unique_ptr< ParsedInput > parseInput(std::string);
     void init(std::shared_ptr< AbstractIOHandler >, std::unique_ptr< ParsedInput >);
     void initDefaults();
