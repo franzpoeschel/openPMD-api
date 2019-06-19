@@ -28,6 +28,7 @@
 #include "openPMD/auxiliary/StringManip.hpp"
 #include <iostream>
 #include <string>
+#include <type_traits>
 
 namespace openPMD
 {
@@ -697,15 +698,39 @@ namespace detail
     }
 
     template < typename T >
-    void AttributeReader::
+    Datatype AttributeReader::
     operator( )( adios2::IO & IO, std::string name,
                  std::shared_ptr< Attribute::resource > resource )
     {
+        /*
+         * If we store an attribute of boolean type, we store an additional
+         * attribute prefixed with '__is_boolean__' to indicate this information
+         * that would otherwise be lost. Check whether this has been done.
+         */
+        using rep = AttributeTypes<bool>::rep;
+#if __cplusplus > 201402L
+        constexpr
+#endif
+        if( std::is_same< T, rep >::value )
+        {
+            std::string metaAttr = "__is_boolean__" + name;
+            auto type = attributeInfo( IO, "__is_boolean__" + name );
+            if ( type == determineDatatype<rep>() )
+            {
+                auto attr = IO.InquireAttribute< rep >( metaAttr );
+                if (attr.Data().size() == 1 && attr.Data()[0] == 1)
+                {
+                    AttributeTypes< bool >::readAttribute( IO, name, resource );
+                    return determineDatatype< bool >();
+                }
+            }
+        }
         AttributeTypes< T >::readAttribute( IO, name, resource );
+        return determineDatatype< T >();
     }
 
     template < int n, typename... Params >
-    void AttributeReader::operator( )( Params &&... )
+    Datatype AttributeReader::operator( )( Params &&... )
     {
         throw std::runtime_error( "Internal error: Unknown datatype while "
                                   "trying to read an attribute." );
@@ -897,6 +922,7 @@ namespace detail
     AttributeTypes< bool >::createAttribute( adios2::IO & IO, std::string name,
                                              const bool value )
     {
+        IO.DefineAttribute< bool_representation >( "__is_boolean__" + name, 1 );
         return AttributeTypes< bool_representation >::createAttribute(
             IO, name, toRep( value ) );
     }
@@ -1073,9 +1099,14 @@ namespace detail
                                       ") not found in backend." );
         }
 
-        *param.dtype = type;
-        switchType( type, detail::AttributeReader{}, ba.m_IO, name,
-                    param.resource );
+        Datatype ret = 
+            switchType< Datatype >( 
+                type, 
+                detail::AttributeReader{}, 
+                ba.m_IO, 
+                name,
+                param.resource );
+        *param.dtype = ret;
     }
 
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,

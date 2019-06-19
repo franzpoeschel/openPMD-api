@@ -85,7 +85,7 @@ class ADIOS2IOHandlerImpl
     friend struct detail::WriteDataset;
     friend struct detail::BufferedActions;
     friend struct detail::BufferedAttributeRead;
-    
+
     static constexpr bool ADIOS2_DEBUG_MODE = false;
 
 
@@ -100,11 +100,11 @@ public:
     ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm );
 
     MPI_Comm m_comm;
-    
+
 #endif // openPMD_HAVE_MPI
-    
+
     explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
-    
+
 
     ~ADIOS2IOHandlerImpl( ) override;
 
@@ -180,9 +180,9 @@ private:
     adios2::ADIOS m_ADIOS;
     adios2::Operator m_zfp;
     adios2::Operator m_sz;
-    
+
     void init( );
-    
+
     /*
      * We need to give names to IO objects. These names are irrelevant
      * within this application, since:
@@ -293,10 +293,11 @@ namespace detail
     struct AttributeReader
     {
         template < typename T >
-        void operator( )( adios2::IO & IO, std::string name,
+        Datatype operator( )( adios2::IO & IO, std::string name,
                           std::shared_ptr< Attribute::resource > resource );
 
-        template < int n, typename... Params > void operator( )( Params &&... );
+        template < int n, typename... Params >
+        Datatype operator( )( Params &&... );
     };
 
     struct AttributeWriter
@@ -618,7 +619,7 @@ public:
 #endif
 
     ADIOS2IOHandler( std::string path, AccessType );
-    
+
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler
 } // namespace openPMD
