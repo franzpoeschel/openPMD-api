@@ -92,10 +92,9 @@ ADIOS2IOHandlerImpl::init( )
     {
         // m_sz stays a "false" operator
     }
-    
-    for( auto & pair : m_handler->m_options )
+    if ( m_handler->m_options.contains( "adios2" ) )
     {
-        notifyOption( pair.first, pair.second, false );
+        m_config = & m_handler->m_options[ "adios2" ];
     }
 }
 
@@ -539,36 +538,6 @@ ADIOS2IOHandlerImpl::advance(
         ba.advance( parameters.mode ) );
 }
 
-void
-ADIOS2IOHandlerImpl::notifyOption(
-    std::string const & key,
-    std::string const & value,
-    bool setAfterConstruction )
-{
-    if( key == "EngineType" )
-    {
-        if( setAfterConstruction )
-        {
-            std::cerr << "Warning: setting 'EngineType' = '" << value
-                      << "' after construction time. "
-                         "This will not apply for ADIOS2 engines that "
-                         "data has been written to or read from nor will"
-                         "it override previously chosen engine types."
-                      << std::endl;
-            for( auto & pair : m_fileData )
-            {
-                pair.second->m_IO.SetEngine( value );
-            }
-        }
-    }
-    else
-    {
-        std::cerr << "ADIOS2 backend: unknown configuration option '" << key
-                  << "'. Ignoring." << std::endl;
-    }
-}
-
-
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
 {
     switch ( m_handler->accessTypeBackend )
@@ -586,6 +555,8 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
         return adios2::Mode::Undefined;
     }
 }
+
+nlohmann::json ADIOS2IOHandlerImpl::nullvalue = nlohmann::json();
 
 std::string ADIOS2IOHandlerImpl::filePositionToString(
     std::shared_ptr< ADIOS2FilePosition > filepos )
@@ -1199,11 +1170,11 @@ namespace detail
                 }
             }
 #endif
-            
-            auto it = impl.m_handler->m_options.find( "EngineType" );
-            if( it != impl.m_handler->m_options.end() )
+
+            auto & engine = impl.config( "engine" );
+            if( !engine.is_null() )
             {
-                m_IO.SetEngine( it->second );
+                m_IO.SetEngine( impl.config( "type", engine ));
             }
         }
     }
@@ -1351,21 +1322,6 @@ ADIOS2IOHandler::~ADIOS2IOHandler( )
 std::future< void > ADIOS2IOHandler::flush( )
 {
     return m_impl.flush( );
-}
-
-void ADIOS2IOHandler::setOptions( options_t options)
-{
-    for ( auto & pair : options )
-    {
-        m_impl.notifyOption( pair.first, pair.second );
-        m_options.emplace( std::move( pair ) );
-    }
-}
-
-void ADIOS2IOHandler::setOption( std::string key, std::string value )
-{
-    m_impl.notifyOption( key, value );
-    m_options.emplace( std::move( key ), std::move( value ) );
 }
 
 #else // openPMD_HAVE_ADIOS2
