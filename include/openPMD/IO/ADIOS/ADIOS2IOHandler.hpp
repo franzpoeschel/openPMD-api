@@ -166,12 +166,6 @@ public:
 
     void
     advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
-    
-    void 
-    notifyOption( 
-        std::string const & key, 
-        std::string const & value,
-        bool setAfterConstruction = true );
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -182,6 +176,37 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+    // data is held by m_handler
+    nlohmann::json * m_config{ nullptr };
+    static nlohmann::json nullvalue;
+
+    void init( );
+    
+    template< typename Key >
+    nlohmann::json & config( Key && key, nlohmann::json & cfg )
+    {
+        if( cfg.is_object() && cfg.contains( key ) )
+        {
+            return cfg[ key ];
+        } 
+        else 
+        {
+            return nullvalue;
+        }
+    }
+    
+    template< typename Key >
+    nlohmann::json & config( Key && key )
+    {
+        if( m_config )
+        {
+            return config( std::forward< Key >( key ), *m_config );
+        }
+        else
+        {
+            return nullvalue;
+        }
+    }
 
     /*
      * We need to give names to IO objects. These names are irrelevant
@@ -620,14 +645,9 @@ public:
 
 #endif
 
-    ADIOS2IOHandler( std::string path, AccessType );
+    ADIOS2IOHandler( std::string path, AccessType, 
+        AbstractIOHandler::options_t options);
 
     std::future< void > flush( ) override;
-    
-    void
-    setOptions( AbstractIOHandler::options_t options ) override;
-    
-    void 
-    setOption( std::string key, std::string value ) override;
 }; // ADIOS2IOHandler
 } // namespace openPMD

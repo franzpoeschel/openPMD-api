@@ -108,6 +108,13 @@ Series::Series(std::string const& filepath,
         input->path, at, input->format, comm, std::move(options));
     init(handler, std::move(input));
 }
+          
+Series::Series(std::string const& filepath,
+               AccessType at,
+               MPI_Comm comm,
+               std::string const& options)
+        : Series( filepath, at, comm, nlohmann::json::parse( options ) )
+{}
 #endif
 
 Series::Series(std::string const& filepath,
@@ -121,6 +128,12 @@ Series::Series(std::string const& filepath,
         input->path, at, input->format, std::move(options));
     init(handler, std::move(input));
 }
+          
+Series::Series(std::string const& filepath,
+               AccessType at,
+               std::string const& options )
+        : Series( filepath, at, nlohmann::json::parse( options ) )
+{}
 
 Series::~Series()
 {
@@ -391,16 +404,6 @@ Series::advance( AdvanceMode mode )
                 new auxiliary::ConsumingFuture< AdvanceStatus >(
                     std::move( future ) ) );
     }
-}
-
-void Series::setOptions( AbstractIOHandler::options_t options )
-{
-    IOHandler->setOptions( std::move( options ) );
-}
-
-void Series::setOption( std::string key, std::string value )
-{
-    IOHandler->setOption( std::move( key ), std::move( value ) );
 }
 
 std::unique_ptr< Series::ParsedInput >

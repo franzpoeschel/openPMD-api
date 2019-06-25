@@ -64,10 +64,19 @@ public:
            AccessType at,
            MPI_Comm comm,
            options_t options = {});
+    
+    Series(std::string const& filepath,
+           AccessType at,
+           MPI_Comm comm,
+           std::string const& options = {});
 #endif
     Series(std::string const& filepath,
            AccessType at,
            options_t options = {});
+    
+    Series(std::string const& filepath,
+           AccessType at,
+           std::string const& options );
     ~Series();
     
 
@@ -241,9 +250,6 @@ public:
     /** Execute all required remaining IO operations to write or read data.
      */
     void flush();
-    
-    void setOptions( options_t options );
-    void setOption( std::string key, std::string value );
     
     std::unique_ptr< std::future< AdvanceStatus > > advance( 
         AdvanceMode = AdvanceMode::AUTO );

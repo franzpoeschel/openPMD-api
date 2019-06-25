@@ -36,6 +36,8 @@
 #include <string>
 #include <map>
 
+#include <nlohmann/json.hpp>
+
 namespace openPMD
 {
 class no_such_file_error : public std::runtime_error
@@ -68,7 +70,7 @@ public:
 class AbstractIOHandler
 {
 public:
-    using options_t = std::map< std::string, std::string >;
+    using options_t = nlohmann::json;
 #if openPMD_HAVE_MPI
     AbstractIOHandler(
         std::string path, 
@@ -106,19 +108,6 @@ public:
      * @return  Future indicating the completion state of the operation for backends that decide to implement this operation asynchronously.
      */
     virtual std::future< void > flush() = 0;
-    
-    virtual void setOptions( options_t options)
-    {
-        for ( auto & pair : options )
-        {
-            m_options.emplace( std::move( pair ) );
-        }
-    }
-    
-    virtual void setOption( std::string key, std::string value )
-    {
-        m_options.emplace( std::move( key ), std::move( value ) );
-    }
 
     std::string const directory;
     AccessType const accessTypeBackend;
