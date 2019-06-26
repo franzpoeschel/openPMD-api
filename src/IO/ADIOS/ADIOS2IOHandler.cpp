@@ -29,6 +29,7 @@
 #include <iostream>
 #include <string>
 #include <type_traits>
+#include <set>
 
 namespace openPMD
 {
@@ -1104,6 +1105,8 @@ namespace detail
         *param.dtype = ret;
     }
 
+    
+
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
                                       InvalidatableFile file )
     : m_file( impl.fullPath( std::move( file ) ) ),
@@ -1119,43 +1122,7 @@ namespace detail
         }
         else
         {
-            // read parameters from environment
-            if ( 1 ==
-                 auxiliary::getEnvNum( 
-                    "OPENPMD_ADIOS2_HAVE_METADATA_FILE", 1 ) )
-            {
-                m_IO.SetParameter( "CollectiveMetadata", "On" );
-            }
-            else
-            {
-                m_IO.SetParameter( "CollectiveMetadata", "Off" );
-            }
-            if ( 1 ==
-                 auxiliary::getEnvNum( "OPENPMD_ADIOS2_HAVE_PROFILING", 1 ) )
-            {
-                m_IO.SetParameter( "Profile", "On" );
-            }
-            else
-            {
-                m_IO.SetParameter( "Profile", "Off" );
-            }
-#if openPMD_HAVE_MPI
-            {
-                auto num_substreams =
-                    auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
-                if ( 0 != num_substreams )
-                {
-                    m_IO.SetParameter( "SubStreams",
-                                       std::to_string( num_substreams ) );
-                }
-            }
-#endif
-
-            auto & engine = impl.config( "engine" );
-            if( !engine.is_null() )
-            {
-                m_IO.SetEngine( impl.config( "type", engine ));
-            }
+            configure_IO(impl);
         }
     }
 
@@ -1175,12 +1142,75 @@ namespace detail
             m_engine->Close( );
         }
     }
+    
+    void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
+        std::set< std::string > alreadyConfigured;
+        auto & engine = impl.config( detail::str_engine );
+        if( !engine.is_null() )
+        {
+            m_IO.SetEngine( impl.config( detail::str_type, engine ));
+            auto & params = impl.config( detail::str_params, engine );
+            if( params.is_object() )
+            {
+                for( auto it = params.begin(); it != params.end(); it++ )
+                {
+                    m_IO.SetParameter( it.key(), it.value() );
+                    alreadyConfigured.emplace( it.key() );
+                }
+            }
+        }
+        
+        auto notYetConfigured = [&alreadyConfigured]
+            ( std::string const & param )
+        {
+            auto it = alreadyConfigured.find( param );
+            return it == alreadyConfigured.end();
+        };
+        
+        // read parameters from environment
+        if( notYetConfigured( "CollectiveMetadata" ) )
+        {
+            if ( 1 ==
+                    auxiliary::getEnvNum( 
+                    "OPENPMD_ADIOS2_HAVE_METADATA_FILE", 1 ) )
+            {
+                m_IO.SetParameter( "CollectiveMetadata", "On" );
+            }
+            else
+            {
+                m_IO.SetParameter( "CollectiveMetadata", "Off" );
+            }
+        }
+        if( notYetConfigured( "Profile" ) )
+        {
+            if ( 1 ==
+                    auxiliary::getEnvNum( "OPENPMD_ADIOS2_HAVE_PROFILING", 1 ) 
+                 && notYetConfigured( "Profile" ) )
+            {
+                m_IO.SetParameter( "Profile", "On" );
+            }
+            else
+            {
+                m_IO.SetParameter( "Profile", "Off" );
+            }
+        }
+#if openPMD_HAVE_MPI
+        {
+            auto num_substreams =
+            auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
+            if ( notYetConfigured( "SubStreams" ) && 0 != num_substreams )
+            {
+                m_IO.SetParameter( "SubStreams",
+                        std::to_string( num_substreams ) );
+            }
+        }
+#endif
+    }
 
     adios2::Engine & BufferedActions::getEngine( )
     {
         if ( !m_engine )
         {
-            std::cout << "initializing engine " << m_file << std::endl;
             m_engine = std::unique_ptr< adios2::Engine >(
                 new adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
             if ( !m_engine )

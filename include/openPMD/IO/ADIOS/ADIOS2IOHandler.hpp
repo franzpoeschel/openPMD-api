@@ -174,7 +174,7 @@ public:
     adios2::Mode adios2Accesstype( );
 
 
-private:
+private: 
     adios2::ADIOS m_ADIOS;
     // data is held by m_handler
     nlohmann::json * m_config{ nullptr };
@@ -291,6 +291,11 @@ private:
 
 namespace detail
 {
+    constexpr char const * str_adios2 = "adios2";
+    constexpr char const * const str_engine = "engine";
+    constexpr char const * str_type = "type";
+    constexpr char const * str_params = "parameters";
+    
     // Helper structs for calls to the switchType function
 
     struct DatasetReader
@@ -601,6 +606,8 @@ namespace detail
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
         ~BufferedActions( );
+
+        void configure_IO(ADIOS2IOHandlerImpl& impl);
 
         adios2::Engine & getEngine( );
 
