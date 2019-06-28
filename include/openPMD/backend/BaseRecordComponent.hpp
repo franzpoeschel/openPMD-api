@@ -23,6 +23,9 @@
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/Dataset.hpp"
 
+#include <vector>
+#include <utility>
+
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected
 #   define OPENPMD_protected protected
@@ -54,6 +57,8 @@ public:
     BaseRecordComponent& resetDatatype(Datatype);
 
     Datatype getDatatype() const;
+    
+    std::vector< std::pair< Offset, Extent > > availableChunks();
 
 OPENPMD_protected:
     BaseRecordComponent();
