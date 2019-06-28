@@ -19,6 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/BaseRecordComponent.hpp"
+#include "openPMD/IO/IOTask.hpp"
 
 
 namespace openPMD
@@ -49,4 +50,15 @@ BaseRecordComponent::getDatatype() const
 {
     return m_dataset->dtype;
 }
+
+std::vector< std::pair< Offset, Extent > >
+BaseRecordComponent::availableChunks()
+{
+    Parameter< Operation::AVAILABLE_CHUNKS > param;
+    IOTask task( this, param );
+    IOHandler->enqueue( task );
+    IOHandler->flush();
+    return std::move( *param.chunks );
+} 
+       
 } // openPMD

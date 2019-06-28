@@ -107,6 +107,9 @@ public:
                     case O::ADVANCE:
                         advance(i.writable, *dynamic_cast< Parameter< O::ADVANCE >* >(i.parameter.get()));
                         break;
+                    case O::AVAILABLE_CHUNKS:
+                        availableChunks(i.writable, *dynamic_cast< Parameter< O::AVAILABLE_CHUNKS >* >(i.parameter.get()));
+                        break;
                 }
             } catch (unsupported_data_error&)
             {
@@ -125,7 +128,10 @@ public:
    */
   virtual void advance(Writable*, Parameter< Operation::ADVANCE > &) 
   {} // TODO remove default implementation
-   
+  
+  virtual void availableChunks(Writable*, Parameter< Operation::AVAILABLE_CHUNKS > &)
+  {} // TODO remove default implementation
+
 
   /** Create a new file in physical storage, possibly overriding an existing file.
    *
