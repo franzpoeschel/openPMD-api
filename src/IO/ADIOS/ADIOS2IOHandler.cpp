@@ -66,7 +66,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler,
 }
 
 #endif // openPMD_HAVE_MPI
-  
+
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
 : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
 {
@@ -74,7 +74,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
 }
 
 
-void 
+void
 ADIOS2IOHandlerImpl::init( )
 {
     try
@@ -1122,8 +1122,8 @@ namespace detail
                 "Internal error: Dimension table written so far contains "
                 "an unexpected number of elements" );
             arr[ 0 ]++; // next chunk has just been written
-            VERIFY( 
-                arr[ 1 ] == param.extent.size(), 
+            VERIFY(
+                arr[ 1 ] == param.extent.size(),
                 "Internal error: Dataset dimensionality has changed." );
         }
         //std::cout << "offsets: ";
@@ -1151,17 +1151,17 @@ namespace detail
                                       ") not found in backend." );
         }
 
-        Datatype ret = 
-            switchType< Datatype >( 
-                type, 
-                detail::AttributeReader{}, 
-                ba.m_IO, 
+        Datatype ret =
+            switchType< Datatype >(
+                type,
+                detail::AttributeReader{},
+                ba.m_IO,
                 name,
                 param.resource );
         *param.dtype = ret;
     }
 
-    
+
 
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
                                       InvalidatableFile file )
@@ -1201,7 +1201,7 @@ namespace detail
             m_engine->Close( );
         }
     }
-    
+
     void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
         std::set< std::string > alreadyConfigured;
         auto & engine = impl.config( detail::str_engine );
@@ -1218,19 +1218,19 @@ namespace detail
                 }
             }
         }
-        
+
         auto notYetConfigured = [&alreadyConfigured]
             ( std::string const & param )
         {
             auto it = alreadyConfigured.find( param );
             return it == alreadyConfigured.end();
         };
-        
+
         // read parameters from environment
         if( notYetConfigured( "CollectiveMetadata" ) )
         {
             if ( 1 ==
-                    auxiliary::getEnvNum( 
+                    auxiliary::getEnvNum(
                     "OPENPMD_ADIOS2_HAVE_METADATA_FILE", 1 ) )
             {
                 m_IO.SetParameter( "CollectiveMetadata", "On" );
@@ -1243,7 +1243,7 @@ namespace detail
         if( notYetConfigured( "Profile" ) )
         {
             if ( 1 ==
-                    auxiliary::getEnvNum( "OPENPMD_ADIOS2_HAVE_PROFILING", 1 ) 
+                    auxiliary::getEnvNum( "OPENPMD_ADIOS2_HAVE_PROFILING", 1 )
                  && notYetConfigured( "Profile" ) )
             {
                 m_IO.SetParameter( "Profile", "On" );
@@ -1321,7 +1321,7 @@ namespace detail
         }
         m_buffer.clear( );
     }
-    
+
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
@@ -1340,7 +1340,7 @@ namespace detail
             return std::packaged_task< AdvanceStatus() >(
                 []() { return AdvanceStatus::OK; } );
         case AdvanceMode::READ:
-            
+
             if ( duringStep )
             {
                 flush();
@@ -1361,29 +1361,29 @@ namespace detail
     {
         m_buffer.clear( );
     }
-    
+
     adios2::Variable< BufferedActions::extent_t >
     BufferedActions::chunksOfDataset( const std::string & dataset )
     {
         return m_IO.DefineVariable< extent_t >(
-            "/openPMD_internal/chunkTables/" 
-            + std::to_string( getEngine().CurrentStep() ) 
+            "/openPMD_internal/chunkTables/"
+            + std::to_string( getEngine().CurrentStep() )
             + dataset );
     }
 
-    
+
     void BufferedActions::writeChunkTables()
     {
         for( auto & pair : writtenChunks )
         {
             adios2::Variable< extent_t > table = chunksOfDataset( pair.first );
             std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
-            table.SetShape( adios2::Dims{ 
+            table.SetShape( adios2::Dims{
                 static_cast< adios2::Dims::value_type > (mpi_size),
                 arr[0], 2, arr[1] } );
             table.SetSelection(
                 {
-                    adios2::Dims{ 
+                    adios2::Dims{
                         static_cast< adios2::Dims::value_type > (mpi_rank),
                         0, 0, 0 },
                     adios2::Dims{ 1, arr[0], 2, arr[1] } } );

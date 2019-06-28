@@ -59,6 +59,6 @@ BaseRecordComponent::availableChunks()
     IOHandler->enqueue( task );
     IOHandler->flush();
     return std::move( *param.chunks );
-} 
-       
+}
+
 } // openPMD
