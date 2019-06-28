@@ -37,6 +37,7 @@
 #include <utility> // pair
 #include <vector>
 #include <future>
+#include <tuple>
 
 
 #if openPMD_HAVE_ADIOS2
@@ -609,13 +610,35 @@ namespace detail
         ADIOS2IOHandlerImpl & m_impl;
         // Does the engine currently have an active step?
         bool duringStep = false;
+        int mpi_rank, mpi_size;
+        
+        using extent_t = Extent::value_type;
+        /*
+         * This map stores for each dataset (indexed by name) a vector
+         * of the chunks written during one step
+         * as a contiguous vector. The layout is as follows:
+         * offsets_of_first_chunk..., extents_of_first_chunk...,
+         * offsets_of_second_chunk..., extents_of_second_chunk...,
+         * ...
+         * Will later be reinterpreted as a 3-dimensional dataset for
+         * storage in ADIOS2, i.e.:
+         * extent_t writtenChunks[ number_of_chunks ][ 2 ][ dimensionality ]
+         * The "2" is for choosing offset (0) or extent (1)
+         * We use a vector since the number of chunks is not known up front.
+         * 
+         * The second component for each dataset is an array of (1) the number
+         * of chunks and (2) the dimensionality of the dataset.
+         */
+        std::unordered_map< 
+            std::string, 
+            std::tuple< std::vector< extent_t >, std::array< extent_t, 2 > > >
+            writtenChunks;
 
 
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
         ~BufferedActions( );
 
-        void configure_IO(ADIOS2IOHandlerImpl& impl);
 
         adios2::Engine & getEngine( );
 
@@ -630,6 +653,14 @@ namespace detail
          * Delete all buffered actions without running them.
          */
         void drop( );
+        
+    private:
+        
+        void configure_IO(ADIOS2IOHandlerImpl& impl);
+        
+        adios2::Variable< extent_t > chunksOfDataset( std::string const & );
+        
+        void writeChunkTables( );
     };
 
 
