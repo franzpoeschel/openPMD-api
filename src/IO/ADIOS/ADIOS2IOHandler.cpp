@@ -30,6 +30,7 @@
 #include <string>
 #include <type_traits>
 #include <set>
+#include <algorithm>
 
 namespace openPMD
 {
@@ -516,6 +517,20 @@ ADIOS2IOHandlerImpl::advance(
     auto & ba = getFileData( file );
     parameters.task = std::make_shared< std::packaged_task< AdvanceStatus() > >(
         ba.advance( parameters.mode ) );
+}
+
+void
+ADIOS2IOHandlerImpl::availableChunks(
+    Writable * writable,
+    Parameter< Operation::AVAILABLE_CHUNKS > & parameters )
+{
+    setAndGetFilePosition( writable );
+    auto file = refreshFileFromParent( writable );
+    detail::BufferedActions & ba = getFileData( file );
+    detail::BufferedTableRead btr;
+    btr.name = nameOfVariable( writable );
+    btr.param = parameters;
+    ba.enqueue( std::move( btr ) );
 }
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
@@ -1148,7 +1163,52 @@ namespace detail
         *param.dtype = ret;
     }
 
+    void detail::BufferedTableRead::run( BufferedActions & ba )
+    {
+        adios2::Variable< BufferedActions::extent_t > table
+                = ba.chunksOfDataset( name );
+        if( !table )
+            return;
+        auto dims = table.Shape();
+        VERIFY_ALWAYS(
+            dims.size() == 4,
+            "ADIOS2 error: Step table for variable " +
+            name + " has an unexpected shape." );
+        size_t length = dims[0] * dims[1] * dims[2] * dims[3];
+        TableReadPostprocessing trp;
+        trp.data = std::vector< BufferedActions::extent_t >( length );
+        trp.param = param;
+        trp.shape = dims;
+        ba.getEngine().Get(table, trp.data.data() );
+        ba.enqueue( std::move( trp ), ba.m_bufferAfterFlush );
+    }
 
+    void detail::TableReadPostprocessing::run( BufferedActions & )
+    {
+        for( size_t rank = 0; rank < shape[0]; rank++ )
+        {
+            for( size_t chunk = 0; chunk < shape[1]; chunk++ )
+            {
+                Offset offset( shape[3] );
+                Extent extent( shape[3] );
+                size_t idx =
+                        rank * shape[3] * shape[2] * shape[1]
+                        + chunk * shape[3] * shape[2];
+                std::copy_n(
+                    &data[ idx ],
+                    shape[3],
+                    offset.begin() );
+                std::copy_n(
+                    &data[ idx + shape[ 3 ] ],
+                    shape[ 3 ],
+                    extent.begin() );
+                param.chunks->push_back(
+                    std::make_pair(
+                        std::move( offset ),
+                        std::move( extent ) ) );
+            }
+        }
+    }
 
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
                                       InvalidatableFile file )
@@ -1274,8 +1334,15 @@ namespace detail
 
     template < typename BA > void BufferedActions::enqueue( BA && ba )
     {
+        enqueue< BA >( std::forward< BA >( ba ), m_buffer );
+    }
+
+    template < typename BA > void BufferedActions::enqueue(
+        BA && ba,
+        decltype( m_buffer ) & buffer )
+    {
         using _BA = typename std::remove_reference< BA >::type;
-        m_buffer.emplace_back( std::unique_ptr< BufferedAction >(
+        buffer.emplace_back( std::unique_ptr< BufferedAction >(
             new _BA( std::forward< BA >( ba ) ) ) );
     }
 
@@ -1288,7 +1355,7 @@ namespace detail
             duringStep = true;
         }
         {
-            for ( auto const & ba : m_buffer )
+            for ( auto & ba : m_buffer )
             {
                 ba->run( *this );
             }
@@ -1312,6 +1379,11 @@ namespace detail
             }
         }
         m_buffer.clear( );
+        for ( auto & ba : m_bufferAfterFlush )
+        {
+            ba->run( *this );
+        }
+        m_bufferAfterFlush.clear();
     }
 
     std::packaged_task< AdvanceStatus() >
@@ -1328,6 +1400,7 @@ namespace detail
             writeChunkTables();
             getEngine().EndStep();
             writtenChunks.clear();
+            currentStep++;
             duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
                 []() { return AdvanceStatus::OK; } );
@@ -1338,6 +1411,7 @@ namespace detail
                 flush();
                 getEngine().EndStep();
             }
+            currentStep++;
             getEngine().BeginStep();
             duringStep = true;
             return std::packaged_task< AdvanceStatus() >(
@@ -1357,10 +1431,15 @@ namespace detail
     adios2::Variable< BufferedActions::extent_t >
     BufferedActions::chunksOfDataset( const std::string & dataset )
     {
-        return m_IO.DefineVariable< extent_t >(
-            "/openPMD_internal/chunkTables/"
-            + std::to_string( getEngine().CurrentStep() )
-            + dataset );
+        std::string table = "/openPMD_internal/chunkTables/"
+            + std::to_string( currentStep )
+            + dataset;
+        auto it = writtenChunks.find( dataset );
+        if( it == writtenChunks.end() )
+        {
+            return m_IO.InquireVariable< extent_t >( table );
+        }
+        return m_IO.DefineVariable< extent_t >( table );
     }
 
 
@@ -1369,6 +1448,8 @@ namespace detail
         for( auto & pair : writtenChunks )
         {
             adios2::Variable< extent_t > table = chunksOfDataset( pair.first );
+            if( !table )
+                continue;
             std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
             table.SetShape( adios2::Dims{
                 static_cast< adios2::Dims::value_type > (mpi_size),
