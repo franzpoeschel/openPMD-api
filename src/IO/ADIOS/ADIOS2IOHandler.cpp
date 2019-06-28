@@ -1083,6 +1083,42 @@ namespace detail
     {
         switchType( param.dtype, ba.m_writeDataset, *this, ba.m_IO,
                     ba.getEngine( ) );
+        //std::cout << "stored to " << name << std::endl;
+        decltype(BufferedActions::writtenChunks)::mapped_type * tuple;
+        auto it = ba.writtenChunks.find( name );
+        if( it == ba.writtenChunks.end() )
+        {
+            tuple = & ba.writtenChunks[ name ];
+            auto & arr = std::get< 1 >( *tuple );
+            arr[ 0 ] = 1; // we have just written the first chunk
+            arr[ 1 ] = param.extent.size(); // the dimensionality of the dataset
+        }
+        else
+        {
+            tuple = & it->second;
+            auto & arr = std::get< 1 >( *tuple );
+            VERIFY(
+                std::get<0>(*tuple).size() == arr[ 0 ] * arr[ 1 ] * 2,
+                "Internal error: Dimension table written so far contains "
+                "an unexpected number of elements" );
+            arr[ 0 ]++; // next chunk has just been written
+            VERIFY( 
+                arr[ 1 ] == param.extent.size(), 
+                "Internal error: Dataset dimensionality has changed." );
+        }
+        //std::cout << "offsets: ";
+        for( auto offset : param.offset )
+        {
+            //std::cout << offset << ", ";
+            std::get<0>(*tuple).push_back( offset );
+        }
+        //std::cout << "\nextents: ";
+        for( auto extent: param.extent )
+        {
+            //std::cout << extent << ", ";
+            std::get<0>(*tuple).push_back( extent );
+        }
+        //std::cout << std::endl;
     }
 
     void BufferedAttributeRead::run( BufferedActions & ba )
@@ -1114,6 +1150,13 @@ namespace detail
       m_mode( impl.adios2Accesstype( ) ), m_writeDataset( &impl ),
       m_readDataset( &impl ), m_attributeReader( ), m_impl( impl )
     {
+#if openPMD_HAVE_MPI
+        MPI_Comm_rank( impl.m_comm, &mpi_rank );
+        MPI_Comm_size( impl.m_comm, &mpi_size );
+#else
+        mpi_rank = 0;
+        mpi_size = 1;
+#endif
         if ( !m_IO )
         {
             throw std::runtime_error(
@@ -1137,6 +1180,7 @@ namespace detail
         {
             if (duringStep)
             {
+                writeChunkTables();
                 m_engine->EndStep();
             }
             m_engine->Close( );
@@ -1274,7 +1318,9 @@ namespace detail
              * will start.
              */
             flush();
+            writeChunkTables();
             getEngine().EndStep();
+            writtenChunks.clear();
             duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
                 []() { return AdvanceStatus::OK; } );
@@ -1299,6 +1345,35 @@ namespace detail
     void BufferedActions::drop( )
     {
         m_buffer.clear( );
+    }
+    
+    adios2::Variable< BufferedActions::extent_t >
+    BufferedActions::chunksOfDataset( const std::string & dataset )
+    {
+        return m_IO.DefineVariable< extent_t >(
+            "/openPMD_internal/chunkTables/" 
+            + std::to_string( getEngine().CurrentStep() ) 
+            + dataset );
+    }
+
+    
+    void BufferedActions::writeChunkTables()
+    {
+        for( auto & pair : writtenChunks )
+        {
+            adios2::Variable< extent_t > table = chunksOfDataset( pair.first );
+            std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
+            table.SetShape( adios2::Dims{ 
+                static_cast< adios2::Dims::value_type > (mpi_size),
+                arr[0], 2, arr[1] } );
+            table.SetSelection(
+                {
+                    adios2::Dims{ 
+                        static_cast< adios2::Dims::value_type > (mpi_rank),
+                        0, 0, 0 },
+                    adios2::Dims{ 1, arr[0], 2, arr[1] } } );
+            getEngine().Put( table, std::get< 0 >( pair.second ).data() );
+        }
     }
 
 } // namespace detail
