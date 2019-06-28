@@ -171,6 +171,10 @@ public:
     void
     advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
 
+    void
+    availableChunks( Writable*,
+                     Parameter< Operation::AVAILABLE_CHUNKS > &) override;
+
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
      * within this instance.
@@ -588,6 +592,23 @@ namespace detail
         void run( BufferedActions & ) override;
     };
 
+    struct BufferedTableRead : BufferedAction
+    {
+        Parameter< Operation::AVAILABLE_CHUNKS > param;
+        std::string name; // name of the dataset
+
+        void run( BufferedActions & ) override;
+    };
+
+    struct TableReadPostprocessing : BufferedAction
+    {
+        Parameter< Operation::AVAILABLE_CHUNKS > param;
+        std::vector< Extent::value_type > data;
+        adios2::Dims shape;
+
+        void run( BufferedActions & ) override;
+    };
+
     /*
      * Manages per-file information about
      * (1) the file's IO and Engine objects
@@ -600,6 +621,8 @@ namespace detail
         std::string m_file;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
+        // actions to be performed after put/get actions have been run
+        std::vector< std::unique_ptr< BufferedAction > > m_bufferAfterFlush;
         // std::optional would be more idiomatic, but it's not in
         // the C++11 standard
         std::unique_ptr< adios2::Engine > m_engine;
@@ -611,6 +634,7 @@ namespace detail
         // Does the engine currently have an active step?
         bool duringStep = false;
         int mpi_rank, mpi_size;
+        size_t currentStep = 0;
 
         using extent_t = Extent::value_type;
         /*
@@ -644,6 +668,8 @@ namespace detail
 
         template < typename BA > void enqueue( BA && ba );
 
+        template < typename BA > void enqueue( BA && ba, decltype( m_buffer ) & );
+
 
         void flush( );
 
@@ -654,11 +680,18 @@ namespace detail
          */
         void drop( );
 
+        /*
+         * Get variable for table describing chunks of dataset.
+         * If any chunks have been written (i.e. the map writtenChunks contains
+         * the dataset's name), create the variable because we are going to
+         * write to it. Otherwise look if the variable is present in m_IO.
+         */
+        adios2::Variable< extent_t > chunksOfDataset( std::string const & );
+
     private:
 
         void configure_IO(ADIOS2IOHandlerImpl& impl);
 
-        adios2::Variable< extent_t > chunksOfDataset( std::string const & );
 
         void writeChunkTables( );
     };

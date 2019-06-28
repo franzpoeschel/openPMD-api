@@ -493,6 +493,12 @@ struct EXPORT Parameter< Operation::AVAILABLE_CHUNKS > : public AbstractParamete
     {
     }
 
+    Parameter & operator=( Parameter const & p )
+    {
+        chunks = p.chunks;
+        return *this;
+    }
+
     std::unique_ptr< AbstractParameter >
     clone() const override
     {
