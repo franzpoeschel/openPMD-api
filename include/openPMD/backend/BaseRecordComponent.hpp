@@ -57,7 +57,7 @@ public:
     BaseRecordComponent& resetDatatype(Datatype);
 
     Datatype getDatatype() const;
-    
+
     std::vector< std::pair< Offset, Extent > > availableChunks();
 
 OPENPMD_protected:

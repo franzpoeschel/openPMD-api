@@ -1114,8 +1114,8 @@ namespace detail
                 "Internal error: Dimension table written so far contains "
                 "an unexpected number of elements" );
             arr[ 0 ]++; // next chunk has just been written
-            VERIFY( 
-                arr[ 1 ] == param.extent.size(), 
+            VERIFY(
+                arr[ 1 ] == param.extent.size(),
                 "Internal error: Dataset dimensionality has changed." );
         }
         //std::cout << "offsets: ";
@@ -1314,7 +1314,7 @@ namespace detail
         }
         m_buffer.clear( );
     }
-    
+
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
@@ -1333,7 +1333,7 @@ namespace detail
             return std::packaged_task< AdvanceStatus() >(
                 []() { return AdvanceStatus::OK; } );
         case AdvanceMode::READ:
-            
+
             if ( duringStep )
             {
                 flush();
@@ -1354,29 +1354,29 @@ namespace detail
     {
         m_buffer.clear( );
     }
-    
+
     adios2::Variable< BufferedActions::extent_t >
     BufferedActions::chunksOfDataset( const std::string & dataset )
     {
         return m_IO.DefineVariable< extent_t >(
-            "/openPMD_internal/chunkTables/" 
-            + std::to_string( getEngine().CurrentStep() ) 
+            "/openPMD_internal/chunkTables/"
+            + std::to_string( getEngine().CurrentStep() )
             + dataset );
     }
 
-    
+
     void BufferedActions::writeChunkTables()
     {
         for( auto & pair : writtenChunks )
         {
             adios2::Variable< extent_t > table = chunksOfDataset( pair.first );
             std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
-            table.SetShape( adios2::Dims{ 
+            table.SetShape( adios2::Dims{
                 static_cast< adios2::Dims::value_type > (mpi_size),
                 arr[0], 2, arr[1] } );
             table.SetSelection(
                 {
-                    adios2::Dims{ 
+                    adios2::Dims{
                         static_cast< adios2::Dims::value_type > (mpi_rank),
                         0, 0, 0 },
                     adios2::Dims{ 1, arr[0], 2, arr[1] } } );

@@ -606,7 +606,7 @@ namespace detail
         // Does the engine currently have an active step?
         bool duringStep = false;
         int mpi_rank, mpi_size;
-        
+
         using extent_t = Extent::value_type;
         /*
          * This map stores for each dataset (indexed by name) a vector
@@ -620,12 +620,12 @@ namespace detail
          * extent_t writtenChunks[ number_of_chunks ][ 2 ][ dimensionality ]
          * The "2" is for choosing offset (0) or extent (1)
          * We use a vector since the number of chunks is not known up front.
-         * 
+         *
          * The second component for each dataset is an array of (1) the number
          * of chunks and (2) the dimensionality of the dataset.
          */
-        std::unordered_map< 
-            std::string, 
+        std::unordered_map<
+            std::string,
             std::tuple< std::vector< extent_t >, std::array< extent_t, 2 > > >
             writtenChunks;
 
@@ -634,29 +634,26 @@ namespace detail
 
         ~BufferedActions();
 
-        void
-        configure_IO( ADIOS2IOHandlerImpl & impl );
-
         adios2::Engine & getEngine( );
 
         template < typename BA > void enqueue( BA && ba );
 
 
         void flush( );
-        
+
         std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
          */
         void drop( );
-        
+
     private:
-        
+
         void configure_IO(ADIOS2IOHandlerImpl& impl);
-        
+
         adios2::Variable< extent_t > chunksOfDataset( std::string const & );
-        
+
         void writeChunkTables( );
     };
 
