@@ -175,27 +175,27 @@ public:
     adios2::Mode adios2Accesstype( );
 
 
-private: 
+private:
     adios2::ADIOS m_ADIOS;
     // data is held by m_handler
     nlohmann::json * m_config{ nullptr };
     static nlohmann::json nullvalue;
 
     void init( );
-    
+
     template< typename Key >
     nlohmann::json & config( Key && key, nlohmann::json & cfg )
     {
         if( cfg.is_object() && cfg.contains( key ) )
         {
             return cfg[ key ];
-        } 
-        else 
+        }
+        else
         {
             return nullvalue;
         }
     }
-    
+
     template< typename Key >
     nlohmann::json & config( Key && key )
     {
@@ -296,7 +296,7 @@ namespace detail
     constexpr char const * const str_engine = "engine";
     constexpr char const * str_type = "type";
     constexpr char const * str_params = "parameters";
-    
+
     // Helper structs for calls to the switchType function
 
     struct DatasetReader
@@ -603,7 +603,7 @@ namespace detail
         // Does the engine currently have an active step?
         bool duringStep = false;
         int mpi_rank, mpi_size;
-        
+
         using extent_t = Extent::value_type;
         /*
          * This map stores for each dataset (indexed by name) a vector
@@ -617,12 +617,12 @@ namespace detail
          * extent_t writtenChunks[ number_of_chunks ][ 2 ][ dimensionality ]
          * The "2" is for choosing offset (0) or extent (1)
          * We use a vector since the number of chunks is not known up front.
-         * 
+         *
          * The second component for each dataset is an array of (1) the number
          * of chunks and (2) the dimensionality of the dataset.
          */
-        std::unordered_map< 
-            std::string, 
+        std::unordered_map<
+            std::string,
             std::tuple< std::vector< extent_t >, std::array< extent_t, 2 > > >
             writtenChunks;
 
@@ -638,20 +638,20 @@ namespace detail
 
 
         void flush( );
-        
+
         std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
          */
         void drop( );
-        
+
     private:
-        
+
         void configure_IO(ADIOS2IOHandlerImpl& impl);
-        
+
         adios2::Variable< extent_t > chunksOfDataset( std::string const & );
-        
+
         void writeChunkTables( );
     };
 
@@ -683,7 +683,7 @@ public:
 
 #endif
 
-    ADIOS2IOHandler( std::string path, AccessType, 
+    ADIOS2IOHandler( std::string path, AccessType,
         AbstractIOHandler::options_t options);
 
     std::future< void > flush( ) override;

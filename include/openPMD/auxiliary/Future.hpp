@@ -10,7 +10,7 @@ namespace auxiliary
     /**
      * Subclass template for std::future<A> that wraps
      * the std::packaged_task<…> creating the future
-     * Useful to extend the lifetime of the task for 
+     * Useful to extend the lifetime of the task for
      * exactly as long as the future lives.
      */
     template< typename A, typename... Args >

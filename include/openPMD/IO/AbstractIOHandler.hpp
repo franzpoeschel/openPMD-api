@@ -73,8 +73,8 @@ public:
     using options_t = nlohmann::json;
 #if openPMD_HAVE_MPI
     AbstractIOHandler(
-        std::string path, 
-        AccessType at, 
+        std::string path,
+        AccessType at,
         MPI_Comm,
         options_t options = {} )
         : directory{std::move(path)},
@@ -84,7 +84,7 @@ public:
     { }
 #endif
     AbstractIOHandler(
-        std::string path, 
+        std::string path,
         AccessType at,
         options_t options = {} )
         : directory{std::move(path)},

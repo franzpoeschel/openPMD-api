@@ -108,7 +108,7 @@ Series::Series(std::string const& filepath,
         input->path, at, input->format, comm, std::move(options));
     init(handler, std::move(input));
 }
-          
+
 Series::Series(std::string const& filepath,
                AccessType at,
                MPI_Comm comm,
@@ -128,7 +128,7 @@ Series::Series(std::string const& filepath,
         input->path, at, input->format, std::move(options));
     init(handler, std::move(input));
 }
-          
+
 Series::Series(std::string const& filepath,
                AccessType at,
                std::string const& options )

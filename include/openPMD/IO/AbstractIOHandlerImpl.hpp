@@ -122,13 +122,13 @@ public:
     }
 
   /**
-   * 
-   * @param 
-   * @param 
+   *
+   * @param
+   * @param
    */
-  virtual void advance(Writable*, Parameter< Operation::ADVANCE > &) 
+  virtual void advance(Writable*, Parameter< Operation::ADVANCE > &)
   {} // TODO remove default implementation
-  
+
   virtual void availableChunks(Writable*, Parameter< Operation::AVAILABLE_CHUNKS > &)
   {} // TODO remove default implementation
 

@@ -64,7 +64,7 @@ public:
            AccessType at,
            MPI_Comm comm,
            options_t options = {});
-    
+
     Series(std::string const& filepath,
            AccessType at,
            MPI_Comm comm,
@@ -73,12 +73,12 @@ public:
     Series(std::string const& filepath,
            AccessType at,
            options_t options = {});
-    
+
     Series(std::string const& filepath,
            AccessType at,
            std::string const& options );
     ~Series();
-    
+
 
     /**
      * @return  String representing the current enforced version of the <A HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file">openPMD standard</A>.
@@ -250,8 +250,8 @@ public:
     /** Execute all required remaining IO operations to write or read data.
      */
     void flush();
-    
-    std::unique_ptr< std::future< AdvanceStatus > > advance( 
+
+    std::unique_ptr< std::future< AdvanceStatus > > advance(
         AdvanceMode = AdvanceMode::AUTO );
 
     Container< Iteration, uint64_t > iterations;
