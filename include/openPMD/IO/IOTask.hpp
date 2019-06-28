@@ -78,7 +78,8 @@ enum class EXPORT Operation
     READ_ATT,
     LIST_ATTS,
 
-    ADVANCE
+    ADVANCE,
+    AVAILABLE_CHUNKS
 };  //Operation
 
 struct EXPORT AbstractParameter
@@ -480,6 +481,28 @@ struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
     AdvanceMode mode;
     // output parameter
     std::shared_ptr< std::packaged_task< AdvanceStatus() > > task;
+};
+
+template<>
+struct EXPORT Parameter< Operation::AVAILABLE_CHUNKS > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & p ) :
+        AbstractParameter(),
+        chunks( p.chunks )
+    {
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::AVAILABLE_CHUNKS >( *this ) );
+    }
+
+    // output parameter
+    std::shared_ptr< std::vector< std::pair< Offset, Extent > > > chunks
+        = std::make_shared< std::vector < std::pair< Offset, Extent > > > ();
 };
 
 
