@@ -22,6 +22,7 @@
 
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/Dataset.hpp"
+#include "openPMD/Streaming.hpp"
 
 #include <vector>
 #include <utility>
@@ -33,7 +34,7 @@
 
 
 namespace openPMD
-{
+{  
 class BaseRecordComponent : public Attributable
 {
     template< typename T_elem >
@@ -58,7 +59,7 @@ public:
 
     Datatype getDatatype() const;
 
-    std::vector< std::pair< Offset, Extent > > availableChunks();
+    ChunkTable availableChunks();
 
 OPENPMD_protected:
     BaseRecordComponent();
