@@ -507,8 +507,8 @@ struct EXPORT Parameter< Operation::AVAILABLE_CHUNKS > : public AbstractParamete
     }
 
     // output parameter
-    std::shared_ptr< std::vector< std::pair< Offset, Extent > > > chunks
-        = std::make_shared< std::vector < std::pair< Offset, Extent > > > ();
+    std::shared_ptr< ChunkTable > chunks
+        = std::make_shared< ChunkTable > ();
 };
 
 

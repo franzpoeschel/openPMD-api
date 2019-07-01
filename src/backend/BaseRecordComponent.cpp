@@ -51,7 +51,7 @@ BaseRecordComponent::getDatatype() const
     return m_dataset->dtype;
 }
 
-std::vector< std::pair< Offset, Extent > >
+ChunkTable
 BaseRecordComponent::availableChunks()
 {
     Parameter< Operation::AVAILABLE_CHUNKS > param;
@@ -60,5 +60,4 @@ BaseRecordComponent::availableChunks()
     IOHandler->flush();
     return std::move( *param.chunks );
 }
-
 } // openPMD

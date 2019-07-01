@@ -1193,8 +1193,10 @@ namespace detail
 
     void detail::TableReadPostprocessing::run( BufferedActions & )
     {
+        ChunkTable res( shapes.size() );
         for( size_t rank = 0; rank < shapes.size(); rank++ )
         {
+            ChunkTable::T_perRank & currentRank = res.chunkTable[ rank ];
             auto const & shape = shapes[ rank ];
             auto number_of_chunks = shape[ 0 ];
             auto dimensionality = shape[ 2 ];
@@ -1212,12 +1214,13 @@ namespace detail
                     &rankData[ idx + dimensionality ],
                     dimensionality,
                     extent.begin() );
-                param.chunks->push_back(
+                currentRank.push_back(
                     std::make_pair(
                         std::move( offset ),
                         std::move( extent ) ) );
             }
         }
+        *param.chunks = res;
     }
 
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
