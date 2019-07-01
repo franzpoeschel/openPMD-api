@@ -30,6 +30,7 @@
 #include <string>
 #include <type_traits>
 #include <set>
+#include <list>
 #include <algorithm>
 
 namespace openPMD
@@ -1178,42 +1179,51 @@ namespace detail
 
     void detail::BufferedTableRead::run( BufferedActions & ba )
     {
-        adios2::Variable< BufferedActions::extent_t > table
-                = ba.chunksOfDataset( name );
-        if( !table )
-            return;
-        auto dims = table.Shape();
-        VERIFY_ALWAYS(
-            dims.size() == 4,
-            "ADIOS2 error: Step table for variable " +
-            name + " has an unexpected shape." );
-        size_t length = dims[0] * dims[1] * dims[2] * dims[3];
+        using var_t = adios2::Variable< BufferedActions::extent_t >;
+        std::vector< var_t > tables
+            = ba.availabeTablesPerRank( name );
         TableReadPostprocessing trp;
-        trp.data = std::vector< BufferedActions::extent_t >( length );
+        trp.data = decltype( TableReadPostprocessing::data )( tables.size() );
         trp.param = param;
-        trp.shape = dims;
-        ba.getEngine().Get(table, trp.data.data() );
+        trp.shapes = 
+                decltype( TableReadPostprocessing::shapes)( tables.size() );
+        adios2::Engine & engine = ba.getEngine();
+        for( size_t rank = 0; rank < tables.size(); rank++ )
+        {
+            var_t & table = tables[ rank ];
+            auto dims = table.Shape();
+            VERIFY_ALWAYS(
+                dims.size() == 3,
+                "ADIOS2 error: Step table for variable " +
+                name + " has an unexpected shape." );
+            size_t length = dims[0] * dims[1] * dims[2];
+            trp.data[ rank ] = std::vector< Extent::value_type >( length );
+            engine.Get( table, trp.data[ rank ].data() );
+            trp.shapes[ rank ] = std::move( dims );
+        }
         ba.enqueue( std::move( trp ), ba.m_bufferAfterFlush );
     }
 
     void detail::TableReadPostprocessing::run( BufferedActions & )
     {
-        for( size_t rank = 0; rank < shape[0]; rank++ )
+        for( size_t rank = 0; rank < shapes.size(); rank++ )
         {
-            for( size_t chunk = 0; chunk < shape[1]; chunk++ )
+            auto const & shape = shapes[ rank ];
+            auto number_of_chunks = shape[ 0 ];
+            auto dimensionality = shape[ 2 ];
+            auto const & rankData = data[ rank ];
+            for( size_t chunk = 0; chunk < number_of_chunks; chunk++ )
             {
-                Offset offset( shape[3] );
-                Extent extent( shape[3] );
-                size_t idx =
-                        rank * shape[3] * shape[2] * shape[1]
-                        + chunk * shape[3] * shape[2];
+                Offset offset( dimensionality );
+                Extent extent( dimensionality );
+                size_t idx = chunk * dimensionality * 2;
                 std::copy_n(
-                    &data[ idx ],
-                    shape[3],
+                    &rankData[ idx ],
+                    dimensionality,
                     offset.begin() );
                 std::copy_n(
-                    &data[ idx + shape[ 3 ] ],
-                    shape[ 3 ],
+                    &rankData[ idx + dimensionality ],
+                    dimensionality,
                     extent.begin() );
                 param.chunks->push_back(
                     std::make_pair(
@@ -1435,19 +1445,73 @@ namespace detail
     {
         m_buffer.clear( );
     }
-
-    adios2::Variable< BufferedActions::extent_t >
-    BufferedActions::chunksOfDataset( const std::string & dataset )
+    
+    std::vector< adios2::Variable< BufferedActions::extent_t > > 
+    BufferedActions::availabeTablesPerRank( std::string dataset )
     {
-        std::string table = "/openPMD_internal/chunkTables/"
+        std::list< std::string > variableNames;
+        std::string prefix = chunkTablePrefix( dataset, false);
+        for( auto & pair : m_IO.AvailableVariables() )
+        {
+            if( auxiliary::starts_with(pair.first, prefix ) )
+            {
+                variableNames.emplace_back( pair.first );
+            }
+        }
+        auto writer_mpi_size = variableNames.size();
+        std::vector< adios2::Variable< extent_t > > res( writer_mpi_size );
+        for( std::string const & var : variableNames )
+        {
+            adios2::Variable< extent_t > table = 
+                m_IO.InquireVariable< extent_t >( var );
+            adios2::Attribute< int > rankAttr =
+                m_IO.InquireAttribute< int >( "rank", var );
+            int rank = rankAttr.Data()[ 0 ];
+            VERIFY_ALWAYS( 
+                table.operator bool() 
+                && rankAttr.operator bool() 
+                && rank < static_cast< int >( writer_mpi_size ), 
+                "ADIOS2 backend: failed trying to load chunk tables for "
+                "dataset " + dataset );
+            res[ rank ] = std::move( table );
+        }
+        VERIFY_ALWAYS(
+            std::all_of(
+                res.begin(),
+                res.end(),
+                []( adios2::Variable< extent_t > & var ){
+                    return var.operator bool(); 
+                }),
+            "ADIOS2 backend: 2 failed trying to load chunk tables for "
+            "dataset " + dataset );
+        return res;
+    }
+
+    std::string
+    BufferedActions::chunkTablePrefix( std::string dataset, bool includeRank )
+    {
+        if( !auxiliary::starts_with(dataset, '/') )
+        {
+            dataset = '/' + dataset;
+        }
+        std::string res =  "/openPMD_internal/chunkTablesPerStepAndRank/"
             + std::to_string( currentStep )
             + dataset;
-        auto it = writtenChunks.find( dataset );
-        if( it == writtenChunks.end() )
-        {
-            return m_IO.InquireVariable< extent_t >( table );
-        }
-        return m_IO.DefineVariable< extent_t >( table );
+        if( includeRank )
+            res += "/" + std::to_string( mpi_rank );
+        return res;
+    }
+    
+    adios2::Variable< BufferedActions::extent_t >
+    BufferedActions::createChunkTable( std::string dataset )
+    {
+        std::string table = chunkTablePrefix( dataset, true );
+        auto attr = m_IO.DefineAttribute( "rank", mpi_rank, table );
+        auto res = m_IO.DefineVariable< extent_t >( table );
+        VERIFY_ALWAYS(
+            res && attr,
+            "ADIOS2: Failed creating attribute/variable." );
+        return res;
     }
 
 
@@ -1455,19 +1519,13 @@ namespace detail
     {
         for( auto & pair : writtenChunks )
         {
-            adios2::Variable< extent_t > table = chunksOfDataset( pair.first );
-            if( !table )
-                continue;
+            adios2::Variable< extent_t > table = createChunkTable( pair.first );
             std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
-            table.SetShape( adios2::Dims{
-                static_cast< adios2::Dims::value_type > (mpi_size),
-                arr[0], 2, arr[1] } );
-            table.SetSelection(
-                {
-                    adios2::Dims{
-                        static_cast< adios2::Dims::value_type > (mpi_rank),
-                        0, 0, 0 },
-                    adios2::Dims{ 1, arr[0], 2, arr[1] } } );
+            extent_t number_of_chunks = arr[ 0 ];
+            extent_t dimensionality = arr[ 1 ];
+            adios2::Dims dims{ number_of_chunks, 2, dimensionality };
+            table.SetShape( dims );
+            table.SetSelection( { adios2::Dims{ 0, 0, 0 }, dims } );
             getEngine().Put( table, std::get< 0 >( pair.second ).data() );
         }
     }
