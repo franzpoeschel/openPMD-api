@@ -73,9 +73,10 @@ namespace auxiliary
         auto second_ptr =
             std::make_shared< decltype( second ) >( std::move( second ) );
         std::packaged_task< B() > ptask( [first_ptr, second_ptr]() {
-            first_ptr->wait();
-            detail::AvoidVoid< A, B >::run_task( *first_ptr, *second_ptr );
+            if( first_ptr->valid() )
+                first_ptr->wait();
             auto future = second_ptr->get_future();
+            detail::AvoidVoid< A, B >::run_task( *first_ptr, *second_ptr );
             future.wait();
             return future.get();
         } );
