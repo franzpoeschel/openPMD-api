@@ -480,7 +480,8 @@ struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
     // input parameters
     AdvanceMode mode;
     // output parameter
-    std::shared_ptr< std::packaged_task< AdvanceStatus() > > task;
+    std::shared_ptr< std::packaged_task< AdvanceStatus() > > task
+        = std::make_shared< std::packaged_task< AdvanceStatus() > >();
 };
 
 template<>

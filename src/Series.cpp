@@ -963,25 +963,8 @@ Series::advance( AdvanceMode mode, std::string )
     // (2) finally run the advance task
 
     auto first_future = IOHandler->flush();
-    auto param_ptr = std::make_shared< Parameter< Operation::ADVANCE > >(
-        std::move( param ) );
-    std::packaged_task< AdvanceStatus() > ptask( [param_ptr]() {
-        if( param_ptr->task )
-        {
-            auto future = param_ptr->task->get_future();
-            future.wait();
-            return future.get();
-        }
-        else
-        {
-            throw std::runtime_error(
-                "Internal error (Writable::advance()):"
-                " backend has not properly finished the ADVANCE task." );
-        }
-    } );
-
     return auxiliary::chain_futures< void, AdvanceStatus >(
-        std::move( first_future ), std::move( ptask ) );
+        std::move( first_future ), std::move( *param.task ) );
 }
 
 Format
