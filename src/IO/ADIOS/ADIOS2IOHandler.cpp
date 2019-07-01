@@ -1412,6 +1412,7 @@ namespace detail
     {
         switch (mode) {
         case AdvanceMode::WRITE:
+        {
             /*
              * This also forces a Engine::BeginStep() if no step
              * is currently active, ensuring that the next step
@@ -1425,18 +1426,29 @@ namespace detail
             duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
                 []() { return AdvanceStatus::OK; } );
+        }
         case AdvanceMode::READ:
-
+        {
             if ( duringStep )
             {
                 flush();
                 getEngine().EndStep();
             }
             currentStep++;
-            getEngine().BeginStep();
+            AdvanceStatus status;
+            switch ( getEngine().BeginStep() )
+            {
+            case adios2::StepStatus::EndOfStream:
+                status = AdvanceStatus::OVER;
+                break;
+            default:
+                status = AdvanceStatus::OK;
+                break;
+            }
             duringStep = true;
             return std::packaged_task< AdvanceStatus() >(
-                []() { return AdvanceStatus::OK; } );
+                [status]() { return status; } );
+        }
         case AdvanceMode::AUTO:
             throw std::runtime_error(
                     "Internal error: Advance mode should be explicitly"

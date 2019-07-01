@@ -10,7 +10,7 @@ namespace openPMD
 {
 enum class AdvanceStatus
 {
-    OK
+    OK, OVER
 };
 
 enum class AdvanceMode
