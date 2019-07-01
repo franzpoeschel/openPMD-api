@@ -1257,10 +1257,14 @@ namespace detail
         }
         if ( m_engine )
         {
-            if (duringStep)
+            if ( duringStep && !endOfStream )
             {
                 writeChunkTables();
-                m_engine->EndStep();
+                // TODO check whether it is correct to assume that
+                // it is sufficient to call close when a step is still
+                // active
+                // calling EndStep() can lead to problems if the previous
+                // call to BeginStep() returned EndOfStream or similar
             }
             m_engine->Close( );
         }
@@ -1360,6 +1364,10 @@ namespace detail
 
     void BufferedActions::flush( )
     {
+        if( endOfStream )
+        {
+            return;
+        }
         auto & eng = getEngine( );
         if ( !duringStep )
         {
@@ -1432,6 +1440,7 @@ namespace detail
             switch ( getEngine().BeginStep() )
             {
             case adios2::StepStatus::EndOfStream:
+                endOfStream = true;
                 status = AdvanceStatus::OVER;
                 break;
             default:
