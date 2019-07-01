@@ -39,6 +39,7 @@
 #include <vector>
 #include <future>
 #include <tuple>
+#include <map>
 
 
 #if openPMD_HAVE_ADIOS2
@@ -592,8 +593,8 @@ namespace detail
     struct TableReadPostprocessing : BufferedAction
     {
         Parameter< Operation::AVAILABLE_CHUNKS > param;
-        std::vector< Extent::value_type > data;
-        adios2::Dims shape;
+        std::vector< std::vector< Extent::value_type > > data;
+        std::vector< adios2::Dims > shapes;
 
         void run( BufferedActions & ) override;
     };
@@ -677,9 +678,17 @@ namespace detail
          * the dataset's name), create the variable because we are going to
          * write to it. Otherwise look if the variable is present in m_IO.
          */
-        adios2::Variable< extent_t > chunksOfDataset( std::string const & );
+        
+        std::vector< adios2::Variable< extent_t > > 
+        availabeTablesPerRank( std::string dataset );
 
     private:
+        /*
+         * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
+         */
+        std::string chunkTablePrefix( std::string dataset, bool includeRank);
+        
+        adios2::Variable< extent_t > createChunkTable( std::string dataset );
 
         void configure_IO(ADIOS2IOHandlerImpl& impl);
 
