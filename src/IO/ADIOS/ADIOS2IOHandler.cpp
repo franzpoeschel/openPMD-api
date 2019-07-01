@@ -516,8 +516,7 @@ ADIOS2IOHandlerImpl::advance(
 {
     auto file = refreshFileFromParent( writable );
     auto & ba = getFileData( file );
-    parameters.task = std::make_shared< std::packaged_task< AdvanceStatus() > >(
-        ba.advance( parameters.mode ) );
+    *parameters.task = ba.advance( parameters.mode );
 }
 
 void
@@ -1417,7 +1416,9 @@ namespace detail
             currentStep++;
             duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
-                []() { return AdvanceStatus::OK; } );
+                []() {
+                    return AdvanceStatus::OK;
+                } );
         }
         case AdvanceMode::READ:
         {
