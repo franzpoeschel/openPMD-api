@@ -1166,13 +1166,10 @@ namespace detail
     void detail::BufferedTableRead::run( BufferedActions & ba )
     {
         using var_t = adios2::Variable< BufferedActions::extent_t >;
-        std::vector< var_t > tables
+        std::map< int, var_t > tables
             = ba.availabeTablesPerRank( name );
         TableReadPostprocessing trp;
-        trp.data = decltype( TableReadPostprocessing::data )( tables.size() );
         trp.param = param;
-        trp.shapes = 
-                decltype( TableReadPostprocessing::shapes)( tables.size() );
         adios2::Engine & engine = ba.getEngine();
         for( size_t rank = 0; rank < tables.size(); rank++ )
         {
@@ -1192,7 +1189,7 @@ namespace detail
 
     void detail::TableReadPostprocessing::run( BufferedActions & )
     {
-        ChunkTable res( shapes.size() );
+        ChunkTable res;
         for( size_t rank = 0; rank < shapes.size(); rank++ )
         {
             ChunkTable::T_perRank & currentRank = res.chunkTable[ rank ];
@@ -1260,11 +1257,7 @@ namespace detail
             if ( duringStep && !endOfStream )
             {
                 writeChunkTables();
-                // TODO check whether it is correct to assume that
-                // it is sufficient to call close when a step is still
-                // active
-                // calling EndStep() can lead to problems if the previous
-                // call to BeginStep() returned EndOfStream or similar
+                m_engine->EndStep();
             }
             m_engine->Close( );
         }
@@ -1442,12 +1435,13 @@ namespace detail
             case adios2::StepStatus::EndOfStream:
                 endOfStream = true;
                 status = AdvanceStatus::OVER;
+                duringStep = false;
                 break;
             default:
                 status = AdvanceStatus::OK;
+                duringStep = true;
                 break;
             }
-            duringStep = true;
             return std::packaged_task< AdvanceStatus() >(
                 [status]() { return status; } );
         }
@@ -1463,7 +1457,7 @@ namespace detail
         m_buffer.clear( );
     }
     
-    std::vector< adios2::Variable< BufferedActions::extent_t > > 
+    std::map< int, adios2::Variable< BufferedActions::extent_t > > 
     BufferedActions::availabeTablesPerRank( std::string dataset )
     {
         std::list< std::string > variableNames;
@@ -1476,7 +1470,7 @@ namespace detail
             }
         }
         auto writer_mpi_size = variableNames.size();
-        std::vector< adios2::Variable< extent_t > > res( writer_mpi_size );
+        std::map< int, adios2::Variable< extent_t > > res;
         for( std::string const & var : variableNames )
         {
             adios2::Variable< extent_t > table = 
@@ -1492,15 +1486,6 @@ namespace detail
                 "dataset " + dataset );
             res[ rank ] = std::move( table );
         }
-        VERIFY_ALWAYS(
-            std::all_of(
-                res.begin(),
-                res.end(),
-                []( adios2::Variable< extent_t > & var ){
-                    return var.operator bool(); 
-                }),
-            "ADIOS2 backend: 2 failed trying to load chunk tables for "
-            "dataset " + dataset );
         return res;
     }
 
