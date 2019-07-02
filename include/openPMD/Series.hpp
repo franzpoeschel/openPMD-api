@@ -262,7 +262,7 @@ public:
     void flushMeshesPath();
     void flushParticlesPath();
     void readFileBased();
-    void readGroupBased();
+    void readGroupBased( bool init = true );
     void readBase();
     void read();
     std::string iterationFilename(uint64_t i);

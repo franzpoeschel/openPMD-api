@@ -387,6 +387,20 @@ Series::advance( AdvanceMode mode )
             flushGroupBased();
             auxiliary::ConsumingFuture< AdvanceStatus > future =
                 advance( mode, *m_name );
+            // re-read -> new datasets might be available
+            if( IOHandler->accessTypeFrontend == AccessType::READ_ONLY
+                || IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
+            {
+                bool previous = iterations.written;
+                iterations.written = false;
+                auto oldType = IOHandler->accessTypeFrontend;
+                auto newType = 
+                    const_cast< AccessType* >(&IOHandler->accessTypeFrontend);
+                *newType = AccessType::READ_WRITE;
+                readGroupBased( false );
+                *newType = oldType;
+                iterations.written = previous;
+            } 
             future(); // run the future
             return std::unique_ptr< std::future< AdvanceStatus > >(
                 new auxiliary::ConsumingFuture< AdvanceStatus >(
@@ -728,54 +742,52 @@ Series::readFileBased()
 }
 
 void
-Series::readGroupBased()
+Series::readGroupBased( bool init )
 {
     Parameter< Operation::OPEN_FILE > fOpen;
     fOpen.name = *m_name;
     IOHandler->enqueue(IOTask(this, fOpen));
     IOHandler->flush();
 
-    readBase();
-
-    using DT = Datatype;
-    Parameter< Operation::READ_ATT > aRead;
-    aRead.name = "iterationEncoding";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
-    if( *aRead.dtype == DT::STRING )
+    if( init )
     {
-        std::string encoding = Attribute(*aRead.resource).get< std::string >();
-        if( encoding == "groupBased" )
-            *m_iterationEncoding = IterationEncoding::groupBased;
-        else if( encoding == "fileBased" )
+        readBase();
+
+        using DT = Datatype;
+        Parameter< Operation::READ_ATT > aRead;
+        aRead.name = "iterationEncoding";
+        IOHandler->enqueue(IOTask(this, aRead));
+        IOHandler->flush();
+        if( *aRead.dtype == DT::STRING )
         {
-            *m_iterationEncoding = IterationEncoding::fileBased;
-            std::cerr << "Series constructor called with explicit iteration suggests loading a "
-                      << "single file with groupBased iteration encoding. Loaded file is fileBased.\n";
-        } else
-            throw std::runtime_error("Unknown iterationEncoding: " + encoding);
-        setAttribute("iterationEncoding", encoding);
-    }
-    else
-        throw std::runtime_error("Unexpected Attribute datatype for 'iterationEncoding'");
+            std::string encoding = Attribute(*aRead.resource).get< std::string >();
+            if( encoding == "groupBased" )
+                *m_iterationEncoding = IterationEncoding::groupBased;
+            else if( encoding == "fileBased" )
+            {
+                *m_iterationEncoding = IterationEncoding::fileBased;
+                std::cerr << "Series constructor called with explicit iteration suggests loading a "
+                          << "single file with groupBased iteration encoding. Loaded file is fileBased.\n";
+            } else
+                throw std::runtime_error("Unknown iterationEncoding: " + encoding);
+            setAttribute("iterationEncoding", encoding);
+        }
+        else
+            throw std::runtime_error("Unexpected Attribute datatype for 'iterationEncoding'");
 
-    aRead.name = "iterationFormat";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
-    if( *aRead.dtype == DT::STRING )
-    {
-        written = false;
-        setIterationFormat(Attribute(*aRead.resource).get< std::string >());
-        written = true;
-    }
-    else
-        throw std::runtime_error("Unexpected Attribute datatype for 'iterationFormat'");
+        aRead.name = "iterationFormat";
+        IOHandler->enqueue(IOTask(this, aRead));
+        IOHandler->flush();
+        if( *aRead.dtype == DT::STRING )
+        {
+            written = false;
+            setIterationFormat(Attribute(*aRead.resource).get< std::string >());
+            written = true;
+        }
+        else
+            throw std::runtime_error("Unexpected Attribute datatype for 'iterationFormat'");
 
-    /* do not use the public checked version
-     * at this point we can guarantee clearing the container won't break anything */
-    written = false;
-    iterations.clear_unchecked();
-    written = true;
+    }
 
     read();
 }
@@ -872,7 +884,7 @@ Series::read()
     Parameter< Operation::LIST_PATHS > pList;
     IOHandler->enqueue(IOTask(&iterations, pList));
     IOHandler->flush();
-
+    
     for( auto const& it : *pList.paths )
     {
         Iteration& i = iterations[std::stoull(it)];

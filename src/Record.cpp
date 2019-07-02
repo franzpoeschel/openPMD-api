@@ -94,9 +94,6 @@ Record::read()
         this->at(RecordComponent::SCALAR).read();
     } else
     {
-        written = false;
-        clear_unchecked();
-        written = true;
         Parameter< Operation::LIST_PATHS > pList;
         IOHandler->enqueue(IOTask(this, pList));
         IOHandler->flush();
