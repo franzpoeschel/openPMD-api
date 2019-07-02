@@ -596,8 +596,8 @@ namespace detail
     struct TableReadPostprocessing : BufferedAction
     {
         Parameter< Operation::AVAILABLE_CHUNKS > param;
-        std::vector< std::vector< Extent::value_type > > data;
-        std::vector< adios2::Dims > shapes;
+        std::map< int, std::vector< Extent::value_type > > data;
+        std::map< int, adios2::Dims > shapes;
 
         void run( BufferedActions & ) override;
     };
@@ -682,7 +682,7 @@ namespace detail
          * write to it. Otherwise look if the variable is present in m_IO.
          */
         
-        std::vector< adios2::Variable< extent_t > > 
+        std::map< int, adios2::Variable< extent_t > >
         availabeTablesPerRank( std::string dataset );
 
     private:
