@@ -911,7 +911,7 @@ Series::advance( AdvanceMode mode, std::string )
 {
     // resolve AdvanceMode
     AccessType at = IOHandler->accessTypeFrontend;
-    AdvanceMode actualMode;
+    AdvanceMode actualMode = mode;
     switch( mode )
     {
         case AdvanceMode::AUTO:
