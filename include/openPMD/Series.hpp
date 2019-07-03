@@ -67,7 +67,7 @@ public:
     Series(std::string const& filepath,
            AccessType at,
            MPI_Comm comm,
-           std::string const& options = {});
+           std::string const& options);
 #endif
     Series(std::string const& filepath,
            AccessType at,
