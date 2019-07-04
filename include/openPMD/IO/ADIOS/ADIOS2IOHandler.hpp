@@ -629,6 +629,7 @@ namespace detail
         // Does the engine currently have an active step?
         bool duringStep = false;
         bool endOfStream = false;
+        bool isStreaming = false;
         int mpi_rank, mpi_size;
         size_t currentStep = 0;
 

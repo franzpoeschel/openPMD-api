@@ -62,25 +62,25 @@ namespace openPMD
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( 
     AbstractIOHandler * handler,
     MPI_Comm communicator,
-    nlohmann::json config )
+    nlohmann::json cfg )
 : AbstractIOHandlerImplCommon( handler ), m_comm{communicator},
   m_ADIOS{communicator, ADIOS2_DEBUG_MODE}
 {
-    init( std::move( config ) );
+    init( std::move( cfg ) );
 }
 
 #endif // openPMD_HAVE_MPI
 
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( 
-    AbstractIOHandler * handler, nlohmann::json config )
+    AbstractIOHandler * handler, nlohmann::json cfg )
 : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
 {
-    init( std::move( config ) );
+    init( std::move( cfg ) );
 }
 
 
 void
-ADIOS2IOHandlerImpl::init( nlohmann::json config )
+ADIOS2IOHandlerImpl::init( nlohmann::json cfg )
 {
     try
     {
@@ -98,9 +98,9 @@ ADIOS2IOHandlerImpl::init( nlohmann::json config )
     {
         // m_sz stays a "false" operator
     }
-    if ( config.contains( "adios2" ) )
+    if ( cfg.contains( "adios2" ) )
     {
-        m_config = std::move( config[ "adios2" ] );
+        m_config = std::move( cfg[ "adios2" ] );
     }
 }
 
@@ -1275,11 +1275,44 @@ namespace detail
     }
 
     void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
+        static std::set< std::string > streamingEngines = {
+            "sst",
+            "insitumpi",
+            "inline"
+        };
+        static std::set< std::string > fileEngines = {
+            "bp3",
+            "hdf5"
+        };
+        
         std::set< std::string > alreadyConfigured;
         auto & engine = impl.config( detail::str_engine );
         if( !engine.is_null() )
         {
-            m_IO.SetEngine( impl.config( detail::str_type, engine ));
+            std::string type = impl.config( detail::str_type, engine );
+            m_IO.SetEngine( type );
+            {
+                auto it = streamingEngines.find( type );
+                if( it != streamingEngines.end() )
+                {
+                    isStreaming = true;
+                }
+                else
+                {
+                    it = fileEngines.find( type );
+                    if( it != fileEngines.end() )
+                    {
+                        isStreaming = false;
+                    }
+                    else
+                    {
+                        std::cerr << "Unknown engine type (" << 
+                            type << "). Defaulting to non-streaming mode."
+                            << std::endl;
+                        isStreaming = false;
+                    }
+                }
+            }
             auto & params = impl.config( detail::str_params, engine );
             if( params.is_object() )
             {
@@ -1291,7 +1324,8 @@ namespace detail
             }
         }
 
-        auto notYetConfigured = [&alreadyConfigured]
+        auto notYetConfigured =
+            [&alreadyConfigured]
             ( std::string const & param )
         {
             auto it = alreadyConfigured.find( param );
@@ -1413,6 +1447,16 @@ namespace detail
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
+        if( !isStreaming )
+        {
+            std::cerr << "Warning: called Series::advance() in non-streaming"
+                << "mode. Defaulting to performing a flush." << std::endl;
+            flush();
+            return std::packaged_task< AdvanceStatus() >(
+                []() {
+                    return AdvanceStatus::OK;
+                } );
+        }
         switch (mode) {
         case AdvanceMode::WRITE:
         {
