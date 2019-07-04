@@ -41,7 +41,7 @@ namespace openPMD
         AccessType accessType,
         Format format,
         MPI_Comm comm,
-        AbstractIOHandler::options_t options = {}
+        std::string const & options = "{}"
     );
 #endif
 
@@ -57,6 +57,6 @@ namespace openPMD
         std::string path,
         AccessType accessType,
         Format format,
-        AbstractIOHandler::options_t options = {}
+        std::string const & options = "{}"
     );
 } // openPMD
