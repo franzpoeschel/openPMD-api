@@ -40,6 +40,7 @@
 #include <future>
 #include <tuple>
 #include <map>
+#include <nlohmann/json.hpp>
 
 
 #if openPMD_HAVE_ADIOS2
@@ -96,13 +97,13 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm );
+    ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm, nlohmann::json config );
 
     MPI_Comm m_comm;
 
 #endif // openPMD_HAVE_MPI
 
-    explicit ADIOS2IOHandlerImpl( AbstractIOHandler * );
+    explicit ADIOS2IOHandlerImpl( AbstractIOHandler *, nlohmann::json config );
 
 
     ~ADIOS2IOHandlerImpl( ) override;
@@ -183,10 +184,10 @@ public:
 private:
     adios2::ADIOS m_ADIOS;
     // data is held by m_handler
-    nlohmann::json * m_config{ nullptr };
+    nlohmann::json m_config;
     static nlohmann::json nullvalue;
 
-    void init( );
+    void init( nlohmann::json config );
 
     template< typename Key >
     nlohmann::json & config( Key && key, nlohmann::json & cfg )
@@ -200,18 +201,11 @@ private:
             return nullvalue;
         }
     }
-
+    
     template< typename Key >
     nlohmann::json & config( Key && key )
     {
-        if( m_config )
-        {
-            return config( std::forward< Key >( key ), *m_config );
-        }
-        else
-        {
-            return nullvalue;
-        }
+        return config< Key >( std::forward< Key >( key ), m_config );
     }
 
     /*
@@ -721,12 +715,12 @@ public:
 #if openPMD_HAVE_MPI
 
     ADIOS2IOHandler( std::string path, AccessType, MPI_Comm,
-        AbstractIOHandler::options_t options );
+        nlohmann::json options );
 
 #endif
 
     ADIOS2IOHandler( std::string path, AccessType,
-        AbstractIOHandler::options_t options);
+        nlohmann::json options);
 
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler

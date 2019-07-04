@@ -99,41 +99,28 @@ struct Series::ParsedInput
 Series::Series(std::string const& filepath,
                AccessType at,
                MPI_Comm comm,
-               options_t options)
+               std::string const& options)
         : iterations{Container< Iteration, uint64_t >()},
           m_iterationEncoding{std::make_shared< IterationEncoding >()}
 {
     auto input = parseInput(filepath);
     auto handler = createIOHandler(
-        input->path, at, input->format, comm, std::move(options));
+        input->path, at, input->format, comm, options);
     init(handler, std::move(input));
 }
-
-Series::Series(std::string const& filepath,
-               AccessType at,
-               MPI_Comm comm,
-               std::string const& options)
-        : Series( filepath, at, comm, nlohmann::json::parse( options ) )
-{}
 #endif
 
 Series::Series(std::string const& filepath,
                AccessType at,
-               options_t options)
+               std::string const& options)
         : iterations{Container< Iteration, uint64_t >()},
           m_iterationEncoding{std::make_shared< IterationEncoding >()}
 {
     auto input = parseInput(filepath);
     auto handler = createIOHandler(
-        input->path, at, input->format, std::move(options));
+        input->path, at, input->format, options);
     init(handler, std::move(input));
 }
-
-Series::Series(std::string const& filepath,
-               AccessType at,
-               std::string const& options )
-        : Series( filepath, at, nlohmann::json::parse( options ) )
-{}
 
 Series::~Series()
 {

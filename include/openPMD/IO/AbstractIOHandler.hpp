@@ -36,8 +36,6 @@
 #include <string>
 #include <map>
 
-#include <nlohmann/json.hpp>
-
 namespace openPMD
 {
 class no_such_file_error : public std::runtime_error
@@ -70,27 +68,22 @@ public:
 class AbstractIOHandler
 {
 public:
-    using options_t = nlohmann::json;
 #if openPMD_HAVE_MPI
     AbstractIOHandler(
         std::string path,
         AccessType at,
-        MPI_Comm,
-        options_t options = {} )
+        MPI_Comm )
         : directory{std::move(path)},
           accessTypeBackend{at},
-          accessTypeFrontend{at},
-          m_options{options}
+          accessTypeFrontend{at}
     { }
 #endif
     AbstractIOHandler(
         std::string path,
-        AccessType at,
-        options_t options = {} )
+        AccessType at )
         : directory{std::move(path)},
           accessTypeBackend{at},
-          accessTypeFrontend{at},
-          m_options{options}
+          accessTypeFrontend{at}
     { }
     virtual ~AbstractIOHandler() = default;
 
@@ -113,7 +106,6 @@ public:
     AccessType const accessTypeBackend;
     AccessType const accessTypeFrontend;
     std::queue< IOTask > m_work;
-    options_t m_options;
 }; // AbstractIOHandler
 
 } // namespace openPMD

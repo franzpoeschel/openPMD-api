@@ -59,30 +59,32 @@ namespace openPMD
 
 #if openPMD_HAVE_MPI
 
-ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
+ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( 
     AbstractIOHandler * handler,
-    MPI_Comm communicator )
-    : AbstractIOHandlerImplCommon( handler )
-    , m_comm{ communicator }
-    , m_ADIOS{ communicator, ADIOS2_DEBUG_MODE }
+    MPI_Comm communicator,
+    nlohmann::json config )
+: AbstractIOHandlerImplCommon( handler ), m_comm{communicator},
+  m_ADIOS{communicator, ADIOS2_DEBUG_MODE}
 {
+    init( std::move( config ) );
 }
 
 #endif // openPMD_HAVE_MPI
 
-ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( AbstractIOHandler * handler )
+ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( 
+    AbstractIOHandler * handler, nlohmann::json config )
 : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
 {
-    init( );
+    init( std::move( config ) );
 }
 
 
 void
-ADIOS2IOHandlerImpl::init( )
+ADIOS2IOHandlerImpl::init( nlohmann::json config )
 {
-    if ( m_handler->m_options.contains( "adios2" ) )
+    if ( config.contains( "adios2" ) )
     {
-        m_config = & m_handler->m_options[ "adios2" ];
+        m_config = std::move( config[ "adios2" ] );
     }
 }
 
@@ -1540,9 +1542,9 @@ ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
     openPMD::AccessType at,
     MPI_Comm comm,
-    AbstractIOHandler::options_t options ) :
-    AbstractIOHandler( std::move( path ), at, comm, std::move( options ) ),
-    m_impl{ this, comm
+    nlohmann::json options )
+    : AbstractIOHandler( std::move( path ), at, comm )
+    , m_impl{ this, comm, std::move( options )
 
     }
 {
@@ -1553,9 +1555,9 @@ ADIOS2IOHandler::ADIOS2IOHandler(
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
     AccessType at,
-    AbstractIOHandler::options_t options ) :
-    AbstractIOHandler( std::move( path ), at, std::move( options ) ),
-    m_impl{ this }
+    nlohmann::json options )
+    : AbstractIOHandler( std::move( path ), at )
+    , m_impl{ this, std::move( options ) }
 {
 }
 

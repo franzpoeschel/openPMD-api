@@ -58,25 +58,16 @@ class Series : public Attributable
     friend class Iteration;
 
 public:
-    using options_t = AbstractIOHandler::options_t;
 #if openPMD_HAVE_MPI
     Series(std::string const& filepath,
            AccessType at,
            MPI_Comm comm,
-           options_t options = {});
-
-    Series(std::string const& filepath,
-           AccessType at,
-           MPI_Comm comm,
-           std::string const& options);
+           std::string const& options = "{}");
 #endif
-    Series(std::string const& filepath,
-           AccessType at,
-           options_t options = {});
 
     Series(std::string const& filepath,
            AccessType at,
-           std::string const& options );
+           std::string const& options = "{}");
     ~Series();
 
 
