@@ -1407,7 +1407,10 @@ namespace detail
             return;
         }
         auto & eng = getEngine( );
-        if ( !duringStep )
+        /*
+         * Only open a new step if it is necessary.
+         */
+        if ( !duringStep && !m_buffer.empty() )
         {
             eng.BeginStep();
             duringStep = true;
@@ -1461,10 +1464,18 @@ namespace detail
         case AdvanceMode::WRITE:
         {
             /*
-             * This also forces a Engine::BeginStep() if no step
-             * is currently active, ensuring that the next step
-             * will start.
+             * Advance mode write:
+             * Close the current step, defer opening the new step
+             * until one is actually needed:
+             * (1) The engine is accessed in BufferedActions::flush
+             * (2) A new step is opened before the currently active step
+             *     has seen an access. See the following lines: open the 
+             *     step just to skip it again.
              */
+            if( !duringStep )
+            {
+                getEngine().BeginStep();
+            }
             flush();
             writeChunkTables();
             getEngine().EndStep();
