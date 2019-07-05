@@ -42,6 +42,7 @@ namespace openPMD
         std::string const & options
     )
     {
+        nlohmann::json optionsJson = nlohmann::json::parse( options );
         switch( format )
         {
             case Format::HDF5:
@@ -54,7 +55,7 @@ namespace openPMD
                 return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
 #   endif
             case Format::ADIOS2:
-                return std::make_shared<ADIOS2IOHandler>(path, accessTypeBackend, comm, std::move(options));
+                return std::make_shared<ADIOS2IOHandler>(path, accessTypeBackend, comm, std::move(optionsJson));
             default:
                 return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
         }

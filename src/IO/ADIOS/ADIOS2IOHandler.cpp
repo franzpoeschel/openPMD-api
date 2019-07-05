@@ -1452,7 +1452,7 @@ namespace detail
     {
         if( !isStreaming )
         {
-            std::cerr << "Warning: called Series::advance() in non-streaming"
+            std::cerr << "Warning: called Series::advance() in non-streaming "
                 << "mode. Defaulting to performing a flush." << std::endl;
             flush();
             return std::packaged_task< AdvanceStatus() >(
