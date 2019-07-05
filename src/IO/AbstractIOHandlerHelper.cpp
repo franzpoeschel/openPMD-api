@@ -42,27 +42,22 @@ createIOHandler(
     MPI_Comm comm,
     std::string const & options )
 {
+    nlohmann::json optionsJson = nlohmann::json::parse( options );
     switch( format )
     {
         case Format::HDF5:
-            return std::make_shared< ParallelHDF5IOHandler >(
-                path, accessTypeBackend, comm );
+            return std::make_shared< ParallelHDF5IOHandler >(path, accessTypeBackend, comm);
         case Format::ADIOS1:
-#    if openPMD_HAVE_ADIOS1
-            return std::make_shared< ParallelADIOS1IOHandler >(
-                path, accessTypeBackend, comm );
-#    else
-            throw std::runtime_error(
-                "openPMD-api built without ADIOS1 support" );
-            return std::make_shared< DummyIOHandler >(
-                path, accessTypeBackend );
-#    endif
+#   if openPMD_HAVE_ADIOS1
+            return std::make_shared< ParallelADIOS1IOHandler >(path, accessTypeBackend, comm);
+#   else
+            throw std::runtime_error("openPMD-api built without ADIOS1 support");
+            return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
+#   endif
         case Format::ADIOS2:
-            return std::make_shared< ADIOS2IOHandler >(
-                path, accessTypeBackend, comm, std::move( options ) );
+            return std::make_shared<ADIOS2IOHandler>(path, accessTypeBackend, comm, std::move(optionsJson));
         default:
-            return std::make_shared< DummyIOHandler >(
-                path, accessTypeBackend );
+            return std::make_shared< DummyIOHandler >(path, accessTypeBackend);
     }
 }
 #endif
