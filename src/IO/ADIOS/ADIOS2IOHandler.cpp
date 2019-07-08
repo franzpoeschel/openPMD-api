@@ -1441,15 +1441,24 @@ namespace detail
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
+        // TODO refactor this a bit
         if( !isStreaming )
         {
             std::cerr << "Warning: called Series::advance() in non-streaming "
                 << "mode. Defaulting to performing a flush." << std::endl;
             flush();
-            return std::packaged_task< AdvanceStatus() >(
-                []() {
-                    return AdvanceStatus::OK;
-                } );
+            switch (mode) {
+            case AdvanceMode::READ:
+                return std::packaged_task< AdvanceStatus() >(
+                    []() {
+                        return AdvanceStatus::OVER;
+                    } );
+            case AdvanceMode::WRITE:
+                return std::packaged_task< AdvanceStatus() >(
+                    []() {
+                        return AdvanceStatus::OK;
+                    } );
+            }
         }
         switch (mode) {
         case AdvanceMode::WRITE:
