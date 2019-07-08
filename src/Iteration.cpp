@@ -83,6 +83,26 @@ Iteration::setTimeUnitSI(double newTimeUnitSI)
     return *this;
 }
 
+Iteration&
+Iteration::setFinalized( bool finalized )
+{
+    setAttribute( "finalized", finalized );
+    return *this;
+}
+
+bool
+Iteration::finalized()
+{
+    if( containsAttribute( "finalized" ) )
+    {
+        return getAttribute( "finalized" ).get< bool >();
+    }
+    else
+    {
+        return false;
+    }
+}
+
 void
 Iteration::flushFileBased(std::string const& filename, uint64_t i)
 {
