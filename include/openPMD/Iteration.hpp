@@ -86,6 +86,10 @@ public:
      */
     Iteration& setTimeUnitSI(double newTimeUnitSI);
 
+    Iteration& setFinalized( bool finalized = true );
+
+    bool finalized();
+
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
 
