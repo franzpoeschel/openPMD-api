@@ -215,10 +215,17 @@ void ADIOS2IOHandlerImpl::createDataset(
         {
             compression = getCompressionOperator( parameters.compression );
         }
+        auto & fileData = getFileData( file );
         switchType( parameters.dtype, detail::VariableDefiner( ),
-                    getFileData( file ).m_IO, varName,
+                    fileData.m_IO, varName,
                     std::move( compression ), parameters.extent );
         writable->written = true;
+
+        fileData.m_IO.DefineAttribute< uint8_t >(
+            detail::openPMD_internal + 
+            std::string( "datasets" )
+            + varName,
+            0 ); // dummy value, we only need the attribute
         m_dirty.emplace( file );
     }
 }
@@ -398,8 +405,8 @@ void ADIOS2IOHandlerImpl::listPaths(
      * inspected.
      */
     std::vector< std::string > delete_me;
-    auto f = [myName, &subdirs, &delete_me](
-                 std::vector< std::string > & varsOrAttrs, bool variables ) {
+    auto f = [myName, &subdirs, &delete_me]
+        ( std::unordered_set< std::string > & varsOrAttrs, bool variables ) {
         for ( auto var : varsOrAttrs )
         {
             if ( auxiliary::starts_with( var, myName ) )
@@ -418,16 +425,30 @@ void ADIOS2IOHandlerImpl::listPaths(
             }
         }
     };
-    std::vector< std::string > vars;
+    std::unordered_set< std::string > vars;
     for ( auto const & p : IO.AvailableVariables( ) )
     {
-        vars.emplace_back( p.first );
+        vars.emplace( p.first );
+    }
+    for ( auto const & p : 
+        IO.AvailableAttributes(
+            detail::openPMD_internal
+            + std::string( "datasets" ) ) )
+    {
+        if( auxiliary::starts_with( p.first, '/' ) )
+        {
+            vars.emplace( p.first );
+        }
+        else
+        {
+            vars.emplace( '/' + p.first );
+        }
     }
 
-    std::vector< std::string > attrs;
+    std::unordered_set< std::string > attrs;
     for ( auto const & p : IO.AvailableAttributes( ) )
     {
-        attrs.emplace_back( p.first );
+        attrs.emplace( p.first );
     }
     f( vars, true );
     f( attrs, false );
@@ -462,16 +483,37 @@ void ADIOS2IOHandlerImpl::listDatasets(
      * yes.
      */
 
-    std::map< std::string, adios2::Params > vars =
-        getFileData( file ).m_IO.AvailableVariables( );
+    auto & fileData = getFileData( file );
+    std::unordered_set< std::string > datasetsRaw;
+    {
+        std::map< std::string, adios2::Params > vars =
+            fileData.m_IO.AvailableVariables( );
+        for( auto & pair : vars )
+        {
+            datasetsRaw.emplace( pair.first );
+        }
+        auto metaAttributes = fileData.m_IO.AvailableAttributes(
+            detail::openPMD_internal + std::string( "datasets" )
+        );
+        for( auto & pair : metaAttributes )
+        {
+            if( auxiliary::starts_with( pair.first, '/' ) )
+            {
+                datasetsRaw.emplace( pair.first );
+            }
+            else
+            {
+                datasetsRaw.emplace( '/' + pair.first );
+            }
+        }
+    }
 
     std::unordered_set< std::string > subdirs;
-    for ( auto & pair : vars )
+    for ( auto var : datasetsRaw )
     {
-        std::string var = pair.first;
         if ( auxiliary::starts_with( var, myName ) )
         {
-            var = auxiliary::replace_first( var, myName, "" );
+            var = auxiliary::replace_first( std::move( var ), myName, "" );
             auto firstSlash = var.find_first_of( '/' );
             if ( firstSlash == std::string::npos )
             {
@@ -483,6 +525,11 @@ void ADIOS2IOHandlerImpl::listDatasets(
     for ( auto & dataset : subdirs )
     {
         parameters.datasets->emplace_back( std::move( dataset ) );
+    }
+    std::cerr << "found datasets: ";
+    for( auto & dataset : *parameters.datasets )
+    {
+        std::cerr << dataset << ", ";
     }
 }
 
@@ -520,6 +567,7 @@ ADIOS2IOHandlerImpl::advance(
     auto file = refreshFileFromParent( writable );
     auto & ba = getFileData( file );
     *parameters.task = ba.advance( parameters.mode );
+    currentStep++;
 }
 
 void
@@ -1563,7 +1611,8 @@ namespace detail
         {
             dataset = '/' + dataset;
         }
-        std::string res =  "/openPMD_internal/chunkTablesPerStepAndRank/"
+        std::string res =  openPMD_internal
+            + std::string( "chunkTablesPerStepAndRank/" )
             + std::to_string( currentStep )
             + dataset;
         if( includeRank )

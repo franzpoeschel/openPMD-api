@@ -189,6 +189,7 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+    size_t currentStep = 0;
     // data is held by m_handler
     nlohmann::json m_config;
     static nlohmann::json nullvalue;
@@ -304,6 +305,7 @@ namespace detail
     constexpr char const * const str_engine = "engine";
     constexpr char const * str_type = "type";
     constexpr char const * str_params = "parameters";
+    constexpr char const * openPMD_internal = "/openPMD_internal/";
 
     // Helper structs for calls to the switchType function
 
