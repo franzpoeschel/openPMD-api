@@ -895,7 +895,19 @@ namespace detail
         throw std::runtime_error( "Defining a variable with undefined type." );
     }
 
+    template < typename T, typename... Params >
+    void DummyWriter::operator( )( Params &&... params )
+    {
+        DatasetHelper< T >::writeDummy( std::forward< Params >( params )... );
+    }
 
+    template < int n, typename... Args >
+    void DummyWriter::operator( )( Args&&... )
+    {
+        std::cerr << "Warning: failed retrieving a variable while trying "
+            "to write a dummy value. Continuing." << std::endl;
+            return;
+    }
 
     template < typename T >
     typename AttributeTypes< T >::Attr
@@ -1094,6 +1106,35 @@ namespace detail
     }
 
     template < typename T >
+    void DatasetHelper<
+        T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
+        writeDummy(
+            std::string const & varName,
+            adios2::IO IO,
+            adios2::Engine engine )
+    {
+        adios2::Variable< T > var = IO.InquireVariable< T >( varName );
+        if( !var )
+        {
+            std::cerr << "Warning: failed retrieving a variable while trying "
+                "to write a dummy value. Continuing." << std::endl;
+                return;
+        }
+        adios2::Dims extent = var.Shape( );
+        adios2::Dims offset = extent;
+        for( auto & offs : offset )
+        {
+            offs = 0;
+        }
+        for( auto & ext : extent )
+        {
+            ext = 0;
+        }
+        var.SetSelection( { offset, extent } );
+        engine.Put( var, T() );
+    }
+
+    template < typename T >
     DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         DatasetHelper( openPMD::ADIOS2IOHandlerImpl * )
@@ -1142,6 +1183,15 @@ namespace detail
     void DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         writeDataset( Params &&... )
+    {
+        throwErr( );
+    }
+
+    template < typename T >
+    template < typename... Params >
+    void DatasetHelper<
+        T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
+        writeDummy( Params &&... )
     {
         throwErr( );
     }
@@ -1527,6 +1577,7 @@ namespace detail
             }
             flush();
             writeChunkTables();
+            writeDummies();
             getEngine().EndStep();
             writtenChunks.clear();
             currentStep++;
@@ -1646,6 +1697,35 @@ namespace detail
             table.SetSelection( { adios2::Dims{ 0, 0, 0 }, dims } );
             getEngine().Put( table, std::get< 0 >( pair.second ).data() );
         }
+    }
+
+    void BufferedActions::writeDummies( )
+    {
+        std::list< std::string > dummies;
+        for( auto & p : m_IO.AvailableVariables() )
+        {
+            if( !auxiliary::starts_with( p.first, openPMD_internal ) )
+            {
+                dummies.emplace_back( p.first );
+            }
+        }
+        for( auto & dummy : dummies )
+        {
+            auto it = writtenChunks.find( dummy );
+            if( it == writtenChunks.end() )
+            {
+                // dataset has not been written to during this adios step
+                // enforce availability by writing dummy data to it
+                static DummyWriter dw;
+                switchType(
+                    fromADIOS2Type( m_IO.VariableType( dummy ) ),
+                    dw,
+                    dummy,
+                    m_IO,
+                    getEngine() );
+            }
+        }
+
     }
 
 } // namespace detail
