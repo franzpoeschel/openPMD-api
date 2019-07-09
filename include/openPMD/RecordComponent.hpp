@@ -157,6 +157,14 @@ public:
         Extent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
+    template< typename T, typename Fun >
+    std::list< TaggedChunk< T > >    
+    loadAvailableChunks(
+        Fun provideBuffer,
+        Offset,
+        Extent,
+        double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
+
     template< typename T >
     void storeChunk(std::shared_ptr< T >, Offset, Extent);
 
@@ -334,6 +342,36 @@ RecordComponent::loadAvailableChunks(
             std::tie( offset, extent ) = chunk;
             restrictToSelection( offset, extent, withinOffset, withinExtent );
             auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
+            res.push_back( 
+                TaggedChunk< T >( 
+                    std::move( offset ), 
+                    std::move( extent ),
+                    std::move( ptr ) ) );
+        }
+    }
+    return res;
+}
+
+template< typename T, typename Fun >
+std::list< TaggedChunk< T > >
+RecordComponent::loadAvailableChunks(
+    Fun provideBuffer,
+    Offset withinOffset,
+    Extent withinExtent,
+    double targetUnitSI )
+{
+    ChunkTable table = availableChunks();
+    std::list< TaggedChunk< T > > res;
+    for( auto & perRank : table.chunkTable )
+    {
+        for( auto & chunk : perRank.second )
+        {
+            Offset offset;
+            Extent extent;
+            std::tie( offset, extent ) = chunk;
+            restrictToSelection( offset, extent, withinOffset, withinExtent );
+            auto ptr = provideBuffer( offset, extent );
+            loadChunk< T >( ptr, offset, extent, targetUnitSI );
             res.push_back( 
                 TaggedChunk< T >( 
                     std::move( offset ), 
