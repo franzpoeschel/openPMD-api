@@ -394,6 +394,14 @@ namespace detail
         void operator( )( adios2::IO & IO, Params &&... );
     };
 
+    struct DummyWriter
+    {
+        template < typename T, typename... Params >
+        void operator( )( Params &&... );
+
+        template < int n, typename... Params >
+        void operator( )( Params &&... );
+    };
 
 
     // Helper structs to help distinguish valid attribute/variable
@@ -529,6 +537,11 @@ namespace detail
                         const adios2::Dims & count, bool constantDims );
 
         void writeDataset( BufferedPut &, adios2::IO &, adios2::Engine & );
+
+        static void writeDummy( 
+            std::string const & varName,
+            adios2::IO IO,
+            adios2::Engine engine );
     };
 
     template < typename T >
@@ -548,6 +561,8 @@ namespace detail
         static void defineVariable( Params &&... );
 
         template < typename... Params > void writeDataset( Params &&... );
+
+        template < typename... Params > static void writeDummy( Params &&... );
     };
 
     // Other datatypes used in the ADIOS2IOHandler implementation
@@ -699,8 +714,9 @@ namespace detail
 
         void configure_IO(ADIOS2IOHandlerImpl& impl);
 
-
         void writeChunkTables( );
+
+        void writeDummies( );
     };
 
 
