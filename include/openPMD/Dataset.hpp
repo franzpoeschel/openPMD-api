@@ -41,6 +41,20 @@ void restrictToSelection(
 
 size_t rowMajorIndex( Offset const &, Extent const & globalExtent );
 
+template< typename T >
+struct TaggedChunk
+{
+    Offset offset;
+    Extent extent;
+    std::shared_ptr< T > data;
+
+    TaggedChunk( Offset _offset, Extent _extent, std::shared_ptr< T > _data ):
+        offset( std::move( _offset ) ),
+        extent( std::move( _extent ) ),
+        data( std::move( _data ) )
+    {}
+};
+
 class Dataset
 {
     friend class RecordComponent;
