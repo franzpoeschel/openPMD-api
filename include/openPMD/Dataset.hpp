@@ -33,6 +33,14 @@ namespace openPMD
 using Extent = std::vector< std::uint64_t >;
 using Offset = std::vector< std::uint64_t >;
 
+void restrictToSelection(
+    Offset & offset,
+    Extent & extent,
+    Offset const & withinOffset,
+    Extent const & withinExtent );
+
+size_t rowMajorIndex( Offset const &, Extent const & globalExtent );
+
 class Dataset
 {
     friend class RecordComponent;
