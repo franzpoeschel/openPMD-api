@@ -34,6 +34,8 @@
 #include <type_traits>
 #include <vector>
 #include <array>
+#include <list>
+#include <iostream>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected
@@ -144,6 +146,13 @@ public:
     template< typename T >
     void loadChunk(
         std::shared_ptr< T >,
+        Offset,
+        Extent,
+        double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
+
+    template< typename T >
+    std::list< TaggedChunk< T > >
+    loadAvailableChunks(
         Offset,
         Extent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
@@ -305,6 +314,34 @@ RecordComponent::loadChunk(std::shared_ptr< T > data, Offset o, Extent e, double
         dRead.data = std::static_pointer_cast< void >(data);
         m_chunks->push(IOTask(this, dRead));
     }
+}
+
+template< typename T >
+std::list< TaggedChunk< T > >
+RecordComponent::loadAvailableChunks(
+    Offset withinOffset,
+    Extent withinExtent,
+    double targetUnitSI )
+{
+    ChunkTable table = availableChunks();
+    std::list< TaggedChunk< T > > res;
+    for( auto & perRank : table.chunkTable )
+    {
+        for( auto & chunk : perRank.second )
+        {
+            Offset offset;
+            Extent extent;
+            std::tie( offset, extent ) = chunk;
+            restrictToSelection( offset, extent, withinOffset, withinExtent );
+            auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
+            res.push_back( 
+                TaggedChunk< T >( 
+                    std::move( offset ), 
+                    std::move( extent ),
+                    std::move( ptr ) ) );
+        }
+    }
+    return res;
 }
 
 template< typename T >

@@ -64,6 +64,7 @@ size_t rowMajorIndex( Offset const & offset, Extent const & globalExtent )
         factor *= globalExtent[i];
     }
     while ( i != 0 );
+    return res;
 }
 
 Dataset::Dataset(Datatype d, Extent e)
