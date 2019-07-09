@@ -22,10 +22,50 @@
 
 #include <iostream>
 #include <cstddef>
+#include <algorithm>
 
 
 namespace openPMD
 {
+void restrictToSelection(
+    Offset & offset,
+    Extent & extent,
+    Offset const & withinOffset,
+    Extent const & withinExtent )
+{
+    for( size_t i = 0; i < offset.size(); ++i )
+    {
+        if( offset[i] < withinOffset[i] )
+        {
+            auto delta = withinOffset[i] - offset[i];
+            offset[i] = withinOffset[i];
+            extent[i] -= delta;
+
+        }
+        auto totalExtent = extent[i] + offset[i];
+        auto totalWithinExtent = withinExtent[i] + withinOffset[i];
+        if( totalExtent > totalWithinExtent )
+        {
+            auto delta = totalExtent - totalWithinExtent;
+            extent[i] -= delta;
+        }
+    }
+}
+
+size_t rowMajorIndex( Offset const & offset, Extent const & globalExtent )
+{
+    size_t res = 0;
+    size_t factor = 1;
+    size_t i = offset.size();
+    do
+    {
+        --i;
+        res += offset[i] * factor;
+        factor *= globalExtent[i];
+    }
+    while ( i != 0 );
+}
+
 Dataset::Dataset(Datatype d, Extent e)
         : extent{e},
           dtype{d},
