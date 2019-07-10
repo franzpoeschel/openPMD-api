@@ -188,7 +188,6 @@ private:
     adios2::ADIOS m_ADIOS;
     adios2::Operator m_zfp;
     adios2::Operator m_sz;
-    size_t currentStep = 0;
     // data is held by m_handler
     nlohmann::json m_config;
     static nlohmann::json nullvalue;
