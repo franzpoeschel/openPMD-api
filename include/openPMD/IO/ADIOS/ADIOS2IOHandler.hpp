@@ -679,6 +679,8 @@ namespace detail
 
         adios2::Engine & getEngine( );
 
+        adios2::Engine & requireActiveStep( );
+
         template < typename BA > void enqueue( BA && ba );
 
         template < typename BA > void enqueue( BA && ba, decltype( m_buffer ) & );

@@ -382,7 +382,9 @@ void ADIOS2IOHandlerImpl::listPaths(
      * yes.
      */
 
-    auto & IO = getFileData( file ).m_IO;
+    auto & fileData = getFileData( file );
+    fileData.requireActiveStep( );
+    auto & IO = fileData.m_IO;
 
     std::unordered_set< std::string > subdirs;
     /*
@@ -462,8 +464,10 @@ void ADIOS2IOHandlerImpl::listDatasets(
      * yes.
      */
 
+    auto & fileData = getFileData( file );
+    fileData.requireActiveStep( );
     std::map< std::string, adios2::Params > vars =
-        getFileData( file ).m_IO.AvailableVariables( );
+        fileData.m_IO.AvailableVariables( );
 
     std::unordered_set< std::string > subdirs;
     for ( auto & pair : vars )
@@ -500,7 +504,7 @@ void ADIOS2IOHandlerImpl::listAttributes(
         attributePrefix = "";
     }
     auto & ba = getFileData( file );
-    ba.getEngine( ); // make sure that the attributes are present
+    ba.requireActiveStep( ); // make sure that the attributes are present
     auto attrs = ba.m_IO.AvailableAttributes( attributePrefix );
     for ( auto & pair : attrs )
     {
@@ -987,7 +991,9 @@ namespace detail
         openDataset( InvalidatableFile file, const std::string & varName,
                      Parameter< Operation::OPEN_DATASET > & parameters )
     {
-        auto & IO = m_impl->getFileData( file ).m_IO;
+        auto & fileData = m_impl->getFileData( file );
+        fileData.requireActiveStep();
+        auto & IO = fileData.m_IO;
         adios2::Variable< T > var = IO.InquireVariable< T >( varName );
         if ( !var )
         {
@@ -1422,6 +1428,17 @@ namespace detail
             }
         }
         return *m_engine;
+    }
+
+    adios2::Engine & BufferedActions::requireActiveStep( )
+    {
+        adios2::Engine & eng = getEngine( );
+        if ( !duringStep )
+        {
+            eng.BeginStep( );
+            duringStep = true;
+        }
+        return eng;
     }
 
     template < typename BA > void BufferedActions::enqueue( BA && ba )
