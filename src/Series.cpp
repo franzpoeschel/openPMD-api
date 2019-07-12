@@ -877,6 +877,7 @@ Series::read()
         throw std::runtime_error("Unknown openPMD version - " + version);
     IOHandler->enqueue(IOTask(&iterations, pOpen));
 
+    readAttributes();
     iterations.readAttributes();
 
     /* obtain all paths inside the basepath (i.e. all iterations) */
@@ -891,8 +892,6 @@ Series::read()
         IOHandler->enqueue(IOTask(&i, pOpen));
         i.read();
     }
-
-    readAttributes();
 }
 
 std::string
