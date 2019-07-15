@@ -150,19 +150,57 @@ public:
         Extent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
+    /**
+     * @brief Load all chunks that are available within a block of the complete
+     *        dataset. Will allocate buffers and return them. For
+     *        self-allocating memory, see 
+     *        RecordComponent::loadAvailableChunksContiguous()
+     *        for a version that allows for manual allocation.
+     * 
+     * @tparam T 
+     * @param withinOffset The offset with respect to the origin of the complete
+     *                     dataset of the block within which chunks are to be
+     *                     loaded.
+     * @param withinExtent The extent of said block.
+     * @param targetUnitSI 
+     * @return A list of chunks that will be loaded after flushing the Series.
+     */
     template< typename T >
     std::list< TaggedChunk< T > >
     loadAvailableChunks(
-        Offset,
-        Extent,
+        Offset withinOffset,
+        Extent withinExtent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
+    /**
+     * @brief Load all chunks that are available within a block of the complete
+     *        dataset. Instead of self-allocating memory, the method asks the 
+     *        caller to provide memory.
+     * 
+     * @tparam T 
+     * @tparam Fun 
+     * @param provideBuffer A functor that accepts an offset (wrt. the origin
+     *                      of the complete dataset) and an extent (wrt. the
+     *                      origin of the chunk that memory is to be allocated
+     *                      for) and returns a shared pointer that provides
+     *                      sufficient memory for loading the chunk into it.
+     *                      The returned dataset will be filled in contiguous
+     *                      manner. Loading in strided manner can be achieved
+     *                      by combining this method with 
+     *                      TaggedChunk::collectStrided()
+     * @param withinOffset The offset with respect to the origin of the complete
+     *                     dataset of the block within which chunks are to be
+     *                     loaded.
+     * @param withinExtent The extent of said block.
+     * @param targetUnitSI 
+     * @return A list of chunks that will be loaded after flushing the Series.
+     */
     template< typename T, typename Fun >
     std::list< TaggedChunk< T > >    
-    loadAvailableChunks(
+    loadAvailableChunksContiguous(
         Fun provideBuffer,
-        Offset,
-        Extent,
+        Offset withinOffset,
+        Extent withinExtent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
     template< typename T >
@@ -354,7 +392,7 @@ RecordComponent::loadAvailableChunks(
 
 template< typename T, typename Fun >
 std::list< TaggedChunk< T > >
-RecordComponent::loadAvailableChunks(
+RecordComponent::loadAvailableChunksContiguous(
     Fun provideBuffer,
     Offset withinOffset,
     Extent withinExtent,
