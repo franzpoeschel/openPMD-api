@@ -34,18 +34,57 @@ namespace openPMD
 using Extent = std::vector< std::uint64_t >;
 using Offset = std::vector< std::uint64_t >;
 
+/**
+ * @brief Restrict a block in a dataset to its intersection with another
+ *        block.
+ * 
+ * @param offset The offset wrt. the origin of the complete dataset of the block
+ *               that is to be modified.
+ * @param extent The extent of the mentioned block, wrt. to the block's own
+ *               origin.
+ * @param withinOffset The offset wrt. the origin of the complete dataset of the
+ *                     second block that will not be modified.
+ * @param withinExtent The extent of the mentioned block, wrt. to the block's
+ *                     own origin.
+ */
 void restrictToSelection(
     Offset & offset,
     Extent & extent,
     Offset const & withinOffset,
     Extent const & withinExtent );
 
-size_t rowMajorIndex( Offset const &, Extent const & globalExtent );
+/**
+ * @brief Calculate the actual index of an element in an n-dimensional 
+ *        dataset stored in row-major fashion,
+ *        given by n-dimensional coordinates.
+ * 
+ * @param offset The n-dimensional index.
+ * @param globalExtent The extent of the dataset in each dimension. If padding
+ *                     is to be considered, the extent has to be given including
+ *                     the padding.
+ * @return size_t The index wrt. the first element of the dataset.
+ */
+size_t rowMajorIndex( Offset const & offset, Extent const & globalExtent );
 
+/**
+ * @brief A chunk of actual data, tagged with meta information on the data's
+ *        position in a dataset.
+ * 
+ * @tparam T 
+ */
 template< typename T >
 struct TaggedChunk
 {
+    /**
+     * @brief The offset of the data chunk with respect to the origin of the
+     *        complete dataset.
+     * 
+     */
     Offset offset;
+    /**
+     * @brief The extent of the data chunk with respect to its own origin.
+     * 
+     */
     Extent extent;
     std::shared_ptr< T > data;
 
