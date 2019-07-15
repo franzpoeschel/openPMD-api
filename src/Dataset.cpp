@@ -67,6 +67,30 @@ size_t rowMajorIndex( Offset const & offset, Extent const & globalExtent )
     return res;
 }
 
+RowMajorIterator::RowMajorIterator( Extent _extent )
+    : extent( _extent )
+    , current( extent.size(), 0 )
+{
+}
+
+bool RowMajorIterator::step( )
+{
+    size_t dim = extent.size( );
+    while ( dim > 0 )
+    {
+        --dim;
+        if ( current[ dim ] + 1 >= extent[ dim ] )
+        {
+            current[ dim ] = 0;
+            continue;
+        }
+        ++current[ dim ];
+        ++index;
+        return true;
+    }
+    return false;
+}
+
 Dataset::Dataset(Datatype d, Extent e)
         : extent{e},
           dtype{d},

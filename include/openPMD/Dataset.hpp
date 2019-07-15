@@ -26,6 +26,7 @@
 #include <type_traits>
 #include <vector>
 #include <string>
+#include <algorithm>
 
 
 namespace openPMD
@@ -53,6 +54,17 @@ struct TaggedChunk
         extent( std::move( _extent ) ),
         data( std::move( _data ) )
     {}
+
+    void collectStrided( TaggedChunk< T > const & from );
+};
+
+struct RowMajorIterator
+{
+    Extent const extent;
+    Offset current;
+    size_t index = 0;
+    RowMajorIterator( Extent );
+    bool step( );
 };
 
 class Dataset
@@ -74,4 +86,43 @@ public:
     std::string compression;
     std::string transform;
 };
+
+template< typename T >
+void TaggedChunk< T >::collectStrided( TaggedChunk< T > const & from )
+{
+    // TODO check input
+    Extent::value_type sliceLength = from.extent[ extent.size() - 1 ];
+    size_t baseIndex;
+    {
+        Offset delta = from.offset;
+        for ( size_t i = 0; i < delta.size( ); ++i )
+        {
+            delta[ i ] -= this->offset[ i ];
+        }
+        baseIndex = rowMajorIndex( delta, this->extent );
+    }
+    Extent prefix;
+    prefix.reserve( from.extent.size() - 1 );
+    for ( size_t i = 0; i < from.extent.size() - 1; i++ )
+    {
+        prefix.push_back( from.extent[ i ] );
+    }
+    RowMajorIterator chunks( prefix );
+    do {
+        // from.offset + chunks.current is now equivalent to
+        // the position of the slice in the global dataset
+        // chunks.current is its position in from
+        // from.offset - this->offset + chunks.current is its position in this
+        // we have already calculated the base index 
+        // for from.offset - this.offset in the variable baseIndex
+        chunks.current.push_back( 0 );
+        size_t toIndex = rowMajorIndex( chunks.current, this->extent );
+        chunks.current.pop_back( );
+        std::copy_n( 
+            from.data.get() + chunks.index * sliceLength,
+            sliceLength,
+            this->data.get() + baseIndex + toIndex );
+    } while( chunks.step( ) );
+}
+
 } // openPMD
