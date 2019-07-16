@@ -62,9 +62,11 @@ namespace auxiliary
         struct AvoidVoid
         {
             using type = B( A );
+
+            template< typename Future >
             static void
             run_task(
-                std::future< A > & first,
+                Future & first,
                 std::packaged_task< type > & second )
             {
                 second( first.get() );
@@ -75,9 +77,11 @@ namespace auxiliary
         struct AvoidVoid< void, B >
         {
             using type = B();
+
+            template< typename Future >
             static void
             run_task(
-                std::future< void > &,
+                Future &,
                 std::packaged_task< type > & second )
             {
                 second();
@@ -85,22 +89,25 @@ namespace auxiliary
         };
     } // namespace detail
 
-    template< typename A, typename B >
+    template< 
+        typename A, 
+        typename B, 
+        typename Future = std::future< A > >
     ConsumingFuture< B >
     chain_futures(
-        std::unique_ptr< std::future< A > > first,
+        Future first,
         std::packaged_task< typename detail::AvoidVoid< A, B >::type > second )
     {
         auto first_ptr =
-            std::make_shared< typename decltype( first )::element_type >(
-                std::move( *first ) );
+            std::make_shared< Future >( std::move( first ) );
         auto second_ptr =
             std::make_shared< decltype( second ) >( std::move( second ) );
         std::packaged_task< B() > ptask( [first_ptr, second_ptr]() {
             if( first_ptr->valid() )
                 first_ptr->wait();
             auto future = second_ptr->get_future();
-            detail::AvoidVoid< A, B >::run_task( *first_ptr, *second_ptr );
+            detail::AvoidVoid< A, B >::template run_task< Future >( 
+                *first_ptr, *second_ptr );
             future.wait();
             return future.get();
         } );

@@ -636,15 +636,15 @@ namespace detail
         std::vector< std::unique_ptr< BufferedAction > > m_bufferAfterFlush;
         // std::optional would be more idiomatic, but it's not in
         // the C++11 standard
-        std::unique_ptr< adios2::Engine > m_engine;
+        std::shared_ptr< adios2::Engine > m_engine;
         adios2::Mode m_mode;
         detail::WriteDataset m_writeDataset;
         detail::DatasetReader m_readDataset;
         detail::AttributeReader m_attributeReader;
         ADIOS2IOHandlerImpl & m_impl;
         // Does the engine currently have an active step?
-        bool duringStep = false;
-        bool endOfStream = false;
+        std::shared_ptr< bool > duringStep = std::make_shared< bool >( false );
+        std::shared_ptr< bool > endOfStream = std::make_shared< bool >( false );
         bool isStreaming = false;
         int mpi_rank, mpi_size;
         size_t currentStep = 0;
