@@ -2,6 +2,7 @@
 #include <future>
 #include <memory>
 #include <utility>
+#include <thread>
 
 namespace openPMD
 {
@@ -18,6 +19,7 @@ namespace auxiliary
     {
     private:
         std::packaged_task< A( Args &&... ) > m_task;
+        std::unique_ptr< std::thread > m_thread;
 
     public:
         ConsumingFuture( std::packaged_task< A( Args &&... ) > task ) :
@@ -26,10 +28,31 @@ namespace auxiliary
         {
         }
 
+        ConsumingFuture ( ConsumingFuture && ) = default;
+
+        ~ConsumingFuture( )
+        {
+            if ( m_thread )
+            {
+                m_thread->join( );
+            }
+        }
+
         void
         operator()( Args &&... args )
         {
             m_task( std::forward< Args >( args )... );
+        }
+
+        void
+        run_as_thread( Args &&... args )
+        {
+            m_thread = std::unique_ptr< std::thread >(
+                new std::thread(
+                    std::move( m_task ),
+                    std::forward< Args >( args )...
+                )
+            );
         }
     };
 
@@ -65,11 +88,12 @@ namespace auxiliary
     template< typename A, typename B >
     ConsumingFuture< B >
     chain_futures(
-        std::future< A > first,
+        std::unique_ptr< std::future< A > > first,
         std::packaged_task< typename detail::AvoidVoid< A, B >::type > second )
     {
         auto first_ptr =
-            std::make_shared< decltype( first ) >( std::move( first ) );
+            std::make_shared< typename decltype( first )::element_type >(
+                std::move( *first ) );
         auto second_ptr =
             std::make_shared< decltype( second ) >( std::move( second ) );
         std::packaged_task< B() > ptask( [first_ptr, second_ptr]() {
