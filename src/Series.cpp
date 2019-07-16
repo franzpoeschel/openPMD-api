@@ -411,9 +411,7 @@ Series::advance( AdvanceMode mode )
                 future.run_as_thread( );
                 auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
                     auxiliary::chain_futures< AdvanceStatus, AdvanceStatus >(
-                        std::unique_ptr< std::future< AdvanceStatus > >(
-                            new decltype(future) ( 
-                                std::move( future ) ) ), 
+                        std::move( future ), 
                         std::move( postProcessing ) );
                 futurePost.run_as_thread( );
                 return std::unique_ptr< std::future< AdvanceStatus > >(
@@ -982,8 +980,7 @@ Series::advance( AdvanceMode mode, std::string )
 
     auto first_future = IOHandler->flush();
     return auxiliary::chain_futures< void, AdvanceStatus >(
-        std::unique_ptr< std::future< void > >( 
-            new decltype( first_future ) ( std::move( first_future ) ) ), 
+        std::move( first_future ),
         std::move( *param.task ) );
 }
 

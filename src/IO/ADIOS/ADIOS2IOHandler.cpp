@@ -1308,7 +1308,7 @@ namespace detail
         }
         if( m_engine )
         {
-            if ( duringStep && !endOfStream )
+            if ( *duringStep && !*endOfStream )
             {
                 writeChunkTables();
                 m_engine->EndStep();
@@ -1420,9 +1420,9 @@ namespace detail
     {
         if ( !m_engine )
         {
-            m_engine = std::unique_ptr< adios2::Engine >(
-                new adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
-            if ( !m_engine )
+            m_engine = std::make_shared< adios2::Engine >(
+                adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
+            if ( !*m_engine )
             {
                 throw std::runtime_error( "Failed opening ADIOS2 Engine." );
             }
@@ -1433,10 +1433,10 @@ namespace detail
     adios2::Engine & BufferedActions::requireActiveStep( )
     {
         adios2::Engine & eng = getEngine( );
-        if ( !duringStep )
+        if ( !*duringStep )
         {
             eng.BeginStep( );
-            duringStep = true;
+            *duringStep = true;
         }
         return eng;
     }
@@ -1457,7 +1457,7 @@ namespace detail
 
     void BufferedActions::flush( )
     {
-        if( endOfStream )
+        if( *endOfStream )
         {
             return;
         }
@@ -1465,10 +1465,10 @@ namespace detail
         /*
          * Only open a new step if it is necessary.
          */
-        if ( !duringStep && !m_buffer.empty() )
+        if ( !*duringStep && !m_buffer.empty() )
         {
             eng.BeginStep();
-            duringStep = true;
+            *duringStep = true;
         }
         {
             for ( auto & ba : m_buffer )
@@ -1540,7 +1540,7 @@ namespace detail
              *     has seen an access. See the following lines: open the 
              *     step just to skip it again.
              */
-            if( !duringStep )
+            if( !*duringStep )
             {
                 getEngine().BeginStep();
             }
@@ -1550,7 +1550,7 @@ namespace detail
             getEngine().EndStep();
             writtenChunks.clear();
             currentStep++;
-            duringStep = false;
+            *duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
                 []() {
                     return AdvanceStatus::OK;
@@ -1558,27 +1558,31 @@ namespace detail
         }
         case AdvanceMode::READ:
         {
-            if ( duringStep )
+            if ( *duringStep )
             {
                 flush();
                 getEngine().EndStep();
             }
             currentStep++;
-            AdvanceStatus status;
-            switch ( getEngine().BeginStep() )
-            {
-            case adios2::StepStatus::EndOfStream:
-                endOfStream = true;
-                status = AdvanceStatus::OVER;
-                duringStep = false;
-                break;
-            default:
-                status = AdvanceStatus::OK;
-                duringStep = true;
-                break;
-            }
+            // c++ won't allow capturing class members, so we make intermediate
+            // copies
+            auto _endOfStream = endOfStream;
+            auto _duringStep = duringStep;
+            getEngine();
+            auto engine = m_engine;
             return std::packaged_task< AdvanceStatus() >(
-                [status]() { return status; } );
+                [engine, _endOfStream, _duringStep]() mutable {
+                    switch( engine->BeginStep() )
+                    {
+                        case adios2::StepStatus::EndOfStream:
+                            *_endOfStream = true;
+                            *_duringStep = false;
+                            return AdvanceStatus::OVER;
+                        default:
+                            *_duringStep = true;
+                            return AdvanceStatus::OK;
+                    }
+                } );
         }
         case AdvanceMode::AUTO:
             throw std::runtime_error(
