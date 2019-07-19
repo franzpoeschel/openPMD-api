@@ -390,21 +390,23 @@ Series::advance( AdvanceMode mode )
             if( IOHandler->accessTypeFrontend == AccessType::READ_ONLY
                 || IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
             {
-                Series _series = *this;
+                // capture this by reference since the destructor will issue a
+                // flush
+                // TODO: open an issue and link it here
                 std::packaged_task< AdvanceStatus( AdvanceStatus ) > 
                 postProcessing(
-                    [_series]( AdvanceStatus status ) mutable
+                    [this]( AdvanceStatus status ) mutable
                 {
-                    bool previous = _series.iterations.written;
-                    _series.iterations.written = false;
-                    auto oldType = _series.IOHandler->accessTypeFrontend;
+                    bool previous = this->iterations.written;
+                    this->iterations.written = false;
+                    auto oldType = this->IOHandler->accessTypeFrontend;
                     auto newType = 
                         const_cast< AccessType* >
-                            (&_series.IOHandler->accessTypeFrontend);
+                            (&this->IOHandler->accessTypeFrontend);
                     *newType = AccessType::READ_WRITE;
-                    _series.readGroupBased( false );
+                    this->readGroupBased( false );
                     *newType = oldType;
-                    _series.iterations.written = previous;
+                    this->iterations.written = previous;
                     return status;
                 } );
                 future.run_as_thread( );
