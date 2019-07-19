@@ -1261,14 +1261,12 @@ ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at,
 {
 }
 
-#else
+#endif
 
 ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at )
 : AbstractIOHandler( std::move( path ), at )
 {
 }
-
-#endif
 
 std::future< void > ADIOS2IOHandler::flush( )
 {

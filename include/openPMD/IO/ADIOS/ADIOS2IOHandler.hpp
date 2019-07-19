@@ -601,7 +601,7 @@ class ADIOS2IOHandler : public AbstractIOHandler
 {
 #if openPMD_HAVE_ADIOS2
 
-    friend class ADIOS2IOHandlerImpl;
+friend class ADIOS2IOHandlerImpl;
 
 private:
     ADIOS2IOHandlerImpl m_impl;
