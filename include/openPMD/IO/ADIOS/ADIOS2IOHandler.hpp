@@ -178,10 +178,6 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
-    adios2::Operator m_zfp;
-    adios2::Operator m_sz;
-
-    void init( );
 
     /*
      * We need to give names to IO objects. These names are irrelevant
@@ -207,6 +203,8 @@ private:
                         std::unique_ptr< detail::BufferedActions > >
         m_fileData;
 
+    std::map< std::string, adios2::Operator > m_operators;
+
     // Overrides from AbstractIOHandlerImplCommon.
 
     std::string
@@ -217,6 +215,9 @@ private:
                         std::string extend ) override;
 
     // Helper methods.
+
+    std::unique_ptr< adios2::Operator >
+    getCompressionOperator( std::string const & compression );
 
     /*
      * The name of the ADIOS2 variable associated with this Writable.
