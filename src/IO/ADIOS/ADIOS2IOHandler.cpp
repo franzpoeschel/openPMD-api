@@ -1134,11 +1134,11 @@ namespace detail
             adios2::IO IO,
             adios2::Engine engine,
             std::string const & varName,
-            size_t step )
+            size_t /* step */ )
     {
         auto & chunkList = params.chunks->chunkTable[ 0 ];
         auto var = IO.InquireVariable< T >( varName );
-        for ( auto const & info : engine.BlocksInfo< T >( var, step ) )
+        for ( auto const & info : engine.BlocksInfo< T >( var, 0 ) )
         {
             Offset offset = info.Start;
             Extent extent = info.Count;
@@ -1286,62 +1286,6 @@ namespace detail
         *param.dtype = ret;
     }
 
-    void detail::BufferedTableRead::run( BufferedActions & ba )
-    {
-        using var_t = adios2::Variable< BufferedActions::extent_t >;
-        std::map< int, var_t > tables
-            = ba.availabeTablesPerRank( name );
-        TableReadPostprocessing trp;
-        trp.param = param;
-        adios2::Engine & engine = ba.getEngine();
-        for( size_t rank = 0; rank < tables.size(); rank++ )
-        {
-            var_t & table = tables[ rank ];
-            auto dims = table.Shape();
-            VERIFY_ALWAYS(
-                dims.size() == 3,
-                "ADIOS2 error: Step table for variable " +
-                name + " has an unexpected shape." );
-            size_t length = dims[0] * dims[1] * dims[2];
-            trp.data[ rank ] = std::vector< Extent::value_type >( length );
-            engine.Get( table, trp.data[ rank ].data() );
-            trp.shapes[ rank ] = std::move( dims );
-        }
-        ba.enqueue( std::move( trp ), ba.m_bufferAfterFlush );
-    }
-
-    void detail::TableReadPostprocessing::run( BufferedActions & )
-    {
-        ChunkTable res;
-        for( size_t rank = 0; rank < shapes.size(); rank++ )
-        {
-            ChunkTable::T_perRank & currentRank = res.chunkTable[ rank ];
-            auto const & shape = shapes[ rank ];
-            auto number_of_chunks = shape[ 0 ];
-            auto dimensionality = shape[ 2 ];
-            auto const & rankData = data[ rank ];
-            for( size_t chunk = 0; chunk < number_of_chunks; chunk++ )
-            {
-                Offset offset( dimensionality );
-                Extent extent( dimensionality );
-                size_t idx = chunk * dimensionality * 2;
-                std::copy_n(
-                    &rankData[ idx ],
-                    dimensionality,
-                    offset.begin() );
-                std::copy_n(
-                    &rankData[ idx + dimensionality ],
-                    dimensionality,
-                    extent.begin() );
-                currentRank.push_back(
-                    std::make_pair(
-                        std::move( offset ),
-                        std::move( extent ) ) );
-            }
-        }
-        *param.chunks = res;
-    }
-
     BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
                                       InvalidatableFile file )
     : m_file( impl.fullPath( std::move( file ) ) ),
@@ -1374,7 +1318,6 @@ namespace detail
         {
             if ( *duringStep && !*endOfStream )
             {
-                writeChunkTables();
                 m_engine->EndStep();
             }
             m_engine->Close( );
@@ -1608,7 +1551,6 @@ namespace detail
                 getEngine().BeginStep();
             }
             flush();
-            writeChunkTables();
             writeDummies();
             getEngine().EndStep();
             writtenChunks.clear();
@@ -1659,81 +1601,6 @@ namespace detail
         m_buffer.clear( );
     }
     
-    std::map< int, adios2::Variable< BufferedActions::extent_t > > 
-    BufferedActions::availabeTablesPerRank( std::string dataset )
-    {
-        std::list< std::string > variableNames;
-        std::string prefix = chunkTablePrefix( dataset, false);
-        for( auto & pair : m_IO.AvailableVariables() )
-        {
-            if( auxiliary::starts_with(pair.first, prefix ) )
-            {
-                variableNames.emplace_back( pair.first );
-            }
-        }
-        auto writer_mpi_size = variableNames.size();
-        std::map< int, adios2::Variable< extent_t > > res;
-        for( std::string const & var : variableNames )
-        {
-            adios2::Variable< extent_t > table = 
-                m_IO.InquireVariable< extent_t >( var );
-            adios2::Attribute< int > rankAttr =
-                m_IO.InquireAttribute< int >( "rank", var );
-            int rank = rankAttr.Data()[ 0 ];
-            VERIFY_ALWAYS( 
-                table.operator bool() 
-                && rankAttr.operator bool() 
-                && rank < static_cast< int >( writer_mpi_size ), 
-                "ADIOS2 backend: failed trying to load chunk tables for "
-                "dataset " + dataset );
-            res[ rank ] = std::move( table );
-        }
-        return res;
-    }
-
-    std::string
-    BufferedActions::chunkTablePrefix( std::string dataset, bool includeRank )
-    {
-        if( !auxiliary::starts_with(dataset, '/') )
-        {
-            dataset = '/' + dataset;
-        }
-        std::string res =  "/openPMD_internal/chunkTablesPerStepAndRank/"
-            + std::to_string( currentStep )
-            + dataset;
-        if( includeRank )
-            res += "/" + std::to_string( mpi_rank );
-        return res;
-    }
-    
-    adios2::Variable< BufferedActions::extent_t >
-    BufferedActions::createChunkTable( std::string dataset )
-    {
-        std::string table = chunkTablePrefix( dataset, true );
-        auto attr = m_IO.DefineAttribute( "rank", mpi_rank, table );
-        auto res = m_IO.DefineVariable< extent_t >( table );
-        VERIFY_ALWAYS(
-            res && attr,
-            "ADIOS2: Failed creating attribute/variable." );
-        return res;
-    }
-
-
-    void BufferedActions::writeChunkTables()
-    {
-        for( auto & pair : writtenChunks )
-        {
-            adios2::Variable< extent_t > table = createChunkTable( pair.first );
-            std::array< extent_t, 2 > & arr = std::get< 1 >( pair.second );
-            extent_t number_of_chunks = arr[ 0 ];
-            extent_t dimensionality = arr[ 1 ];
-            adios2::Dims dims{ number_of_chunks, 2, dimensionality };
-            table.SetShape( dims );
-            table.SetSelection( { adios2::Dims{ 0, 0, 0 }, dims } );
-            getEngine().Put( table, std::get< 0 >( pair.second ).data() );
-        }
-    }
-
     void BufferedActions::writeDummies( )
     {
         std::list< std::string > dummies;
