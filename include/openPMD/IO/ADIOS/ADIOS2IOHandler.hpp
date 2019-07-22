@@ -392,6 +392,15 @@ namespace detail
         void operator( )( Params &&... );
     };
 
+    struct RetrieveBlocksInfo
+    {
+        template < typename T, typename... Params >
+        void operator( )( Params &&... );
+
+        template < int n, typename... Params >
+        void operator( )( Params &&... );
+    };
+
 
     // Helper structs to help distinguish valid attribute/variable
     // datatypes from invalid ones
@@ -531,6 +540,13 @@ namespace detail
             std::string const & varName,
             adios2::IO IO,
             adios2::Engine engine );
+
+        static void blocksInfo(
+            Parameter< Operation::AVAILABLE_CHUNKS > & params,
+            adios2::IO IO,
+            adios2::Engine engine,
+            std::string const & varName,
+            size_t step );
     };
 
     template < typename T >
@@ -552,6 +568,8 @@ namespace detail
         template < typename... Params > void writeDataset( Params &&... );
 
         template < typename... Params > static void writeDummy( Params &&... );
+
+        template < typename... Params > static void blocksInfo( Params &&... );
     };
 
     // Other datatypes used in the ADIOS2IOHandler implementation
