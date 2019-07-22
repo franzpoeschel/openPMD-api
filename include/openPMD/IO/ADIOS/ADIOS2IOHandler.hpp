@@ -96,7 +96,7 @@ class ADIOS2IOHandlerImpl
     friend struct detail::BufferedActions;
     friend struct detail::BufferedAttributeRead;
 
-    static constexpr bool ADIOS2_DEBUG_MODE = false;
+    static constexpr bool ADIOS2_DEBUG_MODE = true;
 
 
 public:
@@ -620,23 +620,6 @@ namespace detail
         void run( BufferedActions & ) override;
     };
 
-    struct BufferedTableRead : BufferedAction
-    {
-        Parameter< Operation::AVAILABLE_CHUNKS > param;
-        std::string name; // name of the dataset
-
-        void run( BufferedActions & ) override;
-    };
-
-    struct TableReadPostprocessing : BufferedAction
-    {
-        Parameter< Operation::AVAILABLE_CHUNKS > param;
-        std::map< int, std::vector< Extent::value_type > > data;
-        std::map< int, adios2::Dims > shapes;
-
-        void run( BufferedActions & ) override;
-    };
-
     /*
      * Manages per-file information about
      * (1) the file's IO and Engine objects
@@ -713,27 +696,12 @@ namespace detail
          */
         void drop( );
 
-        /*
-         * Get variable for table describing chunks of dataset.
-         * If any chunks have been written (i.e. the map writtenChunks contains
-         * the dataset's name), create the variable because we are going to
-         * write to it. Otherwise look if the variable is present in m_IO.
-         */
-        
-        std::map< int, adios2::Variable< extent_t > >
-        availabeTablesPerRank( std::string dataset );
-
     private:
         /*
          * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
          */
-        std::string chunkTablePrefix( std::string dataset, bool includeRank);
-        
-        adios2::Variable< extent_t > createChunkTable( std::string dataset );
 
         void configure_IO(ADIOS2IOHandlerImpl& impl);
-
-        void writeChunkTables( );
 
         void writeDummies( );
     };
