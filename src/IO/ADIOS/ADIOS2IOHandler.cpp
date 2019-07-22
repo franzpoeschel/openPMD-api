@@ -555,10 +555,17 @@ ADIOS2IOHandlerImpl::availableChunks(
     setAndGetFilePosition( writable );
     auto file = refreshFileFromParent( writable );
     detail::BufferedActions & ba = getFileData( file );
-    detail::BufferedTableRead btr;
-    btr.name = nameOfVariable( writable );
-    btr.param = parameters;
-    ba.enqueue( std::move( btr ) );
+    std::string varName = nameOfVariable( writable );
+    auto datatype = detail::fromADIOS2Type(ba.m_IO.VariableType(varName));
+    static detail::RetrieveBlocksInfo rbi;
+    switchType(
+        datatype, 
+        rbi, 
+        parameters, 
+        ba.m_IO, 
+        ba.requireActiveStep( ), 
+        varName,
+        ba.currentStep );
 }
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
@@ -878,6 +885,20 @@ namespace detail
             return;
     }
 
+    template < typename T, typename... Params >
+    void RetrieveBlocksInfo::operator( )( Params &&... params )
+    {
+        DatasetHelper< T >::blocksInfo( std::forward< Params >( params )... );
+    }
+
+    template < int n, typename... Args >
+    void RetrieveBlocksInfo::operator( )( Args&&... )
+    {
+        throw std::runtime_error(
+            "Warning: failed retrieving a variable while trying "
+            "to retrieve blocks info." );
+    }
+
     template < typename T >
     typename AttributeTypes< T >::Attr
     AttributeTypes< T >::createAttribute( adios2::IO & IO, std::string name,
@@ -1106,6 +1127,27 @@ namespace detail
     }
 
     template < typename T >
+    void DatasetHelper<
+        T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
+        blocksInfo(
+            Parameter< Operation::AVAILABLE_CHUNKS > & params,
+            adios2::IO IO,
+            adios2::Engine engine,
+            std::string const & varName,
+            size_t step )
+    {
+        auto & chunkList = params.chunks->chunkTable[ 0 ];
+        auto var = IO.InquireVariable< T >( varName );
+        for ( auto const & info : engine.BlocksInfo< T >( var, step ) )
+        {
+            Offset offset = info.Start;
+            Extent extent = info.Count;
+            chunkList.emplace_back( std::make_pair< Offset, Extent >(
+                std::move( offset ), std::move( extent ) ) );
+        }
+    }
+
+    template < typename T >
     DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         DatasetHelper( openPMD::ADIOS2IOHandlerImpl * )
@@ -1163,6 +1205,15 @@ namespace detail
     void DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         writeDummy( Params &&... )
+    {
+        throwErr( );
+    }
+
+    template < typename T >
+    template < typename... Params >
+    void DatasetHelper<
+        T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
+        blocksInfo( Params &&... )
     {
         throwErr( );
     }
