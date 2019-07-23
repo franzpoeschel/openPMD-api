@@ -1556,6 +1556,16 @@ namespace detail
     
     void BufferedActions::writeDummies( )
     {
+        std::string attributePrefix =
+            openPMD_internal + std::string( "/dummies" );
+        // remove meta attributes of previous steps
+        for ( auto & attr : m_IO.AvailableAttributes( ) )
+        {
+            if ( auxiliary::starts_with( attr.first, attributePrefix ) )
+            {
+                m_IO.RemoveAttribute( attr.first );
+            }
+        }
         std::list< std::string > dummies;
         for( auto & p : m_IO.AvailableVariables() )
         {
@@ -1578,6 +1588,7 @@ namespace detail
                     dummy,
                     m_IO,
                     getEngine() );
+                m_IO.DefineAttribute< char >( attributePrefix + dummy, true );
             }
         }
 
