@@ -393,7 +393,7 @@ Series::advance( AdvanceMode mode )
             {
                 // capture this by reference since the destructor will issue a
                 // flush
-                // TODO: open an issue and link it here
+                // https://github.com/openPMD/openPMD-api/issues/534
                 std::packaged_task< AdvanceStatus( AdvanceStatus ) >
                     postProcessing( [this]( AdvanceStatus status ) mutable {
                         bool previous = this->iterations.written;
