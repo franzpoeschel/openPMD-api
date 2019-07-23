@@ -1556,11 +1556,24 @@ namespace detail
     {
         m_buffer.clear( );
     }
+
+    bool BufferedActions::isDummy( std::string const & variable )
+    {
+        if ( !auxiliary::starts_with( variable, '/' ) )
+        {
+            return isDummy( '/' + variable );
+        }
+        static std::string const prefix = 
+            openPMD_internal + std::string( "dummies" );
+        auto attr = m_IO.InquireAttribute< char >( 
+            prefix + variable );
+        return attr.operator bool( );
+    }
     
     void BufferedActions::writeDummies( )
     {
-        std::string attributePrefix =
-            openPMD_internal + std::string( "/dummies" );
+        static std::string const attributePrefix =
+            openPMD_internal + std::string( "dummies" );
         // remove meta attributes of previous steps
         for ( auto & attr : m_IO.AvailableAttributes( ) )
         {
