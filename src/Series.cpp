@@ -903,6 +903,10 @@ Series::read()
     for( auto const& it : *pList.paths )
     {
         Iteration& i = iterations[std::stoull(it)];
+        if ( i.finalized( ) )
+        {
+            continue;
+        }
         pOpen.path = it;
         IOHandler->enqueue(IOTask(&i, pOpen));
         i.read();
