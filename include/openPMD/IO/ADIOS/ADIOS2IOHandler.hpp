@@ -678,6 +678,8 @@ namespace detail
          */
         void drop( );
 
+        bool isDummy( std::string const & variable );
+
     private:
         /*
          * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
