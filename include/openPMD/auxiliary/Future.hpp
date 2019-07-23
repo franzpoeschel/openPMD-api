@@ -89,9 +89,44 @@ namespace auxiliary
         };
     } // namespace detail
 
+    enum class RunFutureStrategy {
+        DoNotRun,
+        RunBlocking,
+        RunThreaded
+    };
+
+    template < RunFutureStrategy F >
+    struct RunFuture;
+
+    template <>
+    struct RunFuture< RunFutureStrategy::DoNotRun >
+    {
+        template< typename Future >
+        static void run( Future && ){ }
+    };
+
+    template <>
+    struct RunFuture< RunFutureStrategy::RunBlocking >
+    {
+        template< typename Future >
+        static void run( Future && fut ){
+            fut( );
+        }
+    };
+
+    template <>
+    struct RunFuture< RunFutureStrategy::RunThreaded >
+    {
+        template< typename Future >
+        static void run( Future && fut ){
+            fut.run_as_thread( );
+        }
+    };
+
     template< 
         typename A, 
-        typename B, 
+        typename B,
+        typename RunFuture_T = RunFuture< RunFutureStrategy::DoNotRun >,
         typename Future = std::future< A > >
     ConsumingFuture< B >
     chain_futures(
@@ -103,6 +138,7 @@ namespace auxiliary
         auto second_ptr =
             std::make_shared< decltype( second ) >( std::move( second ) );
         std::packaged_task< B() > ptask( [first_ptr, second_ptr]() {
+            RunFuture_T::template run( *first_ptr );
             if( first_ptr->valid() )
                 first_ptr->wait();
             auto future = second_ptr->get_future();
