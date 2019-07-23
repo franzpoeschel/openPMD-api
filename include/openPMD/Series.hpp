@@ -242,7 +242,7 @@ public:
      */
     void flush();
 
-    std::unique_ptr< std::future< AdvanceStatus > > advance(
+    ConsumingFuture< AdvanceStatus > advance(
         AdvanceMode = AdvanceMode::AUTO );
 
     Container< Iteration, uint64_t > iterations;
