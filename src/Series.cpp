@@ -375,7 +375,7 @@ Series::flush()
     IOHandler->flush();
 }
 
-std::unique_ptr< std::future< AdvanceStatus > >
+ConsumingFuture< AdvanceStatus >
 Series::advance( AdvanceMode mode )
 {
     switch( *m_iterationEncoding )
@@ -388,42 +388,37 @@ Series::advance( AdvanceMode mode )
             auxiliary::ConsumingFuture< AdvanceStatus > future =
                 advance( mode, *m_name );
             // re-read -> new datasets might be available
-            if( IOHandler->accessTypeFrontend == AccessType::READ_ONLY
-                || IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
+            if( IOHandler->accessTypeFrontend == AccessType::READ_ONLY ||
+                IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
             {
                 // capture this by reference since the destructor will issue a
                 // flush
                 // TODO: open an issue and link it here
-                std::packaged_task< AdvanceStatus( AdvanceStatus ) > 
-                postProcessing(
-                    [this]( AdvanceStatus status ) mutable
-                {
-                    bool previous = this->iterations.written;
-                    this->iterations.written = false;
-                    auto oldType = this->IOHandler->accessTypeFrontend;
-                    auto newType = 
-                        const_cast< AccessType* >
-                            (&this->IOHandler->accessTypeFrontend);
-                    *newType = AccessType::READ_WRITE;
-                    this->readGroupBased( false );
-                    *newType = oldType;
-                    this->iterations.written = previous;
-                    return status;
-                } );
-                future.run_as_thread( );
+                std::packaged_task< AdvanceStatus( AdvanceStatus ) >
+                    postProcessing( [this]( AdvanceStatus status ) mutable {
+                        bool previous = this->iterations.written;
+                        this->iterations.written = false;
+                        auto oldType = this->IOHandler->accessTypeFrontend;
+                        auto newType = const_cast< AccessType * >(
+                            &this->IOHandler->accessTypeFrontend );
+                        *newType = AccessType::READ_WRITE;
+                        this->readGroupBased( false );
+                        *newType = oldType;
+                        this->iterations.written = previous;
+                        return status;
+                    } );
                 auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
-                    auxiliary::chain_futures< AdvanceStatus, AdvanceStatus >(
-                        std::move( future ), 
-                        std::move( postProcessing ) );
+                    auxiliary::chain_futures<
+                        AdvanceStatus,
+                        AdvanceStatus,
+                        auxiliary::RunFuture<
+                            auxiliary::RunFutureStrategy::RunBlocking > >(
+                        std::move( future ), std::move( postProcessing ) );
                 futurePost.run_as_thread( );
-                return std::unique_ptr< std::future< AdvanceStatus > >(
-                    new auxiliary::ConsumingFuture< AdvanceStatus >(
-                        std::move( futurePost ) ) );
+                return futurePost;
             }
             future.run_as_thread( );
-            return std::unique_ptr< std::future< AdvanceStatus > >(
-                new auxiliary::ConsumingFuture< AdvanceStatus >(
-                    std::move( future ) ) );
+            return future;
     }
 }
 
@@ -981,7 +976,9 @@ Series::advance( AdvanceMode mode, std::string )
     // (2) finally run the advance task
 
     auto first_future = IOHandler->flush();
-    return auxiliary::chain_futures< void, AdvanceStatus >(
+    return auxiliary::chain_futures< 
+        void,
+        AdvanceStatus >(
         std::move( first_future ),
         std::move( *param.task ) );
 }

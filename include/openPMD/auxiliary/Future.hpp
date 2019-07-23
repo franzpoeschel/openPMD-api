@@ -150,4 +150,6 @@ namespace auxiliary
         return ConsumingFuture< B >( std::move( ptask ) );
     }
 } // namespace auxiliary
+
+using auxiliary::ConsumingFuture;
 } // namespace openPMD
