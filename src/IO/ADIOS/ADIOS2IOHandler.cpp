@@ -1228,42 +1228,7 @@ namespace detail
     {
         switchType( param.dtype, ba.m_writeDataset, *this, ba.m_IO,
                     ba.getEngine( ) );
-        //std::cout << "stored to " << name << std::endl;
-        decltype(BufferedActions::writtenChunks)::mapped_type * tuple;
-        auto it = ba.writtenChunks.find( name );
-        if( it == ba.writtenChunks.end() )
-        {
-            tuple = & ba.writtenChunks[ name ];
-            auto & arr = std::get< 1 >( *tuple );
-            arr[ 0 ] = 1; // we have just written the first chunk
-            arr[ 1 ] = param.extent.size(); // the dimensionality of the dataset
-        }
-        else
-        {
-            tuple = & it->second;
-            auto & arr = std::get< 1 >( *tuple );
-            VERIFY(
-                std::get<0>(*tuple).size() == arr[ 0 ] * arr[ 1 ] * 2,
-                "Internal error: Dimension table written so far contains "
-                "an unexpected number of elements" );
-            arr[ 0 ]++; // next chunk has just been written
-            VERIFY(
-                arr[ 1 ] == param.extent.size(),
-                "Internal error: Dataset dimensionality has changed." );
-        }
-        //std::cout << "offsets: ";
-        for( auto offset : param.offset )
-        {
-            //std::cout << offset << ", ";
-            std::get<0>(*tuple).push_back( offset );
-        }
-        //std::cout << "\nextents: ";
-        for( auto extent: param.extent )
-        {
-            //std::cout << extent << ", ";
-            std::get<0>(*tuple).push_back( extent );
-        }
-        //std::cout << std::endl;
+        ba.writtenVariables.emplace( name );
     }
 
     void BufferedAttributeRead::run( BufferedActions & ba )
@@ -1553,7 +1518,7 @@ namespace detail
             flush();
             writeDummies();
             getEngine().EndStep();
-            writtenChunks.clear();
+            writtenVariables.clear();
             currentStep++;
             *duringStep = false;
             return std::packaged_task< AdvanceStatus() >(
@@ -1613,8 +1578,8 @@ namespace detail
         }
         for( auto & dummy : dummies )
         {
-            auto it = writtenChunks.find( dummy );
-            if( it == writtenChunks.end() )
+            auto it = writtenVariables.find( dummy );
+            if( it == writtenVariables.end() )
             {
                 // dataset has not been written to during this adios step
                 // enforce availability by writing dummy data to it
