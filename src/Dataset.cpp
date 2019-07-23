@@ -39,15 +39,28 @@ void restrictToSelection(
         {
             auto delta = withinOffset[i] - offset[i];
             offset[i] = withinOffset[i];
-            extent[i] -= delta;
-
+            if ( delta > extent[i] )
+            {
+                extent[i] = 0;
+            }
+            else
+            {
+                extent[i] -= delta;
+            }
         }
         auto totalExtent = extent[i] + offset[i];
         auto totalWithinExtent = withinExtent[i] + withinOffset[i];
         if( totalExtent > totalWithinExtent )
         {
             auto delta = totalExtent - totalWithinExtent;
-            extent[i] -= delta;
+            if ( delta > extent[i] )
+            {
+                extent[i] = 0;
+            }
+            else
+            {
+                extent[i] -= delta;
+            }
         }
     }
 }
