@@ -673,6 +673,9 @@ namespace detail
 
         bool isDummy( std::string const & variable );
 
+        std::map< std::string, adios2::Params > const & 
+            availableAttributesBuffered( std::string const & variable );
+
     private:
         enum class StreamStatus{
             NoStream, DuringStep, OutsideOfStep, StreamOver
@@ -681,7 +684,13 @@ namespace detail
             = std::make_shared< StreamStatus >( StreamStatus::NoStream );
         int mpi_rank, mpi_size;
         std::shared_ptr< adios2::Engine > m_engine;
-
+        using AttributeMap_t = std::map< std::string, adios2::Params >;
+        std::shared_ptr< 
+            std::map< 
+                std::string, 
+                AttributeMap_t > >
+            m_availableAttributes =
+                std::make_shared< std::map< std::string, AttributeMap_t > >( );
         /*
          * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
          */
