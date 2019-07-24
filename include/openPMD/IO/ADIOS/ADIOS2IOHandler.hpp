@@ -632,23 +632,11 @@ namespace detail
         std::string m_file;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
-        std::vector< std::unique_ptr< BufferedAction > > m_bufferAfterFlush;
-        /**
-         * @brief std::optional would be more idiomatic, but it's not in
-         *        the C++11 standard
-         * @todo replace with std::optional upon switching to C++17
-         */
-        std::shared_ptr< adios2::Engine > m_engine;
         adios2::Mode m_mode;
-        detail::WriteDataset m_writeDataset;
-        detail::DatasetReader m_readDataset;
-        detail::AttributeReader m_attributeReader;
-        ADIOS2IOHandlerImpl & m_impl;
-        // Does the engine currently have an active step?
-        std::shared_ptr< bool > duringStep = std::make_shared< bool >( false );
-        std::shared_ptr< bool > endOfStream = std::make_shared< bool >( false );
-        bool isStreaming = false;
-        int mpi_rank, mpi_size;
+        detail::WriteDataset const m_writeDataset;
+        detail::DatasetReader const m_readDataset;
+        detail::AttributeReader const m_attributeReader;
+        
         size_t currentStep = 0;
 
         using extent_t = Extent::value_type;
@@ -681,6 +669,19 @@ namespace detail
         bool isDummy( std::string const & variable );
 
     private:
+        enum class StreamStatus{
+            NoStream, DuringStep, OutsideOfStep, StreamOver
+        };
+        std::shared_ptr< StreamStatus > streamStatus
+            = std::make_shared< StreamStatus >( StreamStatus::NoStream );
+        int mpi_rank, mpi_size;
+        /**
+         * @brief std::optional would be more idiomatic, but it's not in
+         *        the C++11 standard
+         * @todo replace with std::optional upon switching to C++17
+         */
+        std::shared_ptr< adios2::Engine > m_engine;
+
         /*
          * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
          */
