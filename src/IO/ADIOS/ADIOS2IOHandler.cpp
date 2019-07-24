@@ -1255,7 +1255,7 @@ namespace detail
     : m_file( impl.fullPath( std::move( file ) ) ),
       m_IO( impl.m_ADIOS.DeclareIO( std::to_string( impl.nameCounter++ ) ) ),
       m_mode( impl.adios2Accesstype( ) ), m_writeDataset( &impl ),
-      m_readDataset( &impl ), m_attributeReader( ), m_impl( impl )
+      m_readDataset( &impl ), m_attributeReader( )
     {
 #if openPMD_HAVE_MPI
         MPI_Comm_rank( impl.m_comm, &mpi_rank );
@@ -1285,7 +1285,7 @@ namespace detail
         }
         if ( m_engine )
         {
-            if ( *duringStep && !*endOfStream )
+            if ( *streamStatus == StreamStatus::DuringStep )
             {
                 m_engine->EndStep();
             }
@@ -1314,21 +1314,21 @@ namespace detail
                 auto it = streamingEngines.find( type );
                 if( it != streamingEngines.end() )
                 {
-                    isStreaming = true;
+                    *streamStatus = StreamStatus::OutsideOfStep;
                 }
                 else
                 {
                     it = fileEngines.find( type );
                     if( it != fileEngines.end() )
                     {
-                        isStreaming = false;
+                        *streamStatus = StreamStatus::NoStream;
                     }
                     else
                     {
                         std::cerr << "Unknown engine type (" << 
                             type << "). Defaulting to non-streaming mode."
                             << std::endl;
-                        isStreaming = false;
+                        *streamStatus = StreamStatus::NoStream;
                     }
                 }
             }
@@ -1408,10 +1408,10 @@ namespace detail
     adios2::Engine & BufferedActions::requireActiveStep( )
     {
         adios2::Engine & eng = getEngine( );
-        if ( !*duringStep )
+        if ( *streamStatus == StreamStatus::OutsideOfStep )
         {
             eng.BeginStep( );
-            *duringStep = true;
+            *streamStatus = StreamStatus::DuringStep;
         }
         return eng;
     }
@@ -1432,7 +1432,7 @@ namespace detail
 
     void BufferedActions::flush( )
     {
-        if( *endOfStream )
+        if( *streamStatus == StreamStatus::StreamOver )
         {
             return;
         }
@@ -1440,10 +1440,10 @@ namespace detail
         /*
          * Only open a new step if it is necessary.
          */
-        if ( !*duringStep && !m_buffer.empty() )
+        if ( *streamStatus == StreamStatus::OutsideOfStep && !m_buffer.empty() )
         {
             eng.BeginStep();
-            *duringStep = true;
+            *streamStatus = StreamStatus::DuringStep;
         }
         {
             for ( auto & ba : m_buffer )
@@ -1470,18 +1470,13 @@ namespace detail
             }
         }
         m_buffer.clear( );
-        for ( auto & ba : m_bufferAfterFlush )
-        {
-            ba->run( *this );
-        }
-        m_bufferAfterFlush.clear();
     }
 
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
         // TODO refactor this a bit
-        if( !isStreaming )
+        if( *streamStatus == StreamStatus::NoStream )
         {
             std::cerr << "Warning: called Series::advance() in non-streaming "
                 << "mode. Defaulting to performing a flush." << std::endl;
@@ -1515,7 +1510,7 @@ namespace detail
              *     has seen an access. See the following lines: open the 
              *     step just to skip it again.
              */
-            if( !*duringStep )
+            if( *streamStatus == StreamStatus::OutsideOfStep )
             {
                 getEngine().BeginStep();
             }
@@ -1524,7 +1519,7 @@ namespace detail
             getEngine().EndStep();
             writtenVariables.clear();
             currentStep++;
-            *duringStep = false;
+            *streamStatus = StreamStatus::OutsideOfStep;
             return std::packaged_task< AdvanceStatus() >(
                 []() {
                     return AdvanceStatus::OK;
@@ -1532,7 +1527,7 @@ namespace detail
         }
         case AdvanceMode::READ:
         {
-            if ( *duringStep )
+            if ( *streamStatus == StreamStatus::DuringStep )
             {
                 flush();
                 getEngine().EndStep();
@@ -1540,20 +1535,18 @@ namespace detail
             currentStep++;
             // c++ won't allow capturing class members, so we make intermediate
             // copies
-            auto _endOfStream = endOfStream;
-            auto _duringStep = duringStep;
+            auto _streamStatus = streamStatus;
             getEngine();
             auto engine = m_engine;
             return std::packaged_task< AdvanceStatus() >(
-                [engine, _endOfStream, _duringStep]() mutable {
+                [engine, _streamStatus]() mutable {
                     switch( engine->BeginStep() )
                     {
                         case adios2::StepStatus::EndOfStream:
-                            *_endOfStream = true;
-                            *_duringStep = false;
+                            *_streamStatus = StreamStatus::StreamOver;
                             return AdvanceStatus::OVER;
                         default:
-                            *_duringStep = true;
+                            *_streamStatus = StreamStatus::DuringStep;
                             return AdvanceStatus::OK;
                     }
                 } );
