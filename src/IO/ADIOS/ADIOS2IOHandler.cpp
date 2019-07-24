@@ -534,7 +534,20 @@ ADIOS2IOHandlerImpl::availableChunks(
     auto file = refreshFileFromParent( writable );
     detail::BufferedActions & ba = getFileData( file );
     std::string varName = nameOfVariable( writable );
-    auto datatype = detail::fromADIOS2Type(ba.m_IO.VariableType(varName));
+    ba.requireActiveStep( );
+    if ( ba.isDummy( varName ) )
+    {
+        /*
+         * If a variable is not written to in one step, the writer will write
+         * a single dummy value to position zero, otherwise the variable will
+         * not be sent at all leading to invalid datasets. This block should
+         * of course not be reported, so we check whether the variable is a
+         * dummy (the writer sends an attribute accordingly) and return
+         * immediately if yes.
+         */
+        return;
+    }
+    auto datatype = detail::fromADIOS2Type( ba.m_IO.VariableType( varName ) );
     static detail::RetrieveBlocksInfo rbi;
     switchType(
         datatype, 
