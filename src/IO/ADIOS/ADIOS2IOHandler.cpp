@@ -1538,14 +1538,16 @@ namespace detail
             auto _streamStatus = streamStatus;
             getEngine();
             auto engine = m_engine;
+            auto _availableAttributes = m_availableAttributes;
             return std::packaged_task< AdvanceStatus() >(
-                [engine, _streamStatus]() mutable {
+                [engine, _streamStatus, _availableAttributes]() mutable {
                     switch( engine->BeginStep() )
                     {
                         case adios2::StepStatus::EndOfStream:
                             *_streamStatus = StreamStatus::StreamOver;
                             return AdvanceStatus::OVER;
                         default:
+                            _availableAttributes->clear( );
                             *_streamStatus = StreamStatus::DuringStep;
                             return AdvanceStatus::OK;
                     }
@@ -1574,6 +1576,26 @@ namespace detail
         auto attr = m_IO.InquireAttribute< char >( 
             prefix + variable );
         return attr.operator bool( );
+    }
+
+    std::map< std::string, adios2::Params > const & 
+        BufferedActions::availableAttributesBuffered( 
+            std::string const & variable ){
+        if ( m_mode != adios2::Mode::Read )
+        {
+            auto it = m_availableAttributes->emplace(
+                variable,
+                m_IO.AvailableAttributes( variable ) ).first;
+            return it->second;
+        }
+        auto it = m_availableAttributes->find( variable );
+        if ( it == m_availableAttributes->end( ) )
+        {
+            it = m_availableAttributes->emplace(
+                variable,
+                m_IO.AvailableAttributes( variable ) ).first;
+        }
+        return it->second;
     }
     
     void BufferedActions::writeDummies( )
