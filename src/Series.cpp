@@ -412,7 +412,7 @@ Series::advance( AdvanceMode mode )
                         AdvanceStatus,
                         AdvanceStatus,
                         auxiliary::RunFuture<
-                            auxiliary::RunFutureStrategy::RunBlocking > >(
+                            auxiliary::RunFutureStrategy::RunNonThreaded > >(
                         std::move( future ), std::move( postProcessing ) );
                 futurePost.run_as_thread( );
                 return futurePost;

@@ -9,8 +9,8 @@ namespace openPMD
 namespace auxiliary
 {
     /**
-     * Subclass template for std::future<A> that wraps
-     * the std::packaged_task<…> creating the future
+     * Subclass template for std::future that wraps
+     * the std::packaged_task creating the future
      * Useful to extend the lifetime of the task for
      * exactly as long as the future lives.
      */
@@ -38,12 +38,26 @@ namespace auxiliary
             }
         }
 
+        /**
+         * @brief Run the contained std::packaged_task in blocking manner.
+         *        The future should be available after this returns.
+         * 
+         * @param args The arguments for the std::packaged_task.
+         */
         void
         operator()( Args &&... args )
         {
             m_task( std::forward< Args >( args )... );
         }
 
+        /**
+         * @brief Run the contained std::packaged_task in threaded manner.
+         *        Will return immediately. Use std::future::wait() to know
+         *        when computation has ended.
+         *        The destructor will wait for the created thread to join.
+         * 
+         * @param args The arguments for the std::packaged_task.
+         */
         void
         run_as_thread( Args &&... args )
         {
@@ -91,7 +105,7 @@ namespace auxiliary
 
     enum class RunFutureStrategy {
         DoNotRun,
-        RunBlocking,
+        RunNonThreaded,
         RunThreaded
     };
 
@@ -106,7 +120,7 @@ namespace auxiliary
     };
 
     template <>
-    struct RunFuture< RunFutureStrategy::RunBlocking >
+    struct RunFuture< RunFutureStrategy::RunNonThreaded >
     {
         template< typename Future >
         static void run( Future && fut ){
@@ -123,6 +137,30 @@ namespace auxiliary
         }
     };
 
+    /**
+     * @brief Chain a std::future with a successive std::packaged_task.
+     * 
+     * @tparam A Value produced by the first future. May be void.
+     * @tparam B 
+     * @tparam RunFuture< RunFutureStrategy::DoNotRun > This function template
+     *         facultatively supports activating the future passed to it.
+     *         Since this future may also be a ConsumingFuture, it may not be
+     *         running yet. It is advised to set this template parameter to
+     *         RunFuture< RunFutureStrategy::RunNonThreaded > in this case.
+     *         This avoids creating a new thread alone for execution of the 
+     *         first future which is unnecessary since running it can be 
+     *         embedded into the created std::packaged_task.
+     * @tparam std::future< A > 
+     * @param first The future that runs first. Produces a value of
+     *              type A.
+     * @param second A packaged task that consumes the value created by the 
+     *               future.
+     * @return ConsumingFuture< B > A ConsumingFuture representing the chained
+     *         computation. It is important to note that the task is not running
+     *         yet. Running it has to be triggered by calling either 
+     *         ConsumingFuture::operator()() or 
+     *         ConsumingFuture::run_as_thread().
+     */
     template< 
         typename A, 
         typename B,
