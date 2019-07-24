@@ -448,7 +448,7 @@ void ADIOS2IOHandlerImpl::listPaths(
     }
 
     std::vector< std::string > attrs;
-    for ( auto const & p : IO.AvailableAttributes( ) )
+    for ( auto const & p : fileData.availableAttributesBuffered( "" ) )
     {
         attrs.emplace_back( p.first );
     }
@@ -526,7 +526,7 @@ void ADIOS2IOHandlerImpl::listAttributes(
     }
     auto & ba = getFileData( file );
     ba.requireActiveStep( ); // make sure that the attributes are present
-    auto attrs = ba.m_IO.AvailableAttributes( attributePrefix );
+    auto const & attrs = ba.availableAttributesBuffered( attributePrefix );
     for ( auto & pair : attrs )
     {
         auto attr = auxiliary::removeSlashes( pair.first );
