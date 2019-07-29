@@ -22,6 +22,16 @@ namespace auxiliary
         std::unique_ptr< std::thread > m_thread;
 
     public:
+        /**
+         * @brief  Upon creation of a ConsumingFuture, the wrapped 
+         * std::packaged_tasked is not automatically run.
+         * ConsumingFuture::operator()() or ConsumingFuture::run_threaded()
+         * has to be invoked in order to do so. This boolean flag indicates
+         * whether the std::packaged_task is running already.
+         * 
+         */
+        bool isRunning = false;
+
         ConsumingFuture( std::packaged_task< A( Args &&... ) > task ) :
             std::future< A >( task.get_future() ),
             m_task( std::move( task ) )
@@ -48,6 +58,7 @@ namespace auxiliary
         operator()( Args &&... args )
         {
             m_task( std::forward< Args >( args )... );
+            isRunning = true;
         }
 
         /**
@@ -67,6 +78,7 @@ namespace auxiliary
                     std::forward< Args >( args )...
                 )
             );
+            isRunning = true;
         }
     };
 
