@@ -665,7 +665,8 @@ namespace detail
 
     private:
         enum class StreamStatus{
-            NoStream, DuringStep, OutsideOfStep, StreamOver
+            NoStream, DuringStep, OutsideOfStep, StreamOver, 
+            TemporarilyInvalid
         };
         std::shared_ptr< StreamStatus > streamStatus
             = std::make_shared< StreamStatus >( StreamStatus::NoStream );
