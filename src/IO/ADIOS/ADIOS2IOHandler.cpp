@@ -1434,6 +1434,10 @@ namespace detail
             eng.BeginStep();
             *streamStatus = StreamStatus::DuringStep;
         }
+        else if ( *streamStatus == StreamStatus::TemporarilyInvalid )
+        {
+            return; // no flush heh
+        }
         {
             for ( auto & ba : m_buffer )
             {
@@ -1528,6 +1532,7 @@ namespace detail
             getEngine();
             auto engine = m_engine;
             auto _availableAttributes = m_availableAttributes;
+            *streamStatus = StreamStatus::TemporarilyInvalid;
             return std::packaged_task< AdvanceStatus() >(
                 [engine, _streamStatus, _availableAttributes]() mutable {
                     switch( engine->BeginStep() )
