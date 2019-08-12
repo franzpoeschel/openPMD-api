@@ -392,15 +392,6 @@ namespace detail
         void operator( )( adios2::IO & IO, Params &&... );
     };
 
-    struct DummyWriter
-    {
-        template < typename T, typename... Params >
-        void operator( )( Params &&... );
-
-        template < int n, typename... Params >
-        void operator( )( Params &&... );
-    };
-
     struct RetrieveBlocksInfo
     {
         template < typename T, typename... Params >
@@ -545,11 +536,6 @@ namespace detail
 
         void writeDataset( BufferedPut &, adios2::IO &, adios2::Engine & );
 
-        static void writeDummy( 
-            std::string const & varName,
-            adios2::IO IO,
-            adios2::Engine engine );
-
         static void blocksInfo(
             Parameter< Operation::AVAILABLE_CHUNKS > & params,
             adios2::IO IO,
@@ -575,8 +561,6 @@ namespace detail
         static void defineVariable( Params &&... );
 
         template < typename... Params > void writeDataset( Params &&... );
-
-        template < typename... Params > static void writeDummy( Params &&... );
 
         template < typename... Params > static void blocksInfo( Params &&... );
     };
@@ -641,9 +625,6 @@ namespace detail
 
         using extent_t = Extent::value_type;
         
-        std::unordered_set< std::string > writtenVariables;
-
-
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
         ~BufferedActions();
@@ -665,8 +646,6 @@ namespace detail
          * Delete all buffered actions without running them.
          */
         void drop( );
-
-        bool isDummy( std::string const & variable );
 
         std::map< std::string, adios2::Params > const & 
             availableAttributesBuffered( std::string const & variable );
@@ -697,8 +676,6 @@ namespace detail
          */
 
         void configure_IO(ADIOS2IOHandlerImpl& impl);
-
-        void writeDummies( );
     };
 
 
