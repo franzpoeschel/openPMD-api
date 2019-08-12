@@ -234,6 +234,8 @@ private:
      * @return Reference to this RecordComponent instance.
      */
     RecordComponent& makeEmpty( Dataset );
+
+    std::shared_ptr< bool > hasBeenRead = std::make_shared< bool >( false );
 }; // RecordComponent
 
 
@@ -379,6 +381,19 @@ RecordComponent::loadAvailableChunks(
             Extent extent;
             std::tie( offset, extent ) = chunk;
             restrictToSelection( offset, extent, withinOffset, withinExtent );
+            bool load = true;
+            for ( auto ext : extent )
+            {
+                if ( ext == 0 )
+                {
+                    // nothing to load
+                    load = false;
+                }
+            }
+            if ( !load )
+            {
+                continue;
+            }
             auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
             res.push_back( 
                 TaggedChunk< T >( 
@@ -408,6 +423,20 @@ RecordComponent::loadAvailableChunksContiguous(
             Extent extent;
             std::tie( offset, extent ) = chunk;
             restrictToSelection( offset, extent, withinOffset, withinExtent );
+            bool load = true;
+            for ( auto ext : extent )
+            {
+                if ( ext == 0 )
+                {
+                    // nothing to load
+                    load = false;
+                }
+            }
+            if ( !load )
+            {
+                continue;
+            }
+            std::cerr << std::endl;
             auto ptr = provideBuffer( offset, extent );
             loadChunk< T >( ptr, offset, extent, targetUnitSI );
             res.push_back( 
