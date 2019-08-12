@@ -1432,7 +1432,7 @@ namespace detail
 
     void BufferedActions::flush( )
     {
-        if( *streamStatus == StreamStatus::StreamOver )
+        if( *streamStatus == StreamStatus::StreamOver || m_buffer.empty( ) )
         {
             return;
         }
