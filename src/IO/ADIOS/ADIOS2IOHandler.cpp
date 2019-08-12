@@ -535,18 +535,6 @@ ADIOS2IOHandlerImpl::availableChunks(
     detail::BufferedActions & ba = getFileData( file );
     std::string varName = nameOfVariable( writable );
     ba.requireActiveStep( );
-    if ( ba.isDummy( varName ) )
-    {
-        /*
-         * If a variable is not written to in one step, the writer will write
-         * a single dummy value to position zero, otherwise the variable will
-         * not be sent at all leading to invalid datasets. This block should
-         * of course not be reported, so we check whether the variable is a
-         * dummy (the writer sends an attribute accordingly) and return
-         * immediately if yes.
-         */
-        return;
-    }
     auto datatype = detail::fromADIOS2Type( ba.m_IO.VariableType( varName ) );
     static detail::RetrieveBlocksInfo rbi;
     switchType(
@@ -871,20 +859,6 @@ namespace detail
     }
 
     template < typename T, typename... Params >
-    void DummyWriter::operator( )( Params &&... params )
-    {
-        DatasetHelper< T >::writeDummy( std::forward< Params >( params )... );
-    }
-
-    template < int n, typename... Args >
-    void DummyWriter::operator( )( Args&&... )
-    {
-        std::cerr << "Warning: failed retrieving a variable while trying "
-            "to write a dummy value. Continuing." << std::endl;
-            return;
-    }
-
-    template < typename T, typename... Params >
     void RetrieveBlocksInfo::operator( )( Params &&... params )
     {
         DatasetHelper< T >::blocksInfo( std::forward< Params >( params )... );
@@ -1099,35 +1073,6 @@ namespace detail
     template < typename T >
     void DatasetHelper<
         T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
-        writeDummy(
-            std::string const & varName,
-            adios2::IO IO,
-            adios2::Engine engine )
-    {
-        adios2::Variable< T > var = IO.InquireVariable< T >( varName );
-        if( !var )
-        {
-            std::cerr << "Warning: failed retrieving a variable while trying "
-                "to write a dummy value. Continuing." << std::endl;
-                return;
-        }
-        adios2::Dims extent = var.Shape( );
-        adios2::Dims offset = extent;
-        for( auto & offs : offset )
-        {
-            offs = 0;
-        }
-        for( auto & ext : extent )
-        {
-            ext = 0;
-        }
-        var.SetSelection( { offset, extent } );
-        engine.Put( var, T() );
-    }
-
-    template < typename T >
-    void DatasetHelper<
-        T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
         blocksInfo(
             Parameter< Operation::AVAILABLE_CHUNKS > & params,
             adios2::IO IO,
@@ -1203,15 +1148,6 @@ namespace detail
     template < typename... Params >
     void DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
-        writeDummy( Params &&... )
-    {
-        throwErr( );
-    }
-
-    template < typename T >
-    template < typename... Params >
-    void DatasetHelper<
-        T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         blocksInfo( Params &&... )
     {
         throwErr( );
@@ -1227,7 +1163,6 @@ namespace detail
     {
         switchType( param.dtype, ba.m_writeDataset, *this, ba.m_IO,
                     ba.getEngine( ) );
-        ba.writtenVariables.emplace( name );
     }
 
     void BufferedAttributeRead::run( BufferedActions & ba )
@@ -1519,9 +1454,7 @@ namespace detail
                 getEngine().BeginStep();
             }
             flush();
-            writeDummies();
             getEngine().EndStep();
-            writtenVariables.clear();
             currentStep++;
             *streamStatus = StreamStatus::OutsideOfStep;
             return std::packaged_task< AdvanceStatus() >(
@@ -1570,19 +1503,6 @@ namespace detail
         m_buffer.clear( );
     }
 
-    bool BufferedActions::isDummy( std::string const & variable )
-    {
-        if ( !auxiliary::starts_with( variable, '/' ) )
-        {
-            return isDummy( '/' + variable );
-        }
-        static std::string const prefix = 
-            openPMD_internal + std::string( "dummies" );
-        auto attr = m_IO.InquireAttribute< char >( 
-            prefix + variable );
-        return attr.operator bool( );
-    }
-
     std::map< std::string, adios2::Params > const & 
         BufferedActions::availableAttributesBuffered( 
             std::string const & variable ){
@@ -1603,46 +1523,6 @@ namespace detail
         return it->second;
     }
     
-    void BufferedActions::writeDummies( )
-    {
-        static std::string const attributePrefix =
-            openPMD_internal + std::string( "dummies" );
-        // remove meta attributes of previous steps
-        for ( auto & attr : m_IO.AvailableAttributes( ) )
-        {
-            if ( auxiliary::starts_with( attr.first, attributePrefix ) )
-            {
-                m_IO.RemoveAttribute( attr.first );
-            }
-        }
-        std::list< std::string > dummies;
-        for( auto & p : m_IO.AvailableVariables() )
-        {
-            if( !auxiliary::starts_with( p.first, openPMD_internal ) )
-            {
-                dummies.emplace_back( p.first );
-            }
-        }
-        for( auto & dummy : dummies )
-        {
-            auto it = writtenVariables.find( dummy );
-            if( it == writtenVariables.end() )
-            {
-                // dataset has not been written to during this adios step
-                // enforce availability by writing dummy data to it
-                static DummyWriter dw;
-                switchType(
-                    fromADIOS2Type( m_IO.VariableType( dummy ) ),
-                    dw,
-                    dummy,
-                    m_IO,
-                    getEngine() );
-                m_IO.DefineAttribute< char >( attributePrefix + dummy, true );
-            }
-        }
-
-    }
-
 } // namespace detail
 
 #if openPMD_HAVE_MPI
