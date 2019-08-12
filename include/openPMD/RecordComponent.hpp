@@ -235,6 +235,7 @@ private:
      */
     RecordComponent& makeEmpty( Dataset );
 
+protected:
     std::shared_ptr< bool > hasBeenRead = std::make_shared< bool >( false );
 }; // RecordComponent
 

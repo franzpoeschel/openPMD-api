@@ -102,6 +102,10 @@ Record::read()
         for( auto const& component : *pList.paths )
         {
             RecordComponent& rc = (*this)[component];
+            if ( *rc.hasBeenRead )
+            {
+                continue;
+            }
             pOpen.path = component;
             IOHandler->enqueue(IOTask(&rc, pOpen));
             *rc.m_isConstant = true;
