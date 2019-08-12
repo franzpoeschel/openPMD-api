@@ -331,6 +331,10 @@ Mesh::read()
         for( auto const& component : *pList.paths )
         {
             MeshRecordComponent& rc = (*this)[component];
+            if ( *rc.hasBeenRead )
+            {
+                continue;
+            }
             pOpen.path = component;
             IOHandler->enqueue(IOTask(&rc, pOpen));
             *rc.m_isConstant = true;
