@@ -867,9 +867,7 @@ namespace detail
     template < int n, typename... Args >
     void RetrieveBlocksInfo::operator( )( Args&&... )
     {
-        throw std::runtime_error(
-            "Warning: failed retrieving a variable while trying "
-            "to retrieve blocks info." );
+        // variable has not been found, so we don't fill in any blocks
     }
 
     template < typename T >
