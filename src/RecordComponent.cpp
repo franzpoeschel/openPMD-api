@@ -153,7 +153,12 @@ RecordComponent::flush(std::string const& name)
 void
 RecordComponent::read()
 {
+    if ( *hasBeenRead )
+    {
+        return;
+    }
     readBase();
+    *hasBeenRead = true;
 }
 
 void
