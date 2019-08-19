@@ -80,6 +80,15 @@ namespace chunk_assignment
         FirstPass & firstPass,
         SecondPass & secondPass );
 
+    struct SplitEgalitarianTrivial : SplitEgalitarian
+    {
+        void
+        splitEgalitarian(
+            ChunkTable const & sourceChunks,
+            std::list< int > destinationRanks,
+            ChunkTable & sinkChunks ) override;
+    };
+
     struct FirstPassByHostname : FirstPass
     {
         FirstPassByHostname( std::unique_ptr< SplitEgalitarian > );
