@@ -4,6 +4,32 @@ namespace openPMD
 {
 namespace chunk_assignment
 {
+    void
+    SplitEgalitarianTrivial::splitEgalitarian(
+        ChunkTable const & sourceChunks,
+        std::list< int > destinationRanks,
+        ChunkTable & sinkChunks )
+    {
+        auto it = destinationRanks.begin();
+        auto nextRank = [&it, &destinationRanks]() {
+            if( it == destinationRanks.end() )
+            {
+                it = destinationRanks.begin();
+            }
+            auto res = *it;
+            it++;
+            return res;
+        };
+        for( auto const & pair : sourceChunks.chunkTable )
+        {
+            for( auto chunk : pair.second )
+            {
+                sinkChunks.chunkTable[ nextRank() ].push_back(
+                    std::move( chunk ) );
+            }
+        }
+    }
+
     FirstPassByHostname::FirstPassByHostname(
         std::unique_ptr< SplitEgalitarian > _splitter )
         : splitter( std::move( _splitter ) )
@@ -18,7 +44,6 @@ namespace chunk_assignment
     {
         std::unordered_map< std::string, ChunkTable > chunkGroups;
         FirstPass::Result res;
-        auto ranksPerHost = initRanksPerHost( metaOut );
         for( auto const & pair : table.chunkTable )
         {
             std::string hostname = metaIn[ pair.first ];
@@ -31,12 +56,15 @@ namespace chunk_assignment
         }
         // chunkGroups will now contain chunks by hostname
         // the ranks are the source ranks
+
+        // which ranks live on host <string> in the sink?
+        auto ranksPerHostSink = initRanksPerHost( metaOut );
         for( auto & chunkGroup : chunkGroups )
         {
             // chunkGroup.first = source host
             // find reading ranks on the sink host with same name
-            auto it = ranksPerHost.find( chunkGroup.first );
-            if( it == ranksPerHost.end() || it->second.empty() )
+            auto it = ranksPerHostSink.find( chunkGroup.first );
+            if( it == ranksPerHostSink.end() || it->second.empty() )
             {
                 for( auto & chunksPerRank : chunkGroup.second.chunkTable )
                 {
@@ -49,7 +77,6 @@ namespace chunk_assignment
                 splitter->splitEgalitarian(
                     chunkGroup.second, it->second, res.sinkSide );
             }
-            return res;
         }
         return res;
     }
@@ -76,7 +103,8 @@ namespace chunk_assignment
     {
         FirstPass::Result intermediateAssignment =
             firstPass.firstPass( table, rankIn, rankOut );
-        return secondPass.assignLeftovers( intermediateAssignment, rankIn, rankOut );
+        return secondPass.assignLeftovers(
+            intermediateAssignment, rankIn, rankOut );
     }
 } // namespace chunk_assignment
 } // namespace openPMD
