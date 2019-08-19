@@ -45,13 +45,19 @@ namespace chunk_assignment
         };
 
         virtual Result
-        firstPass( ChunkTable const &, RankMeta const & ) = 0;
+        firstPass(
+            ChunkTable const &,
+            RankMeta const & in,
+            RankMeta const & out ) = 0;
     };
 
     struct SecondPass
     {
         virtual ChunkTable
-        assignLeftovers( FirstPass::Result, RankMeta const & ) = 0;
+        assignLeftovers(
+            FirstPass::Result,
+            RankMeta const & in,
+            RankMeta const & out ) = 0;
     };
 
     struct SplitEgalitarian
@@ -69,26 +75,26 @@ namespace chunk_assignment
     ChunkTable
     assignChunks(
         ChunkTable,
-        RankMeta const &,
+        RankMeta const & rankMetaIn,
+        RankMeta const & rankMetaOut,
         FirstPass & firstPass,
         SecondPass & secondPass );
 
     struct FirstPassByHostname : FirstPass
     {
-        FirstPassByHostname(
-            RankMeta hostnames,
-            std::unique_ptr< SplitEgalitarian > );
+        FirstPassByHostname( std::unique_ptr< SplitEgalitarian > );
 
         Result
-        firstPass( ChunkTable const &, RankMeta const & ) override;
+        firstPass(
+            ChunkTable const &,
+            RankMeta const & in,
+            RankMeta const & out ) override;
 
     private:
         std::unique_ptr< SplitEgalitarian > splitter;
-        RankMeta const hostnames;
-        std::unordered_map< std::string, std::list< int > > ranksPerHost;
 
-        void
-        initRanksPerHost();
+        std::unordered_map< std::string, std::list< int > >
+        initRanksPerHost( RankMeta const & );
     };
 } // namespace chunk_assignment
 
