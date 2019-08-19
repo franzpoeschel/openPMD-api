@@ -5,24 +5,23 @@ namespace openPMD
 namespace chunk_assignment
 {
     FirstPassByHostname::FirstPassByHostname(
-        RankMeta _hostnames,
         std::unique_ptr< SplitEgalitarian > _splitter )
         : splitter( std::move( _splitter ) )
-        , hostnames( std::move( _hostnames ) )
     {
-        initRanksPerHost();
     }
 
     FirstPass::Result
     FirstPassByHostname::firstPass(
         ChunkTable const & table,
-        RankMeta const & metaInfo )
+        RankMeta const & metaIn,
+        RankMeta const & metaOut )
     {
         std::unordered_map< std::string, ChunkTable > chunkGroups;
         FirstPass::Result res;
+        auto ranksPerHost = initRanksPerHost( metaOut );
         for( auto const & pair : table.chunkTable )
         {
-            std::string hostname = metaInfo[ pair.first ];
+            std::string hostname = metaIn[ pair.first ];
             auto & hostTable = chunkGroups[ hostname ];
             for( auto chunk : pair.second )
             {
@@ -55,26 +54,29 @@ namespace chunk_assignment
         return res;
     }
 
-    void
-    FirstPassByHostname::initRanksPerHost()
+    std::unordered_map< std::string, std::list< int > >
+    FirstPassByHostname::initRanksPerHost( RankMeta const & rankMeta )
     {
-        for( unsigned i = 0; i < hostnames.size(); ++i )
+        std::unordered_map< std::string, std::list< int > > res;
+        for( unsigned i = 0; i < rankMeta.size(); ++i )
         {
-            auto & list = ranksPerHost[ hostnames[ i ] ];
+            auto & list = res[ rankMeta[ i ] ];
             list.emplace_back( i );
         }
+        return res;
     }
 
     ChunkTable
     assignChunks(
         ChunkTable table,
-        RankMeta const & rankMeta,
+        RankMeta const & rankIn,
+        RankMeta const & rankOut,
         FirstPass & firstPass,
         SecondPass & secondPass )
     {
         FirstPass::Result intermediateAssignment =
-            firstPass.firstPass( table, rankMeta );
-        return secondPass.assignLeftovers( intermediateAssignment, rankMeta );
+            firstPass.firstPass( table, rankIn, rankOut );
+        return secondPass.assignLeftovers( intermediateAssignment, rankIn, rankOut );
     }
 } // namespace chunk_assignment
 } // namespace openPMD
