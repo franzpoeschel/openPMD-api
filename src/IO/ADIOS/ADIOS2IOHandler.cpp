@@ -1072,14 +1072,15 @@ namespace detail
             std::string const & varName,
             size_t /* step */ )
     {
-        auto & chunkList = params.chunks->chunkTable[ 0 ];
         auto var = IO.InquireVariable< T >( varName );
         for ( auto const & info : engine.BlocksInfo< T >( var, 0 ) )
         {
             Offset offset = info.Start;
             Extent extent = info.Count;
-            chunkList.emplace_back( std::make_pair< Offset, Extent >(
-                std::move( offset ), std::move( extent ) ) );
+            params.chunks->chunkTable[ info.WriterID ]
+                .emplace_back(
+                    std::make_pair< Offset, Extent >(
+                        std::move( offset ), std::move( extent ) ) );
         }
     }
 
