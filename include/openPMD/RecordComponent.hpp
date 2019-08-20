@@ -153,16 +153,16 @@ public:
     /**
      * @brief Load all chunks that are available within a block of the complete
      *        dataset. Will allocate buffers and return them. For
-     *        self-allocating memory, see 
+     *        self-allocating memory, see
      *        RecordComponent::loadAvailableChunksContiguous()
      *        for a version that allows for manual allocation.
-     * 
-     * @tparam T 
+     *
+     * @tparam T
      * @param withinOffset The offset with respect to the origin of the complete
      *                     dataset of the block within which chunks are to be
      *                     loaded.
      * @param withinExtent The extent of said block.
-     * @param targetUnitSI 
+     * @param targetUnitSI
      * @return A list of chunks that will be loaded after flushing the Series.
      */
     template< typename T >
@@ -174,11 +174,11 @@ public:
 
     /**
      * @brief Load all chunks that are available within a block of the complete
-     *        dataset. Instead of self-allocating memory, the method asks the 
+     *        dataset. Instead of self-allocating memory, the method asks the
      *        caller to provide memory.
-     * 
-     * @tparam T 
-     * @tparam Fun 
+     *
+     * @tparam T
+     * @tparam Fun
      * @param provideBuffer A functor that accepts an offset (wrt. the origin
      *                      of the complete dataset) and an extent (wrt. the
      *                      origin of the chunk that memory is to be allocated
@@ -186,21 +186,28 @@ public:
      *                      sufficient memory for loading the chunk into it.
      *                      The returned dataset will be filled in contiguous
      *                      manner. Loading in strided manner can be achieved
-     *                      by combining this method with 
+     *                      by combining this method with
      *                      TaggedChunk::collectStrided()
      * @param withinOffset The offset with respect to the origin of the complete
      *                     dataset of the block within which chunks are to be
      *                     loaded.
      * @param withinExtent The extent of said block.
-     * @param targetUnitSI 
+     * @param targetUnitSI
      * @return A list of chunks that will be loaded after flushing the Series.
      */
     template< typename T, typename Fun >
-    std::list< TaggedChunk< T > >    
+    std::list< TaggedChunk< T > >
     loadAvailableChunksContiguous(
-        Fun provideBuffer,
+        Fun & provideBuffer,
         Offset withinOffset,
         Extent withinExtent,
+        double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
+
+    template< typename T, typename Fun >
+    std::list< TaggedChunk< T > >
+    loadChunksContiguous(
+        Fun & provideBuffer,
+        ChunkList chunks,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
     template< typename T >
@@ -396,9 +403,9 @@ RecordComponent::loadAvailableChunks(
                 continue;
             }
             auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
-            res.push_back( 
-                TaggedChunk< T >( 
-                    std::move( offset ), 
+            res.push_back(
+                TaggedChunk< T >(
+                    std::move( offset ),
                     std::move( extent ),
                     std::move( ptr ) ) );
         }
@@ -409,20 +416,19 @@ RecordComponent::loadAvailableChunks(
 template< typename T, typename Fun >
 std::list< TaggedChunk< T > >
 RecordComponent::loadAvailableChunksContiguous(
-    Fun provideBuffer,
+    Fun & provideBuffer,
     Offset withinOffset,
     Extent withinExtent,
     double targetUnitSI )
 {
     ChunkTable table = availableChunks();
-    std::list< TaggedChunk< T > > res;
+    std::list< Chunk > loadTheseChunks;
     for( auto & perRank : table.chunkTable )
     {
-        for( auto & chunk : perRank.second )
+        for( auto chunk : perRank.second )
         {
-            Offset offset;
-            Extent extent;
-            std::tie( offset, extent ) = chunk;
+            Offset offset = std::move( chunk.first );
+            Extent extent = std::move( chunk.second );
             restrictToSelection( offset, extent, withinOffset, withinExtent );
             bool load = true;
             for ( auto ext : extent )
@@ -433,19 +439,36 @@ RecordComponent::loadAvailableChunksContiguous(
                     load = false;
                 }
             }
-            if ( !load )
+            if ( load )
             {
-                continue;
+                loadTheseChunks.push_back(
+                    Chunk( std::move( offset ), std::move( extent ) ) );
             }
-            std::cerr << std::endl;
-            auto ptr = provideBuffer( offset, extent );
-            loadChunk< T >( ptr, offset, extent, targetUnitSI );
-            res.push_back( 
-                TaggedChunk< T >( 
-                    std::move( offset ), 
-                    std::move( extent ),
-                    std::move( ptr ) ) );
         }
+    }
+    return loadChunksContiguous< T, Fun >(
+        provideBuffer,
+        std::move( loadTheseChunks ),
+        targetUnitSI );
+}
+
+template< typename T, typename Fun >
+std::list< TaggedChunk< T > >
+RecordComponent::loadChunksContiguous(
+    Fun & provideBuffer,
+    ChunkList chunks,
+    double targetUnitSI )
+{
+    std::list< TaggedChunk< T > > res;
+    for( auto & chunk : chunks )
+    {
+        auto ptr = provideBuffer( chunk.first, chunk.second );
+        loadChunk< T >( ptr, chunk.first, chunk.second, targetUnitSI );
+        res.push_back(
+            TaggedChunk< T >(
+                std::move( chunk.first ),
+                std::move( chunk.second ),
+                std::move( ptr ) ) );
     }
     return res;
 }
