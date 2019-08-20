@@ -44,8 +44,7 @@ namespace chunk_assignment
             ChunkTable leftOver;
         };
 
-        static
-        std::unordered_map< std::string, std::list< int > >
+        static std::unordered_map< std::string, std::list< int > >
         ranksPerHost( RankMeta const & );
 
         virtual Result
@@ -69,7 +68,7 @@ namespace chunk_assignment
         virtual void
         splitEgalitarian(
             ChunkTable const & sourceChunks,
-            std::list< int > destinationRanks,
+            std::list< int > const & destinationRanks,
             ChunkTable & sinkChunks ) = 0;
 
         virtual ~SplitEgalitarian() = default;
@@ -89,7 +88,7 @@ namespace chunk_assignment
         void
         splitEgalitarian(
             ChunkTable const & sourceChunks,
-            std::list< int > destinationRanks,
+            std::list< int > const & destinationRanks,
             ChunkTable & sinkChunks ) override;
     };
 
@@ -106,6 +105,19 @@ namespace chunk_assignment
     private:
         std::unique_ptr< SplitEgalitarian > splitter;
     };
-} // namespace chunk_assignment
 
+    struct SecondPassBySplitEgalitarian : SecondPass
+    {
+        SecondPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian > );
+
+        ChunkTable
+        assignLeftovers(
+            FirstPass::Result,
+            RankMeta const & in,
+            RankMeta const & out ) override;
+
+    private:
+        std::unique_ptr< SplitEgalitarian > splitter;
+    };
+} // namespace chunk_assignment
 } // namespace openPMD
