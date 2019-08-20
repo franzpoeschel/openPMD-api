@@ -44,6 +44,10 @@ namespace chunk_assignment
             ChunkTable leftOver;
         };
 
+        static
+        std::unordered_map< std::string, std::list< int > >
+        ranksPerHost( RankMeta const & );
+
         virtual Result
         firstPass(
             ChunkTable const &,
@@ -101,9 +105,6 @@ namespace chunk_assignment
 
     private:
         std::unique_ptr< SplitEgalitarian > splitter;
-
-        std::unordered_map< std::string, std::list< int > >
-        initRanksPerHost( RankMeta const & );
     };
 } // namespace chunk_assignment
 

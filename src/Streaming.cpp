@@ -58,7 +58,7 @@ namespace chunk_assignment
         // the ranks are the source ranks
 
         // which ranks live on host <string> in the sink?
-        auto ranksPerHostSink = initRanksPerHost( metaOut );
+        auto ranksPerHostSink = ranksPerHost( metaOut );
         for( auto & chunkGroup : chunkGroups )
         {
             // chunkGroup.first = source host
@@ -82,7 +82,7 @@ namespace chunk_assignment
     }
 
     std::unordered_map< std::string, std::list< int > >
-    FirstPassByHostname::initRanksPerHost( RankMeta const & rankMeta )
+    FirstPass::ranksPerHost( RankMeta const & rankMeta )
     {
         std::unordered_map< std::string, std::list< int > > res;
         for( unsigned i = 0; i < rankMeta.size(); ++i )
