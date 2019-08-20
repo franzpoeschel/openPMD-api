@@ -7,7 +7,7 @@ namespace chunk_assignment
     void
     SplitEgalitarianTrivial::splitEgalitarian(
         ChunkTable const & sourceChunks,
-        std::list< int > destinationRanks,
+        std::list< int > const & destinationRanks,
         ChunkTable & sinkChunks )
     {
         auto it = destinationRanks.begin();
@@ -105,6 +105,30 @@ namespace chunk_assignment
             firstPass.firstPass( table, rankIn, rankOut );
         return secondPass.assignLeftovers(
             intermediateAssignment, rankIn, rankOut );
+    }
+
+    SecondPassBySplitEgalitarian::SecondPassBySplitEgalitarian(
+        std::unique_ptr< SplitEgalitarian > _splitter )
+        : splitter( std::move( _splitter ) )
+    {
+    }
+
+    ChunkTable
+    SecondPassBySplitEgalitarian::assignLeftovers(
+        FirstPass::Result intermediateResult,
+        RankMeta const &,
+        RankMeta const & out )
+    {
+        std::list< int > destinationRanks;
+        for( size_t rank = 0; rank < out.size(); ++rank )
+        {
+            destinationRanks.push_back( rank );
+        }
+        splitter->splitEgalitarian(
+            intermediateResult.leftOver,
+            destinationRanks,
+            intermediateResult.sinkSide );
+        return intermediateResult.sinkSide;
     }
 } // namespace chunk_assignment
 } // namespace openPMD
