@@ -32,6 +32,9 @@ struct ChunkTable
     T_chunkTable chunkTable;
 };
 
+using Chunk = ChunkTable::T_chunk;
+using ChunkList = ChunkTable::T_perRank;
+
 namespace chunk_assignment
 {
     using RankMeta = std::vector< std::string >;
