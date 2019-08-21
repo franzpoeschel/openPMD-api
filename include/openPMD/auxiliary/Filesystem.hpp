@@ -87,5 +87,14 @@ remove_directory(std::string const& path);
  */
 bool
 remove_file(std::string const& path);
+
+/**
+ * @brief Read a file line by line.
+ * 
+ * @param path Path to the file.
+ * @return Lines of the read file, excluding newline characters.
+ */
+std::vector< std::string >
+read_file_by_lines( std::string const & path );
 } // auxiliary
 } // openPMD
