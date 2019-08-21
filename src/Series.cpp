@@ -24,6 +24,7 @@
 #include "openPMD/IO/AbstractIOHandlerHelper.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/Future.hpp"
+#include "openPMD/auxiliary/MPI.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -304,6 +305,23 @@ Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
     setAttribute( "rankMetaInfo", std::move( rankMeta ) );
     return *this;
 }
+
+#if openPMD_HAVE_MPI
+Series &
+Series::setMpiRanksMetaInfo( std::string const & myRankInfo )
+{
+    int rank;
+    MPI_Comm_rank( m_communicator, &rank );
+    chunk_assignment::RankMeta rankMeta =
+        auxiliary::collectStringsTo(
+            m_communicator, 0, myRankInfo );
+    if ( rank == 0 )
+    {
+        setMpiRanksMetaInfo( std::move( rankMeta ) );
+    }
+    return *this;
+}
+#endif
 
 Series &
 Series::setMpiRanksMetaInfoByFile( std::string const & pathToMetaFile )

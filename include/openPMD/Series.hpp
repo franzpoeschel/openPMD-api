@@ -222,6 +222,18 @@ public:
     Series &
     setMpiRanksMetaInfo( chunk_assignment::RankMeta );
 
+#if openPMD_HAVE_MPI
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfo( std::string const & myRankInfo );
+#endif
+
     /**
      * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
      *        a String per (writing) MPI rank, indicating user-
