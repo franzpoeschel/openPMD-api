@@ -201,6 +201,35 @@ public:
     Series& setMachine(std::string const& newMachine);
 
     /**
+     * @throw   no_such_attribute_error If optional attribute is not present.
+     * @return  Vector with a String per (writing) MPI rank, indicating user-
+     *          defined meta information per rank. Example: host name.
+     */
+    chunk_assignment::RankMeta
+    mpiRanksMetaInfo( ) const;
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfo( chunk_assignment::RankMeta );
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *        This vector is read from the given file line by line.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfo( std::string const & pathToMetaFile );
+
+    /**
      * @return  Current encoding style for multiple iterations in this series.
      */
     IterationEncoding iterationEncoding() const;
