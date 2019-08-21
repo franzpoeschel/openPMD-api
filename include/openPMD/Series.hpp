@@ -229,6 +229,19 @@ public:
     setMpiRanksMetaInfo( std::string const & pathToMetaFile );
 
     /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *        This vector is read from a file whose location is found
+     *        in an environment variable.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfoByEnvvar(
+        std::string const & envvar = chunk_assignment::HOSTFILE_VARNAME );
+
+    /**
      * @return  Current encoding style for multiple iterations in this series.
      */
     IterationEncoding iterationEncoding() const;

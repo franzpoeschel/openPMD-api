@@ -37,6 +37,8 @@ using ChunkList = ChunkTable::T_perRank;
 
 namespace chunk_assignment
 {
+    constexpr char const * HOSTFILE_VARNAME = "MPI_WRITTEN_HOSTFILE";
+
     using RankMeta = std::vector< std::string >;
 
     struct FirstPass
