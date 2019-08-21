@@ -33,6 +33,7 @@
 #include <tuple>
 #include <memory>
 #include <future>
+#include <cstdlib>
 
 #if defined(__GNUC__)
 #   if (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
@@ -300,6 +301,7 @@ Series &
 Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
 {
     setAttribute( "rankMetaInfo", std::move( rankMeta ) );
+    return *this;
 }
 
 Series &
@@ -314,9 +316,27 @@ Series::setMpiRanksMetaInfo( std::string const & pathToMetaFile )
     {
         std::cerr << "Not setting rank meta information, because file has "
             "not been found: " << pathToMetaFile << std::endl;
-        return;
+        return *this;
     }
     setAttribute( "rankMetaInfo", rankMeta );
+    return *this;
+}
+
+Series &
+Series::setMpiRanksMetaInfoByEnvvar( std::string const & envvar )
+{
+    const char * filename = std::getenv( envvar.c_str( ) );
+    if ( filename )
+    {
+        setMpiRanksMetaInfo( filename );
+    }
+    else
+    {
+        std::cerr << "Not setting rank meta information, because environment"
+            " variable containing path to file has not been found: "
+            << envvar << std::endl;
+    }
+    return *this;
 }
 
 IterationEncoding
