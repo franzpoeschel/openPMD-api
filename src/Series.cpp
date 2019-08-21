@@ -291,6 +291,25 @@ Series::setMachine(std::string const &newMachine)
     return *this;
 }
 
+chunk_assignment::RankMeta
+Series::mpiRanksMetaInfo( ) const
+{
+    return getAttribute( "rankMetaInfo" ).get< chunk_assignment::RankMeta >( );
+}
+
+Series &
+Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
+{
+    setAttribute( "rankMetaInfo", std::move( rankMeta ) );
+}
+
+Series &
+Series::setMpiRanksMetaInfo( std::string const & pathToMetaFile )
+{
+    setAttribute( "rankMetaInfo", auxiliary::read_file_by_lines(
+        pathToMetaFile ) );
+}
+
 IterationEncoding
 Series::iterationEncoding() const
 {
