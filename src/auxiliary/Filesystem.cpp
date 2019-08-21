@@ -175,6 +175,10 @@ read_file_by_lines( std::string const & path )
 {
     std::vector< std::string > res;
     std::ifstream file( path, std::ios_base::in );
+    if ( file.fail( ) )
+    {
+        throw no_such_file_error( );
+    }
     std::string line;
     while( std::getline( file, line ) )
     {

@@ -305,8 +305,18 @@ Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
 Series &
 Series::setMpiRanksMetaInfo( std::string const & pathToMetaFile )
 {
-    setAttribute( "rankMetaInfo", auxiliary::read_file_by_lines(
-        pathToMetaFile ) );
+    chunk_assignment::RankMeta rankMeta;
+    try
+    {
+        rankMeta = auxiliary::read_file_by_lines( pathToMetaFile );
+    }
+    catch( auxiliary::no_such_file_error const & )
+    {
+        std::cerr << "Not setting rank meta information, because file has "
+            "not been found: " << pathToMetaFile << std::endl;
+        return;
+    }
+    setAttribute( "rankMetaInfo", rankMeta );
 }
 
 IterationEncoding
