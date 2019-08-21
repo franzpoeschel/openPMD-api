@@ -306,7 +306,7 @@ Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
 }
 
 Series &
-Series::setMpiRanksMetaInfo( std::string const & pathToMetaFile )
+Series::setMpiRanksMetaInfoByFile( std::string const & pathToMetaFile )
 {
     chunk_assignment::RankMeta rankMeta;
     try
@@ -329,7 +329,7 @@ Series::setMpiRanksMetaInfoByEnvvar( std::string const & envvar )
     const char * filename = std::getenv( envvar.c_str( ) );
     if ( filename )
     {
-        setMpiRanksMetaInfo( filename );
+        setMpiRanksMetaInfoByFile( filename );
     }
     else
     {

@@ -36,6 +36,7 @@
 
 #include <string>
 #include <future>
+#include <map>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -230,7 +231,7 @@ public:
      * @return Reference to modified series.
      */
     Series &
-    setMpiRanksMetaInfo( std::string const & pathToMetaFile );
+    setMpiRanksMetaInfoByFile( std::string const & pathToMetaFile );
 
     /**
      * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
@@ -321,5 +322,8 @@ public:
     std::shared_ptr< std::string > m_filenamePrefix;
     std::shared_ptr< std::string > m_filenamePostfix;
     std::shared_ptr< int > m_filenamePadding;
+#if openPMD_HAVE_MPI
+    MPI_Comm m_communicator;
+#endif
 }; // Series
 } // namespace openPMD
