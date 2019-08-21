@@ -198,7 +198,7 @@ public:
     template< typename T, typename Fun >
     std::list< TaggedChunk< T > >
     loadAvailableChunksContiguous(
-        Fun & provideBuffer,
+        Fun provideBuffer,
         Offset withinOffset,
         Extent withinExtent,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
@@ -206,7 +206,7 @@ public:
     template< typename T, typename Fun >
     std::list< TaggedChunk< T > >
     loadChunksContiguous(
-        Fun & provideBuffer,
+        Fun provideBuffer,
         ChunkList chunks,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
@@ -416,7 +416,7 @@ RecordComponent::loadAvailableChunks(
 template< typename T, typename Fun >
 std::list< TaggedChunk< T > >
 RecordComponent::loadAvailableChunksContiguous(
-    Fun & provideBuffer,
+    Fun provideBuffer,
     Offset withinOffset,
     Extent withinExtent,
     double targetUnitSI )
@@ -446,7 +446,7 @@ RecordComponent::loadAvailableChunksContiguous(
             }
         }
     }
-    return loadChunksContiguous< T, Fun >(
+    return loadChunksContiguous< T, Fun & >(
         provideBuffer,
         std::move( loadTheseChunks ),
         targetUnitSI );
@@ -455,7 +455,7 @@ RecordComponent::loadAvailableChunksContiguous(
 template< typename T, typename Fun >
 std::list< TaggedChunk< T > >
 RecordComponent::loadChunksContiguous(
-    Fun & provideBuffer,
+    Fun provideBuffer,
     ChunkList chunks,
     double targetUnitSI )
 {
