@@ -125,4 +125,10 @@ namespace chunk_assignment
         std::unique_ptr< SplitEgalitarian > splitter;
     };
 } // namespace chunk_assignment
+
+namespace host_info
+{
+    std::string
+    hostname();
+}
 } // namespace openPMD

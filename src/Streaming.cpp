@@ -1,5 +1,7 @@
 #include "openPMD/Streaming.hpp"
 
+#include <unistd.h>
+
 namespace openPMD
 {
 namespace chunk_assignment
@@ -131,4 +133,17 @@ namespace chunk_assignment
         return intermediateResult.sinkSide;
     }
 } // namespace chunk_assignment
+
+namespace host_info
+{
+    constexpr size_t MAX_HOSTNAME_LENGTH = 200;
+    std::string
+    hostname()
+    {
+        char hostname[ MAX_HOSTNAME_LENGTH ];
+        gethostname( hostname, MAX_HOSTNAME_LENGTH );
+        std::string res( hostname );
+        return res;
+    }
+} // namespace host_info
 } // namespace openPMD
