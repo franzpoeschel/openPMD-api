@@ -16,6 +16,10 @@ namespace auxiliary
         int destRank,
         std::string const & thisRankString );
 
+    std::vector< std::string >
+    distributeStringsToAllRanks(
+        MPI_Comm communicator,
+        std::string const & thisRankString );
 } // namespace auxiliary
 } // namespace openPMD
 
