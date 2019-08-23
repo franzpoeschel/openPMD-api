@@ -1,5 +1,6 @@
 #include "openPMD/Streaming.hpp"
 
+#include <map>
 #include <unistd.h>
 
 namespace openPMD
@@ -137,6 +138,15 @@ namespace chunk_assignment
 namespace host_info
 {
     constexpr size_t MAX_HOSTNAME_LENGTH = 200;
+
+    std::string
+    byMethod( Method method )
+    {
+        static std::map< Method, std::string ( * )() > map{ { Method::HOSTNAME,
+                                                              &hostname } };
+        return ( *map[ method ] )();
+    }
+
     std::string
     hostname()
     {
