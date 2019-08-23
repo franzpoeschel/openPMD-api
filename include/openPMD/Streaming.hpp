@@ -128,7 +128,14 @@ namespace chunk_assignment
 
 namespace host_info
 {
+    enum class Method
+    {
+        HOSTNAME
+    };
+
+    std::string byMethod( Method );
+
     std::string
     hostname();
-}
+} // namespace host_info
 } // namespace openPMD
