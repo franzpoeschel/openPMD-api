@@ -3,6 +3,8 @@
 #include <map>
 #include <unistd.h>
 
+#include "openPMD/Dataset.hpp"
+
 namespace openPMD
 {
 namespace chunk_assignment
@@ -82,6 +84,54 @@ namespace chunk_assignment
             }
         }
         return res;
+    }
+
+    FirstPassByCuboidSlice::FirstPassByCuboidSlice(
+        std::unique_ptr< BlockSlicer > _blockSlicer,
+        Extent _totalExtent,
+        int _mpi_rank,
+        int _mpi_size )
+        : blockSlicer( std::move( _blockSlicer ) )
+        , totalExtent( std::move( _totalExtent ) )
+        , mpi_rank( _mpi_rank )
+        , mpi_size( _mpi_size )
+    {
+    }
+
+    FirstPass::Result
+    FirstPassByCuboidSlice::firstPass(
+        ChunkTable const & availableChunks,
+        RankMeta const &,
+        RankMeta const & )
+    {
+        ChunkTable sinkSide;
+        auto & onMyRank = sinkSide.chunkTable[ mpi_rank ];
+        Offset myOffset;
+        Extent myExtent;
+        std::tie( myOffset, myExtent ) =
+            blockSlicer->sliceBlock( totalExtent, mpi_size, mpi_rank );
+
+        for( auto const & perRank : availableChunks.chunkTable )
+        {
+            for( auto chunk : perRank.second )
+            {
+                restrictToSelection(
+                    chunk.first, chunk.second, myOffset, myExtent );
+                for( auto ext : chunk.second )
+                {
+                    if( ext == 0 )
+                    {
+                        goto outer_loop;
+                    }
+                }
+                onMyRank.push_back( std::move( chunk ) );
+            outer_loop:;
+            }
+        }
+
+        Result result;
+        result.sinkSide = std::move( sinkSide );
+        return result;
     }
 
     std::unordered_map< std::string, std::list< int > >

@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "openPMD/Dataset.hpp"
+#include "openPMD/benchmark/mpi/BlockSlicer.hpp"
 #include <unordered_map>
 
 namespace openPMD
@@ -109,6 +110,26 @@ namespace chunk_assignment
 
     private:
         std::unique_ptr< SplitEgalitarian > splitter;
+    };
+
+    struct FirstPassByCuboidSlice : FirstPass
+    {
+        FirstPassByCuboidSlice(
+            std::unique_ptr< BlockSlicer > blockSlicer,
+            Extent totalExtent,
+            int mpi_rank,
+            int mpi_size );
+
+        Result
+        firstPass(
+            ChunkTable const &,
+            RankMeta const & in,
+            RankMeta const & out ) override;
+
+    private:
+        std::unique_ptr< BlockSlicer > blockSlicer;
+        Extent totalExtent;
+        int mpi_rank, mpi_size;
     };
 
     struct SecondPassBySplitEgalitarian : SecondPass
