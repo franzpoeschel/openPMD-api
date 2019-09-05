@@ -25,6 +25,7 @@
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/Future.hpp"
 #include "openPMD/auxiliary/MPI.hpp"
+#include "openPMD/benchmark/utils/DumpTimes.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -47,6 +48,12 @@
 #else
 #   include <regex>
 #endif
+
+void tmp()
+{
+    openPMD::DumpTimes< std::chrono::system_clock > dumpTimes;
+    dumpTimes.now< std::chrono::seconds >( "test" );
+}
 
 
 namespace openPMD
@@ -296,7 +303,20 @@ Series::setMachine(std::string const &newMachine)
 chunk_assignment::RankMeta
 Series::mpiRanksMetaInfo( ) const
 {
-    return getAttribute( "rankMetaInfo" ).get< chunk_assignment::RankMeta >( );
+    try 
+    {
+        return getAttribute( "rankMetaInfo" )
+            .get< chunk_assignment::RankMeta >( );
+    }
+    catch ( std::runtime_error const & )
+    {
+        // workaround: if vector has length 1, some backends may report a 
+        // single value instead of a vector
+        return chunk_assignment::RankMeta {
+            getAttribute( "rankMetaInfo" )
+                .get< chunk_assignment::RankMeta::value_type >( ) };
+    }
+
 }
 
 Series &
