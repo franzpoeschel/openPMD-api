@@ -65,6 +65,9 @@ public:
                     case O::OPEN_FILE:
                         openFile(i.writable, *dynamic_cast< Parameter< O::OPEN_FILE >* >(i.parameter.get()));
                         break;
+                    case O::CLOSE_FILE:
+                        closeFile(i.writable, *dynamic_cast< Parameter< O::CLOSE_FILE >* >(i.parameter.get()));
+                        break;
                     case O::OPEN_PATH:
                         openPath(i.writable, *dynamic_cast< Parameter< O::OPEN_PATH >* >(i.parameter.get()));
                         break;
@@ -131,6 +134,9 @@ public:
 
   virtual void availableChunks(Writable*, Parameter< Operation::AVAILABLE_CHUNKS > &)
   {} // TODO remove default implementation
+
+  virtual void closeFile(Writable*, Parameter< Operation::CLOSE_FILE > const &)
+  {}
 
 
   /** Create a new file in physical storage, possibly overriding an existing file.

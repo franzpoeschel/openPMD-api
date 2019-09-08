@@ -36,6 +36,7 @@
 #include <memory>
 #include <future>
 #include <cstdlib>
+#include <list>
 
 #if defined(__GNUC__)
 #   if (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
@@ -48,13 +49,6 @@
 #else
 #   include <regex>
 #endif
-
-void tmp()
-{
-    openPMD::DumpTimes< std::chrono::system_clock > dumpTimes;
-    dumpTimes.now< std::chrono::seconds >( "test" );
-}
-
 
 namespace openPMD
 {
@@ -687,6 +681,10 @@ Series::flushFileBased()
         bool allDirty = dirty;
         for( auto& i : iterations )
         {
+            if ( *i.second.skipFlush )
+            {
+                continue;
+            }
             /* as there is only one series,
              * emulate the file belonging to each iteration as not yet written */
             written = false;
@@ -700,6 +698,14 @@ Series::flushFileBased()
             iterations.flush(auxiliary::replace_first(basePath(), "%T/", ""));
 
             flushAttributes();
+
+            if ( i.second.finalized( ) )
+            {
+                Parameter< Operation::CLOSE_FILE > fClose;
+                fClose.name = filename;
+                IOHandler->enqueue( IOTask( &i.second, std::move( fClose ) ) );
+                *i.second.skipFlush = true;
+            }
 
             IOHandler->flush();
 
