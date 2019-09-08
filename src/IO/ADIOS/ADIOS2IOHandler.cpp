@@ -1363,7 +1363,7 @@ namespace detail
 
     void BufferedActions::flush( )
     {
-        if( *streamStatus == StreamStatus::StreamOver || m_buffer.empty( ) )
+        if( *streamStatus == StreamStatus::StreamOver )
         {
             return;
         }
@@ -1411,6 +1411,7 @@ namespace detail
     BufferedActions::advance( AdvanceMode mode )
     {
         // TODO refactor this a bit
+        // TODO allow user to override this choice
         if( *streamStatus == StreamStatus::NoStream )
         {
             std::cerr << "Warning: called Series::advance() in non-streaming "
