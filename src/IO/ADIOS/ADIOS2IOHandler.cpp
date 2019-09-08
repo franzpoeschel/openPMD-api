@@ -252,6 +252,28 @@ void ADIOS2IOHandlerImpl::openFile(
     writable->abstractFilePosition = std::make_shared< ADIOS2FilePosition >( );
 }
 
+void 
+ADIOS2IOHandlerImpl::closeFile( 
+    Writable * writable, Parameter< Operation::CLOSE_FILE > const & parameters )
+{
+    std::cerr << "Closing file " << parameters.name << std::endl;
+    std::string name = parameters.name;
+    if ( !auxiliary::ends_with( name, ".bp" ) )
+    {
+        name += ".bp";
+    }
+    auto fileIterator = m_files.find( writable );
+    if ( fileIterator != m_files.end( ) )
+    {
+        auto it = m_fileData.find( fileIterator->second );
+        if ( it != m_fileData.end( ) )
+        {
+            it->second->flush( );
+            m_fileData.erase( it );
+        }
+    }
+}
+
 void ADIOS2IOHandlerImpl::openPath(
     Writable * writable, const Parameter< Operation::OPEN_PATH > & parameters )
 {
@@ -1223,6 +1245,7 @@ namespace detail
             {
                 m_engine->EndStep();
             }
+            std::cerr << "Closing ADIOS2 engine " << m_file << std::endl;
             m_engine->Close( );
         }
     }

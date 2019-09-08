@@ -58,6 +58,7 @@ enum class EXPORT Operation
 {
     CREATE_FILE,
     OPEN_FILE,
+    CLOSE_FILE,
     DELETE_FILE,
 
     CREATE_PATH,
@@ -137,6 +138,22 @@ struct EXPORT Parameter< Operation::OPEN_FILE > : public AbstractParameter
     {
         return std::unique_ptr< AbstractParameter >(
             new Parameter< Operation::OPEN_FILE >(*this));
+    }
+
+    std::string name = "";
+};
+
+template<>
+struct EXPORT Parameter< Operation::CLOSE_FILE > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter(Parameter const & p) : AbstractParameter(), name(p.name) {};
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::CLOSE_FILE >(*this));
     }
 
     std::string name = "";

@@ -127,6 +127,9 @@ public:
     void openFile( Writable *,
                    Parameter< Operation::OPEN_FILE > const & ) override;
 
+    void closeFile( Writable *,
+                   Parameter< Operation::CLOSE_FILE > const & ) override;
+
     void openPath( Writable *,
                    Parameter< Operation::OPEN_PATH > const & ) override;
 
