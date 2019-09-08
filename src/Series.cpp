@@ -468,8 +468,16 @@ Series::advance( AdvanceMode mode )
     switch( *m_iterationEncoding )
     {
         case IterationEncoding::fileBased:
-            throw std::runtime_error(
-                "Advancing not yet implemented in file-based mode" );
+        {
+            std::cerr << "Advancing not yet implemented in file-based mode, "
+                "defaulting to performing a flush." << std::endl;
+            flushFileBased();
+            auto res = ConsumingFuture< AdvanceStatus >(
+                std::packaged_task< AdvanceStatus() >(
+                    [](){ return AdvanceStatus::OK; } ) );
+            res( );
+            return res;
+        }
         case IterationEncoding::groupBased:
             flushGroupBased();
             auxiliary::ConsumingFuture< AdvanceStatus > future =
