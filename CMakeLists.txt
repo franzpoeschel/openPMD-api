@@ -327,7 +327,6 @@ set(CORE_SOURCE
         src/Series.cpp
         src/Streaming.cpp
         src/auxiliary/Filesystem.cpp
-        src/auxiliary/MPI.cpp
         src/backend/Attributable.cpp
         src/backend/BaseRecordComponent.cpp
         src/backend/MeshRecordComponent.cpp
