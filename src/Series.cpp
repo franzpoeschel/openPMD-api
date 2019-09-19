@@ -485,6 +485,10 @@ Series::advance( AdvanceMode mode )
                 // https://github.com/openPMD/openPMD-api/issues/534
                 std::packaged_task< AdvanceStatus( AdvanceStatus ) >
                     postProcessing( [this]( AdvanceStatus status ) mutable {
+                        if ( status != AdvanceStatus::OK )
+                        {
+                            return status;
+                        }
                         bool previous = this->iterations.written;
                         this->iterations.written = false;
                         auto oldType = this->IOHandler->accessTypeFrontend;
