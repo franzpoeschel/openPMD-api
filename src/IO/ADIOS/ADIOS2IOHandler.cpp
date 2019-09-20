@@ -82,22 +82,6 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
 void
 ADIOS2IOHandlerImpl::init( nlohmann::json cfg )
 {
-    try
-    {
-        m_zfp = m_ADIOS.DefineOperator( "zfp", "zfp" );
-    }
-    catch ( std::invalid_argument const & )
-    {
-        // m_zfp stays a "false" operator
-    }
-    try
-    {
-        m_sz = m_ADIOS.DefineOperator( "sz", "sz" );
-    }
-    catch ( std::invalid_argument const & )
-    {
-        // m_sz stays a "false" operator
-    }
     if ( cfg.contains( "adios2" ) )
     {
         m_config = std::move( cfg[ "adios2" ] );
@@ -226,19 +210,13 @@ void ADIOS2IOHandlerImpl::createDataset(
         // we use a unique_ptr to circumvent the fact that std::optional
         // is only available beginning with c++17
         std::unique_ptr< adios2::Operator > compression;
-        if ( parameters.compression == "zfp" )
+        if ( !parameters.compression.empty( ) )
         {
-            compression = std::unique_ptr< adios2::Operator >{
-                new adios2::Operator( this->m_zfp )};
-        }
-        else if ( parameters.compression == "sz" )
-        {
-            compression = std::unique_ptr< adios2::Operator >{
-                new adios2::Operator( this->m_sz )};
+            compression = getCompressionOperator( parameters.compression );
         }
         switchType( parameters.dtype, detail::VariableDefiner( ),
                     getFileData( file ).m_IO, varName,
-                    std::unique_ptr< adios2::Operator >( ), parameters.extent );
+                    std::move( compression ), parameters.extent );
         writable->written = true;
         m_dirty.emplace( file );
     }
@@ -633,6 +611,34 @@ std::shared_ptr< ADIOS2FilePosition > ADIOS2IOHandlerImpl::extendFilePosition(
     }
     return std::make_shared< ADIOS2FilePosition >( path + std::move( s ),
                                                    oldPos->gd );
+}
+
+std::unique_ptr< adios2::Operator >
+ADIOS2IOHandlerImpl::getCompressionOperator( std::string const & compression )
+{
+    adios2::Operator res;
+    auto it = m_operators.find( compression );
+    if ( it == m_operators.end( ) )
+    {
+        try {
+            res = m_ADIOS.DefineOperator( compression, compression );
+        }
+        catch ( std::invalid_argument const & )
+        {
+            std::cerr << "Warning: ADIOS2 backend does not support compression "
+                "method " << compression << ". Continuing without compression."
+                << std::endl;
+            return std::unique_ptr< adios2::Operator >( );
+        }
+        m_operators.emplace( compression, res );
+
+    }
+    else
+    {
+        res = it->second;
+    }
+    return std::unique_ptr< adios2::Operator >(
+        new adios2::Operator( res ) );
 }
 
 std::string ADIOS2IOHandlerImpl::nameOfVariable( Writable * writable )
@@ -1205,7 +1211,8 @@ namespace detail
     : m_file( impl.fullPath( std::move( file ) ) ),
       m_IO( impl.m_ADIOS.DeclareIO( std::to_string( impl.nameCounter++ ) ) ),
       m_mode( impl.adios2Accesstype( ) ), m_writeDataset( &impl ),
-      m_readDataset( &impl ), m_attributeReader( )
+      m_readDataset( &impl ), m_attributeReader( ),
+      m_impl( impl )
     {
 #if openPMD_HAVE_MPI
         MPI_Comm_rank( impl.m_comm, &mpi_rank );
@@ -1600,6 +1607,6 @@ std::future< void > ADIOS2IOHandler::flush( )
     return std::future< void >( );
 }
 
-#endif
+#endif // openPMD_HAVE_ADIOS2
 
 } // namespace openPMD

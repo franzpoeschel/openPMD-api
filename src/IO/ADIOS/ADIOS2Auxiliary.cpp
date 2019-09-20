@@ -1,3 +1,4 @@
+#include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #include "openPMD/Datatype.hpp"

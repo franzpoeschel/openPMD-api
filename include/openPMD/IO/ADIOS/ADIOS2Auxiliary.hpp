@@ -1,5 +1,7 @@
 #pragma once
 
+#include "openPMD/config.hpp"
+#if openPMD_HAVE_ADIOS2
 #include "openPMD/Datatype.hpp"
 #include <adios2.h>
 #include <utility>
@@ -92,3 +94,5 @@ namespace detail
 } // namespace detail
 
 } // namespace openPMD
+
+#endif

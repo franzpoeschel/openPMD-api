@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include "openPMD/config.hpp"
 
 #include "ADIOS2FilePosition.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
@@ -189,8 +190,6 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
-    adios2::Operator m_zfp;
-    adios2::Operator m_sz;
     // data is held by m_handler
     nlohmann::json m_config;
     static nlohmann::json nullvalue;
@@ -240,6 +239,8 @@ private:
                         std::unique_ptr< detail::BufferedActions > >
         m_fileData;
 
+    std::map< std::string, adios2::Operator > m_operators;
+
     // Overrides from AbstractIOHandlerImplCommon.
 
     std::string
@@ -250,6 +251,9 @@ private:
                         std::string extend ) override;
 
     // Helper methods.
+
+    std::unique_ptr< adios2::Operator >
+    getCompressionOperator( std::string const & compression );
 
     /*
      * The name of the ADIOS2 variable associated with this Writable.
@@ -615,7 +619,7 @@ namespace detail
         detail::WriteDataset const m_writeDataset;
         detail::DatasetReader const m_readDataset;
         detail::AttributeReader const m_attributeReader;
-        // Does the engine currently have an active step?
+        ADIOS2IOHandlerImpl & m_impl;
         
         size_t currentStep = 0;
 
