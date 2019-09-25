@@ -64,7 +64,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     MPI_Comm communicator,
     nlohmann::json cfg )
 : AbstractIOHandlerImplCommon( handler ), m_comm{communicator},
-  m_ADIOS{communicator, ADIOS2_DEBUG_MODE}
+  m_ADIOS{communicator, ADIOS2_DEBUG_MODE}, m_isSerial( false )
 {
     init( std::move( cfg ) );
 }
@@ -1214,13 +1214,18 @@ namespace detail
       m_readDataset( &impl ), m_attributeReader( ),
       m_impl( impl )
     {
+        if ( impl.m_isSerial )
+        {
+            mpi_rank = 0;
+            mpi_size = 1;
+        }
+        else
+        {
 #if openPMD_HAVE_MPI
-        MPI_Comm_rank( impl.m_comm, &mpi_rank );
-        MPI_Comm_size( impl.m_comm, &mpi_size );
-#else
-        mpi_rank = 0;
-        mpi_size = 1;
+            MPI_Comm_rank( impl.m_comm, &mpi_rank );
+            MPI_Comm_size( impl.m_comm, &mpi_size );
 #endif
+        }
         if ( !m_IO )
         {
             throw std::runtime_error(
@@ -1337,12 +1342,15 @@ namespace detail
         }
 #if openPMD_HAVE_MPI
         {
-            auto num_substreams =
-            auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
-            if ( notYetConfigured( "SubStreams" ) && 0 != num_substreams )
+            if ( !impl.m_isSerial )
             {
-                m_IO.SetParameter( "SubStreams",
-                        std::to_string( num_substreams ) );
+                auto num_substreams =
+                auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
+                if ( notYetConfigured( "SubStreams" ) && 0 != num_substreams )
+                {
+                    m_IO.SetParameter( "SubStreams",
+                            std::to_string( num_substreams ) );
+                }
             }
         }
 #endif
