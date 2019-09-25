@@ -187,6 +187,7 @@ public:
 private:
     adios2::ADIOS m_ADIOS;
     size_t currentStep = 0;
+    bool m_isSerial = true;
     // data is held by m_handler
     nlohmann::json m_config;
     static nlohmann::json nullvalue;
