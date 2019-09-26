@@ -2,12 +2,46 @@
 #include <cstdlib>
 #include <ctime>
 #include <fstream>
+#include <functional>
 #include <iomanip>
+#include <sstream>
 #include <string>
 #include <utility>
 
 namespace openPMD
 {
+template< typename Clock >
+struct TimeFormatters
+{
+    using TimeFormatter =
+        std::function< std::string( typename Clock::time_point const & ) >;
+
+    static std::string
+    humanReadable( typename Clock::time_point const & currentTime )
+    {
+        std::stringstream res;
+        std::time_t now_c = Clock::to_time_t( currentTime );
+        res << std::put_time( std::localtime( &now_c ), "%F %T" ) << '.'
+            << std::setfill( '0' ) << std::setw( 3 )
+            << std::chrono::duration_cast< std::chrono::milliseconds >(
+                   currentTime.time_since_epoch() )
+                    .count() %
+                1000;
+        return res.str();
+    }
+
+    static std::string
+    epochTime( typename Clock::time_point const & currentTime )
+    {
+        return std::to_string(
+            std::chrono::duration_cast< std::chrono::milliseconds >(
+                currentTime.time_since_epoch() )
+                .count() );
+    }
+};
+template< typename Clock >
+using TimeFormatter = typename TimeFormatters< Clock >::TimeFormatter;
+
 // https://en.cppreference.com/w/cpp/named_req/Clock
 template< typename Clock = std::chrono::system_clock, bool enable = true >
 class DumpTimes
@@ -25,7 +59,9 @@ public:
 
     template< typename Duration >
     Ret_T
-    now( std::string description, std::string separator = "\t" );
+    now( std::string description,
+         std::string separator = "\t",
+         TimeFormatter< Clock > = &TimeFormatters< Clock >::epochTime );
 
     void
     flush();
@@ -54,19 +90,14 @@ template< typename Duration >
 typename DumpTimes< Clock, enable >::Ret_T
 DumpTimes< Clock, enable >::now(
     std::string description,
-    std::string separator )
+    std::string separator,
+    TimeFormatter< Clock > timeFormatter )
 {
     auto currentTime = Clock::now();
     auto delta = currentTime - lastTimePoint;
     lastTimePoint = currentTime;
-    std::time_t now_c = Clock::to_time_t( currentTime );
-    outStream << std::put_time( std::localtime( &now_c ), "%F %T" ) << '.'
-              << std::setfill( '0' ) << std::setw( 3 )
-              << std::chrono::duration_cast< std::chrono::milliseconds >(
-                     currentTime.time_since_epoch() )
-                     .count() %
-            1000
-              << separator
+    std::string nowFormatted = timeFormatter( currentTime );
+    outStream << std::move( nowFormatted ) << separator
               << std::chrono::duration_cast< Duration >( delta ).count()
               << separator << description << '\n';
     return std::make_pair( currentTime, delta );
