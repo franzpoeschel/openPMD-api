@@ -25,7 +25,6 @@
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/Future.hpp"
 #include "openPMD/auxiliary/MPI.hpp"
-#include "openPMD/benchmark/utils/DumpTimes.hpp"
 
 #include <iomanip>
 #include <iostream>
