@@ -91,7 +91,7 @@ Iteration::setFinalized( bool finalized )
 }
 
 bool
-Iteration::finalized()
+Iteration::finalized() const
 {
     if( containsAttribute( "finalized" ) )
     {
