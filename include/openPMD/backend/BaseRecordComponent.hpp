@@ -22,6 +22,10 @@
 
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/Dataset.hpp"
+#include "openPMD/Streaming.hpp"
+
+#include <vector>
+#include <utility>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected
@@ -30,7 +34,7 @@
 
 
 namespace openPMD
-{
+{  
 class BaseRecordComponent : public Attributable
 {
     template< typename T_elem >
@@ -53,6 +57,8 @@ public:
     BaseRecordComponent& resetDatatype(Datatype);
 
     Datatype getDatatype() const;
+
+    ChunkTable availableChunks();
 
 OPENPMD_protected:
     BaseRecordComponent();

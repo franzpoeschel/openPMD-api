@@ -28,8 +28,6 @@
 #include "openPMD/IO/AccessType.hpp"
 #include "openPMD/IO/JSON/JSONFilePosition.hpp"
 
-#include <nlohmann/json.hpp>
-
 #include <fstream>
 #include <memory>
 #include <tuple>
@@ -37,6 +35,15 @@
 #include <unordered_set>
 #include <vector>
 #include <stdexcept>
+
+
+#if openPMD_HAVE_JSON
+
+
+#include <nlohmann/json.hpp>
+
+
+#endif
 
 
 namespace openPMD
@@ -149,6 +156,8 @@ namespace std
 
 namespace openPMD
 {
+#if openPMD_HAVE_JSON
+
     class JSONIOHandlerImpl :
         public AbstractIOHandlerImpl
     {
@@ -542,5 +551,29 @@ namespace openPMD
             T operator()( nlohmann::json const & );
         };
     };
+
+#else
+
+    class JSONIOHandlerImpl
+    {
+    public:
+        JSONIOHandlerImpl( openPMD::AbstractIOHandler * )
+        {
+            throw std::runtime_error("openPMD-api built without JSON support");
+        };
+
+
+        ~JSONIOHandlerImpl( )
+        {};
+
+
+        std::future< void > flush( )
+        {
+            return std::future< void >( );
+        }
+    };
+
+#endif
+
 
 } // openPMD

@@ -97,13 +97,33 @@ Iteration::setTimeUnitSI(double newTimeUnitSI)
     return *this;
 }
 
+Iteration&
+Iteration::setFinalized( bool finalized )
+{
+    setAttribute( "finalized", finalized );
+    return *this;
+}
+
+bool
+Iteration::finalized() const
+{
+    if( containsAttribute( "finalized" ) )
+    {
+        return getAttribute( "finalized" ).get< bool >();
+    }
+    else
+    {
+        return false;
+    }
+}
+
 void
 Iteration::flushFileBased(std::string const& filename, uint64_t i)
 {
+    Series* s = dynamic_cast<Series *>(parent->attributable->parent->attributable);
     if( !written )
     {
         /* create file */
-        auto s = dynamic_cast< Series* >(parent->attributable->parent->attributable);
         Parameter< Operation::CREATE_FILE > fCreate;
         fCreate.name = filename;
         IOHandler->enqueue(IOTask(s, fCreate));
@@ -119,7 +139,6 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
     } else
     {
         /* open file */
-        auto s = dynamic_cast< Series* >(parent->attributable->parent->attributable);
         Parameter< Operation::OPEN_FILE > fOpen;
         fOpen.name = filename;
         IOHandler->enqueue(IOTask(s, fOpen));

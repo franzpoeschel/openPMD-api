@@ -23,12 +23,14 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/Dataset.hpp"
+#include "openPMD/Streaming.hpp"
 
 #include <memory>
 #include <map>
 #include <vector>
 #include <string>
 #include <utility>
+#include <future>
 
 #ifdef _MSC_VER
 #   define EXPORT __declspec( dllexport )
@@ -58,6 +60,7 @@ enum class EXPORT Operation
 {
     CREATE_FILE,
     OPEN_FILE,
+    CLOSE_FILE,
     DELETE_FILE,
 
     CREATE_PATH,
@@ -76,8 +79,12 @@ enum class EXPORT Operation
     DELETE_ATT,
     WRITE_ATT,
     READ_ATT,
-    LIST_ATTS
-};  //Operation
+    LIST_ATTS,
+
+    ADVANCE,
+    AVAILABLE_CHUNKS,
+    STALE_GROUP
+}; // Operation
 
 struct EXPORT AbstractParameter
 {
@@ -134,6 +141,22 @@ struct EXPORT Parameter< Operation::OPEN_FILE > : public AbstractParameter
     {
         return std::unique_ptr< AbstractParameter >(
             new Parameter< Operation::OPEN_FILE >(*this));
+    }
+
+    std::string name = "";
+};
+
+template<>
+struct EXPORT Parameter< Operation::CLOSE_FILE > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter(Parameter const & p) : AbstractParameter(), name(p.name) {};
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::CLOSE_FILE >(*this));
     }
 
     std::string name = "";
@@ -454,6 +477,81 @@ struct EXPORT Parameter< Operation::LIST_ATTS > : public AbstractParameter
 
     std::shared_ptr< std::vector< std::string > > attributes
             = std::make_shared< std::vector< std::string > >();
+};
+
+template<>
+struct EXPORT Parameter< Operation::ADVANCE > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & p ) :
+        AbstractParameter(),
+        mode( p.mode ),
+        task( p.task )
+    {
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::ADVANCE >( *this ) );
+    }
+
+    // input parameters
+    AdvanceMode mode;
+    // output parameter
+    std::shared_ptr< std::packaged_task< AdvanceStatus() > > task
+        = std::make_shared< std::packaged_task< AdvanceStatus() > >();
+};
+
+template<>
+struct EXPORT Parameter< Operation::AVAILABLE_CHUNKS > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & p ) :
+        AbstractParameter(),
+        chunks( p.chunks )
+    {
+    }
+
+    Parameter & operator=( Parameter const & p )
+    {
+        chunks = p.chunks;
+        return *this;
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::AVAILABLE_CHUNKS >( *this ) );
+    }
+
+    // output parameter
+    std::shared_ptr< ChunkTable > chunks
+        = std::make_shared< ChunkTable > ();
+};
+
+template<>
+struct EXPORT Parameter< Operation::STALE_GROUP > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & ) : AbstractParameter()
+    {
+    }
+
+    Parameter &
+    operator=( Parameter const & )
+    {
+        return *this;
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::STALE_GROUP >( *this ) );
+    }
 };
 
 

@@ -267,6 +267,29 @@ void ADIOS2IOHandlerImpl::openFile(
     writable->abstractFilePosition = std::make_shared< ADIOS2FilePosition >( );
 }
 
+void
+ADIOS2IOHandlerImpl::closeFile(
+    Writable * writable,
+    Parameter< Operation::CLOSE_FILE > const & parameters )
+{
+    std::cerr << "Closing file " << parameters.name << std::endl;
+    std::string name = parameters.name;
+    if ( !auxiliary::ends_with( name, ".bp" ) )
+    {
+        name += ".bp";
+    }
+    auto fileIterator = m_files.find( writable );
+    if ( fileIterator != m_files.end( ) )
+    {
+        auto it = m_fileData.find( fileIterator->second );
+        if ( it != m_fileData.end( ) )
+        {
+            it->second->flush( );
+            m_fileData.erase( it );
+        }
+    }
+}
+
 void ADIOS2IOHandlerImpl::openPath(
     Writable * writable, const Parameter< Operation::OPEN_PATH > & parameters )
 {
@@ -397,8 +420,9 @@ void ADIOS2IOHandlerImpl::listPaths(
      * since ADIOS does not have a concept of paths, restore them
      * from variables and attributes.
      */
+
     auto & fileData = getFileData( file );
-    fileData.getEngine( ); // make sure that the attributes are present
+    fileData.requireActiveStep();
 
     std::unordered_set< std::string > subdirs;
     /*
@@ -474,8 +498,7 @@ void ADIOS2IOHandlerImpl::listDatasets(
      */
 
     auto & fileData = getFileData( file );
-    fileData.getEngine( ); // make sure that the attributes are present
-
+    fileData.requireActiveStep();
     std::map< std::string, adios2::Params > vars =
         fileData.availableVariables();
 
@@ -509,7 +532,8 @@ void ADIOS2IOHandlerImpl::listAttributes(
         attributePrefix = "";
     }
     auto & ba = getFileData( file );
-    ba.getEngine( ); // make sure that the attributes are present
+    ba.requireActiveStep(); // make sure that the attributes are present
+
     auto const & attrs = ba.availableAttributesPrefixed( attributePrefix );
     for( auto & rawAttr : attrs )
     {
@@ -524,21 +548,85 @@ void ADIOS2IOHandlerImpl::listAttributes(
     }
 }
 
-adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
+void
+ADIOS2IOHandlerImpl::advance(
+    Writable * writable,
+    Parameter< Operation::ADVANCE > & parameters )
 {
-    switch ( m_handler->accessTypeBackend )
+    auto file = refreshFileFromParent( writable );
+    auto & ba = getFileData( file );
+    *parameters.task = ba.advance( parameters.mode );
+}
+
+void
+ADIOS2IOHandlerImpl::availableChunks(
+    Writable * writable,
+    Parameter< Operation::AVAILABLE_CHUNKS > & parameters )
+{
+    setAndGetFilePosition( writable );
+    auto file = refreshFileFromParent( writable );
+    detail::BufferedActions & ba = getFileData( file );
+    std::string varName = nameOfVariable( writable );
+    ba.requireActiveStep( );
+    auto datatype = detail::fromADIOS2Type( ba.m_IO.VariableType( varName ) );
+    static detail::RetrieveBlocksInfo rbi;
+    switchType(
+        datatype,
+        rbi,
+        parameters,
+        ba.m_IO,
+        ba.requireActiveStep(),
+        varName,
+        ba.currentStep );
+}
+
+void
+ADIOS2IOHandlerImpl::staleGroup(
+    Writable * writable,
+    Parameter< Operation::STALE_GROUP > const & )
+{
+    VERIFY_ALWAYS(
+        writable->written,
+        "Cannot put a group in stale mode that has not been written yet." );
+    VERIFY_ALWAYS(
+        m_handler->accessTypeBackend != AccessType::READ_ONLY,
+        "Cannot put a group in stale while in read-only mode." );
+    auto file = refreshFileFromParent( writable );
+    auto & fileData = getFileData( file );
+    if( !fileData.isStreaming )
     {
-    case AccessType::CREATE:
-        return adios2::Mode::Write;
-    case AccessType::READ_ONLY:
-        return adios2::Mode::Read;
-    case AccessType::READ_WRITE:
-        std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
-                     "(Append) mode."
-                  << "Replacing with Read mode." << std::endl;
-        return adios2::Mode::Read;
-    default:
-        return adios2::Mode::Undefined;
+        return;
+    }
+    auto position = setAndGetFilePosition( writable );
+    auto const positionString = filePositionToString( position );
+    VERIFY(
+        !auxiliary::ends_with( positionString, '/' ),
+        "ADIOS2 backend: Position string has unexpected format. This is a bug "
+        "in the openPMD API." );
+
+    for( auto const & attr :
+         fileData.availableAttributesPrefixed( positionString ) )
+    {
+        fileData.m_IO.RemoveAttribute( positionString + '/' + attr );
+    }
+}
+
+adios2::Mode
+ADIOS2IOHandlerImpl::adios2Accesstype()
+{
+    switch( m_handler->accessTypeBackend )
+    {
+        case AccessType::CREATE:
+            return adios2::Mode::Write;
+        case AccessType::READ_ONLY:
+            return adios2::Mode::Read;
+        case AccessType::READ_WRITE:
+            std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
+                         "(Append) mode."
+                      << "Replacing with Read mode." << std::endl;
+            return adios2::Mode::Read;
+        default:
+            return adios2::Mode::Undefined;
     }
 }
 
@@ -844,7 +932,17 @@ namespace detail
         throw std::runtime_error( "[ADIOS2] Defining a variable with undefined type." );
     }
 
+    template < typename T, typename... Params >
+    void RetrieveBlocksInfo::operator( )( Params &&... params )
+    {
+        DatasetHelper< T >::blocksInfo( std::forward< Params >( params )... );
+    }
 
+    template < int n, typename... Args >
+    void RetrieveBlocksInfo::operator( )( Args&&... )
+    {
+        // variable has not been found, so we don't fill in any blocks
+    }
 
     template < typename T >
     typename AttributeTypes< T >::Attr
@@ -972,7 +1070,9 @@ namespace detail
         openDataset( InvalidatableFile file, const std::string & varName,
                      Parameter< Operation::OPEN_DATASET > & parameters )
     {
-        auto & IO = m_impl->getFileData( file ).m_IO;
+        auto & fileData = m_impl->getFileData( file );
+        fileData.requireActiveStep();
+        auto & IO = fileData.m_IO;
         adios2::Variable< T > var = IO.InquireVariable< T >( varName );
         if ( !var )
         {
@@ -1048,6 +1148,28 @@ namespace detail
     }
 
     template < typename T >
+    void DatasetHelper<
+        T, typename std::enable_if< DatasetTypes< T >::validType >::type >::
+        blocksInfo(
+            Parameter< Operation::AVAILABLE_CHUNKS > & params,
+            adios2::IO IO,
+            adios2::Engine engine,
+            std::string const & varName,
+            size_t /* step */ )
+    {
+        auto var = IO.InquireVariable< T >( varName );
+        for ( auto const & info : engine.BlocksInfo< T >( var, 0 ) )
+        {
+            Offset offset = info.Start;
+            Extent extent = info.Count;
+            params.chunks->chunkTable[ info.WriterID ]
+                .emplace_back(
+                    std::make_pair< Offset, Extent >(
+                        std::move( offset ), std::move( extent ) ) );
+        }
+    }
+
+    template < typename T >
     DatasetHelper<
         T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
         DatasetHelper( openPMD::ADIOS2IOHandlerImpl * )
@@ -1100,6 +1222,15 @@ namespace detail
         throwErr( );
     }
 
+    template < typename T >
+    template < typename... Params >
+    void DatasetHelper<
+        T, typename std::enable_if< !DatasetTypes< T >::validType >::type >::
+        blocksInfo( Params &&... )
+    {
+        throwErr( );
+    }
+
     void BufferedGet::run( BufferedActions & ba )
     {
         switchType( param.dtype, ba.m_readDataset, *this, ba.m_IO,
@@ -1127,14 +1258,30 @@ namespace detail
         *param.dtype = ret;
     }
 
-
-    BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
-                                      InvalidatableFile file )
-    : m_file( impl.fullPath( std::move( file ) ) ),
-      m_IO( impl.m_ADIOS.DeclareIO( std::to_string( impl.nameCounter++ ) ) ),
-      m_mode( impl.adios2Accesstype( ) ), m_writeDataset( &impl ),
-      m_readDataset( &impl ), m_attributeReader( ), m_impl( impl )
+    BufferedActions::BufferedActions(
+        ADIOS2IOHandlerImpl & impl,
+        InvalidatableFile file )
+        : m_file( impl.fullPath( std::move( file ) ) )
+        , m_IOName( std::to_string( impl.nameCounter++ ) )
+        , m_ADIOS( impl.m_ADIOS )
+        , m_IO( impl.m_ADIOS.DeclareIO( m_IOName ) )
+        , m_mode( impl.adios2Accesstype() )
+        , m_writeDataset( &impl )
+        , m_readDataset( &impl )
+        , m_attributeReader()
     {
+        if ( impl.m_isSerial )
+        {
+            mpi_rank = 0;
+            mpi_size = 1;
+        }
+        else
+        {
+#if openPMD_HAVE_MPI
+            MPI_Comm_rank( impl.m_comm, &mpi_rank );
+            MPI_Comm_size( impl.m_comm, &mpi_size );
+#endif
+        }
         if ( !m_IO )
         {
             throw std::runtime_error(
@@ -1156,20 +1303,54 @@ namespace detail
         }
         if( m_engine )
         {
-            m_engine->Close();
+            if( *streamStatus == StreamStatus::DuringStep )
+            {
+                m_engine->EndStep();
+            }
+            std::cerr << "Closing ADIOS2 engine " << m_file << std::endl;
+            m_engine->Close( );
+            m_ADIOS.RemoveIO( m_IOName );
         }
     }
 
-    void
-    BufferedActions::configure_IO( ADIOS2IOHandlerImpl & impl )
-    {
+    void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
         (void)impl;
+        static std::set< std::string > streamingEngines = { "sst",
+                                                            "insitumpi",
+                                                            "inline" };
+        static std::set< std::string > fileEngines = { "bp4", "bp3", "hdf5" };
+
         std::set< std::string > alreadyConfigured;
 #if openPMD_HAVE_JSON
         auto & engine = impl.config( detail::str_engine );
         if( !engine.is_null() )
         {
-            m_IO.SetEngine( impl.config( detail::str_type, engine ) );
+            std::string type = impl.config( detail::str_type, engine );
+            m_IO.SetEngine( type );
+            {
+                auto it = streamingEngines.find( type );
+                if( it != streamingEngines.end() )
+                {
+                    isStreaming = true;
+                    *streamStatus = StreamStatus::OutsideOfStep;
+                }
+                else
+                {
+                    isStreaming = false;
+                    it = fileEngines.find( type );
+                    if( it != fileEngines.end() )
+                    {
+                        *streamStatus = StreamStatus::NoStream;
+                    }
+                    else
+                    {
+                        std::cerr << "Unknown engine type (" << type
+                                  << "). Defaulting to non-streaming mode."
+                                  << std::endl;
+                        *streamStatus = StreamStatus::NoStream;
+                    }
+                }
+            }
             auto & params = impl.config( detail::str_params, engine );
             if( params.is_object() )
             {
@@ -1180,7 +1361,14 @@ namespace detail
                 }
             }
         }
+        else
+        {
+            m_IO.SetEngine( "bp4" );
+        }
+#else
+        m_IO.SetEngine( "bp4" );
 #endif // openPMD_HAVE_JSON
+
         auto notYetConfigured =
             [&alreadyConfigured]( std::string const & param ) {
                 auto it = alreadyConfigured.find( param );
@@ -1232,9 +1420,9 @@ namespace detail
     {
         if ( !m_engine )
         {
-            m_engine = std::unique_ptr< adios2::Engine >(
-                new adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
-            if ( !m_engine )
+            m_engine = std::make_shared< adios2::Engine >(
+                adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
+            if ( !*m_engine )
             {
                 throw std::runtime_error( "[ADIOS2] Failed opening Engine." );
             }
@@ -1242,18 +1430,52 @@ namespace detail
         return *m_engine;
     }
 
+    adios2::Engine & BufferedActions::requireActiveStep( )
+    {
+        adios2::Engine & eng = getEngine( );
+        if ( *streamStatus == StreamStatus::OutsideOfStep )
+        {
+            eng.BeginStep( );
+            *streamStatus = StreamStatus::DuringStep;
+        }
+        return eng;
+    }
+
     template < typename BA > void BufferedActions::enqueue( BA && ba )
     {
+        enqueue< BA >( std::forward< BA >( ba ), m_buffer );
+    }
+
+    template < typename BA > void BufferedActions::enqueue(
+        BA && ba,
+        decltype( m_buffer ) & buffer )
+    {
         using _BA = typename std::remove_reference< BA >::type;
-        m_buffer.emplace_back( std::unique_ptr< BufferedAction >(
+        buffer.emplace_back( std::unique_ptr< BufferedAction >(
             new _BA( std::forward< BA >( ba ) ) ) );
     }
 
     void BufferedActions::flush( )
     {
-        auto & eng = getEngine( );
+        if( *streamStatus == StreamStatus::StreamOver )
         {
-            for ( auto const & ba : m_buffer )
+            return;
+        }
+        auto & eng = getEngine( );
+        /*
+         * Only open a new step if it is necessary.
+         */
+        if ( *streamStatus == StreamStatus::OutsideOfStep && !m_buffer.empty() )
+        {
+            eng.BeginStep();
+            *streamStatus = StreamStatus::DuringStep;
+        }
+        else if ( *streamStatus == StreamStatus::TemporarilyInvalid )
+        {
+            return; // no flush heh
+        }
+        {
+            for ( auto & ba : m_buffer )
             {
                 ba->run( *this );
             }
@@ -1279,53 +1501,98 @@ namespace detail
         m_buffer.clear( );
     }
 
+    std::packaged_task< AdvanceStatus() >
+    BufferedActions::advance( AdvanceMode mode )
+    {
+        // TODO refactor this a bit
+        // TODO allow user to override this choice
+        if( *streamStatus == StreamStatus::NoStream )
+        {
+            std::cerr << "Warning: called Series::advance() in non-streaming "
+                << "mode. Defaulting to performing a flush." << std::endl;
+            flush();
+            switch (mode) {
+            case AdvanceMode::READ:
+                return std::packaged_task< AdvanceStatus() >(
+                    []() {
+                        return AdvanceStatus::OVER;
+                    } );
+            case AdvanceMode::WRITE:
+                return std::packaged_task< AdvanceStatus() >(
+                    []() {
+                        return AdvanceStatus::OK;
+                    } );
+            case AdvanceMode::AUTO:
+                throw std::runtime_error(
+                        "Internal error: Advance mode should be explicitly"
+                        " chosen by the front-end.");
+            }
+        }
+        switch (mode) {
+        case AdvanceMode::WRITE:
+        {
+            /*
+             * Advance mode write:
+             * Close the current step, defer opening the new step
+             * until one is actually needed:
+             * (1) The engine is accessed in BufferedActions::flush
+             * (2) A new step is opened before the currently active step
+             *     has seen an access. See the following lines: open the
+             *     step just to skip it again.
+             */
+            if( *streamStatus == StreamStatus::OutsideOfStep )
+            {
+                getEngine().BeginStep();
+            }
+            flush();
+            getEngine().EndStep();
+            currentStep++;
+            *streamStatus = StreamStatus::OutsideOfStep;
+            return std::packaged_task< AdvanceStatus() >(
+                []() {
+                    return AdvanceStatus::OK;
+                } );
+        }
+        case AdvanceMode::READ:
+        {
+            if ( *streamStatus == StreamStatus::DuringStep )
+            {
+                flush();
+                getEngine().EndStep();
+            }
+            currentStep++;
+            // c++ won't allow capturing class members, so we make intermediate
+            // copies
+            auto _streamStatus = streamStatus;
+            getEngine();
+            auto engine = m_engine;
+            invalidateAttributesMap();
+            invalidateVariablesMap();
+            *streamStatus = StreamStatus::TemporarilyInvalid;
+            return std::packaged_task< AdvanceStatus() >(
+                [engine, _streamStatus]() mutable {
+                    switch( engine->BeginStep() )
+                    {
+                        case adios2::StepStatus::EndOfStream:
+                            *_streamStatus = StreamStatus::StreamOver;
+                            return AdvanceStatus::OVER;
+                        default:
+                            *_streamStatus = StreamStatus::DuringStep;
+                            return AdvanceStatus::OK;
+                    }
+                } );
+        }
+        case AdvanceMode::AUTO:
+            break;
+        }
+        throw std::runtime_error(
+            "Internal error: Advance mode should be explicitly"
+            " chosen by the front-end." );
+    }
+
     void BufferedActions::drop( )
     {
         m_buffer.clear();
-    }
-
-    void
-    BufferedActions::invalidateAttributesMap()
-    {
-        m_availableAttributesValid = false;
-        m_availableAttributes.clear( );
-    }
-
-    BufferedActions::AttributeMap_t const &
-    BufferedActions::availableAttributes()
-    {
-        if( m_availableAttributesValid )
-        {
-            return m_availableAttributes;
-        }
-        else
-        {
-            m_availableAttributes = m_IO.AvailableAttributes();
-            m_availableAttributesValid = true;
-            return m_availableAttributes;
-        }
-    }
-
-    void
-    BufferedActions::invalidateVariablesMap()
-    {
-        m_availableVariablesValid = false;
-        m_availableVariables.clear();
-    }
-
-    BufferedActions::AttributeMap_t const &
-    BufferedActions::availableVariables()
-    {
-        if( m_availableVariablesValid )
-        {
-            return m_availableVariables;
-        }
-        else
-        {
-            m_availableVariables = m_IO.AvailableVariables();
-            m_availableVariablesValid = true;
-            return m_availableVariables;
-        }
     }
 
     static std::vector< std::string >
@@ -1372,6 +1639,50 @@ namespace detail
             prefix,
             &BufferedActions::availableVariables,
             *this );
+    }
+
+    void
+    BufferedActions::invalidateAttributesMap()
+    {
+        m_availableAttributesValid = false;
+        m_availableAttributes.clear( );
+    }
+
+    BufferedActions::AttributeMap_t const &
+    BufferedActions::availableAttributes()
+    {
+        if( m_availableAttributesValid )
+        {
+            return m_availableAttributes;
+        }
+        else
+        {
+            m_availableAttributes = m_IO.AvailableAttributes();
+            m_availableAttributesValid = true;
+            return m_availableAttributes;
+        }
+    }
+
+    void
+    BufferedActions::invalidateVariablesMap()
+    {
+        m_availableVariablesValid = false;
+        m_availableVariables.clear();
+    }
+
+    BufferedActions::AttributeMap_t const &
+    BufferedActions::availableVariables()
+    {
+        if( m_availableVariablesValid )
+        {
+            return m_availableVariables;
+        }
+        else
+        {
+            m_availableVariables = m_IO.AvailableVariables();
+            m_availableVariablesValid = true;
+            return m_availableVariables;
+        }
     }
 
 } // namespace detail

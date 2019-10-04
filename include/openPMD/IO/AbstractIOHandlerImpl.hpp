@@ -65,6 +65,9 @@ public:
                     case O::OPEN_FILE:
                         openFile(i.writable, *dynamic_cast< Parameter< O::OPEN_FILE >* >(i.parameter.get()));
                         break;
+                    case O::CLOSE_FILE:
+                        closeFile(i.writable, *dynamic_cast< Parameter< O::CLOSE_FILE >* >(i.parameter.get()));
+                        break;
                     case O::OPEN_PATH:
                         openPath(i.writable, *dynamic_cast< Parameter< O::OPEN_PATH >* >(i.parameter.get()));
                         break;
@@ -104,16 +107,57 @@ public:
                     case O::LIST_ATTS:
                         listAttributes(i.writable, *dynamic_cast< Parameter< O::LIST_ATTS >* >(i.parameter.get()));
                         break;
+                    case O::ADVANCE:
+                        advance(i.writable, *dynamic_cast< Parameter< O::ADVANCE >* >(i.parameter.get()));
+                        break;
+                    case O::AVAILABLE_CHUNKS:
+                        availableChunks(i.writable, *dynamic_cast< Parameter< O::AVAILABLE_CHUNKS >* >(i.parameter.get()));
+                        break;
+                    case O::STALE_GROUP:
+                        staleGroup(
+                            i.writable,
+                            *dynamic_cast< Parameter< O::STALE_GROUP > * >(
+                                i.parameter.get() ) );
+                        break;
                 }
-            } catch (unsupported_data_error&)
+            }
+            catch( unsupported_data_error & )
             {
-                (*m_handler).m_work.pop();
+                ( *m_handler ).m_work.pop();
                 throw;
             }
             (*m_handler).m_work.pop();
         }
         return std::future< void >();
     }
+
+  /**
+   *
+   * @param
+   * @param
+   */
+  virtual void advance(Writable*, Parameter< Operation::ADVANCE > &)
+  {} // TODO remove default implementation
+
+  virtual void
+  availableChunks( Writable *, Parameter< Operation::AVAILABLE_CHUNKS > & )
+  {
+  } // TODO remove default implementation
+
+  virtual void
+  closeFile( Writable *, Parameter< Operation::CLOSE_FILE > const & )
+  {
+  }
+
+  /**
+   * @brief must be written
+   *
+   */
+  virtual void
+  staleGroup( Writable *, Parameter< Operation::STALE_GROUP > const & )
+  {
+  }
+
 
   /** Create a new file in physical storage, possibly overriding an existing file.
    *

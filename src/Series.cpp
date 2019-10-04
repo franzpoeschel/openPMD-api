@@ -24,6 +24,8 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerHelper.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/auxiliary/Future.hpp"
+#include "openPMD/auxiliary/MPI.hpp"
 
 #include <iomanip>
 #include <iostream>
@@ -31,6 +33,10 @@
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <memory>
+#include <future>
+#include <cstdlib>
+#include <list>
 
 #if defined(__GNUC__)
 #   if (__GNUC__ == 4 && __GNUC_MINOR__ < 9)
@@ -43,7 +49,6 @@
 #else
 #   include <regex>
 #endif
-
 
 namespace openPMD
 {
@@ -101,6 +106,7 @@ Series::Series(
     std::string const & options )
     : iterations{ Container< Iteration, uint64_t >() }
     , m_iterationEncoding{ std::make_shared< IterationEncoding >() }
+    , m_communicator{comm}
 {
     auto input = parseInput( filepath );
     auto handler =
@@ -289,6 +295,84 @@ Series::setMachine(std::string const &newMachine)
     return *this;
 }
 
+chunk_assignment::RankMeta
+Series::mpiRanksMetaInfo( ) const
+{
+    try 
+    {
+        return getAttribute( "rankMetaInfo" )
+            .get< chunk_assignment::RankMeta >( );
+    }
+    catch ( std::runtime_error const & )
+    {
+        // workaround: if vector has length 1, some backends may report a 
+        // single value instead of a vector
+        return chunk_assignment::RankMeta {
+            getAttribute( "rankMetaInfo" )
+                .get< chunk_assignment::RankMeta::value_type >( ) };
+    }
+
+}
+
+Series &
+Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
+{
+    setAttribute( "rankMetaInfo", std::move( rankMeta ) );
+    return *this;
+}
+
+#if openPMD_HAVE_MPI
+Series &
+Series::setMpiRanksMetaInfo( std::string const & myRankInfo )
+{
+    int rank;
+    MPI_Comm_rank( m_communicator, &rank );
+    chunk_assignment::RankMeta rankMeta =
+        auxiliary::collectStringsTo(
+            m_communicator, 0, myRankInfo );
+    if ( rank == 0 )
+    {
+        setMpiRanksMetaInfo( std::move( rankMeta ) );
+    }
+    return *this;
+}
+#endif
+
+Series &
+Series::setMpiRanksMetaInfoByFile( std::string const & pathToMetaFile )
+{
+    chunk_assignment::RankMeta rankMeta;
+    try
+    {
+        rankMeta = auxiliary::read_file_by_lines( pathToMetaFile );
+    }
+    catch( auxiliary::no_such_file_error const & )
+    {
+        std::cerr << "Not setting rank meta information, because file has "
+            "not been found: " << pathToMetaFile << std::endl;
+        return *this;
+    }
+    setAttribute( "rankMetaInfo", rankMeta );
+    return *this;
+}
+
+Series &
+Series::setMpiRanksMetaInfoByEnvvar( std::string const & envvar )
+{
+    const char * filename = std::getenv( envvar.c_str( ) );
+    if ( filename )
+    {
+        setMpiRanksMetaInfoByFile( filename );
+    }
+    else
+    {
+        std::cerr << "Not setting rank meta information, because environment"
+            " variable containing path to file has not been found: "
+            << envvar << std::endl;
+    }
+    return *this;
+}
+
 IterationEncoding
 Series::iterationEncoding() const
 {
@@ -371,6 +455,86 @@ Series::flush()
     }
 
     IOHandler->flush();
+}
+
+ConsumingFuture< AdvanceStatus >
+Series::advance( AdvanceMode mode )
+{
+    switch( *m_iterationEncoding )
+    {
+        case IterationEncoding::fileBased:
+        {
+            std::cerr << "Advancing not yet implemented in file-based mode, "
+                "defaulting to performing a flush." << std::endl;
+            flushFileBased();
+            auto res = ConsumingFuture< AdvanceStatus >(
+                std::packaged_task< AdvanceStatus() >(
+                    [](){ return AdvanceStatus::OK; } ) );
+            res( );
+            return res;
+        }
+        case IterationEncoding::groupBased:
+            flushGroupBased();
+            auxiliary::ConsumingFuture< AdvanceStatus > future =
+                advance( mode, *m_name );
+            // capture this by reference since the destructor will issue a
+            // flush
+            // https://github.com/openPMD/openPMD-api/issues/534
+            std::packaged_task< AdvanceStatus( AdvanceStatus ) > postProcessing(
+                [this]( AdvanceStatus status ) mutable {
+                    if( status != AdvanceStatus::OK )
+                    {
+                        return status;
+                    }
+
+                    // re-read -> new datasets might be available
+                    if( this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_ONLY ||
+                        this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_WRITE )
+                    {
+                        bool previous = this->iterations.written;
+                        this->iterations.written = false;
+                        auto oldType = this->IOHandler->accessTypeFrontend;
+                        auto newType = const_cast< AccessType * >(
+                            &this->IOHandler->accessTypeFrontend );
+                        *newType = AccessType::READ_WRITE;
+                        this->readGroupBased( false );
+                        *newType = oldType;
+                        this->iterations.written = previous;
+                    }
+
+                    if( this->IOHandler->accessTypeFrontend ==
+                            AccessType::CREATE ||
+                        this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_WRITE )
+                    {
+                        for( auto & i : iterations )
+                        {
+                            if( !*i.second.skipFlush && i.second.finalized() )
+                            {
+                                Parameter< Operation::STALE_GROUP > fStale;
+                                IOHandler->enqueue(
+                                    IOTask( &i.second, std::move( fStale ) ) );
+                                *i.second.skipFlush = true;
+                            }
+                        }
+                    }
+
+                    return status;
+                } );
+            auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
+                auxiliary::chain_futures<
+                    AdvanceStatus,
+                    AdvanceStatus,
+                    auxiliary::RunFuture<
+                        auxiliary::RunFutureStrategy::RunNonThreaded > >(
+                    std::move( future ), std::move( postProcessing ) );
+            futurePost.run_as_thread();
+            return futurePost;
+    }
+    throw std::runtime_error(
+        "Bug in the openPMD API: This path cannot be taken." );
 }
 
 std::unique_ptr< Series::ParsedInput >
@@ -543,14 +707,16 @@ Series::flushFileBased()
         bool allDirty = dirty;
         for( auto& i : iterations )
         {
+            if ( *i.second.skipFlush )
+            {
+                continue;
+            }
             /* as there is only one series,
              * emulate the file belonging to each iteration as not yet written */
             written = false;
             iterations.written = false;
 
-            std::stringstream iteration("");
-            iteration << std::setw(*m_filenamePadding) << std::setfill('0') << i.first;
-            std::string filename = *m_filenamePrefix + iteration.str() + *m_filenamePostfix;
+            std::string filename = iterationFilename( i.first );
 
             dirty |= i.second.dirty;
             i.second.flushFileBased(filename, i.first);
@@ -558,6 +724,14 @@ Series::flushFileBased()
             iterations.flush(auxiliary::replace_first(basePath(), "%T/", ""));
 
             flushAttributes();
+
+            if ( i.second.finalized( ) )
+            {
+                Parameter< Operation::CLOSE_FILE > fClose;
+                fClose.name = filename;
+                IOHandler->enqueue( IOTask( &i.second, std::move( fClose ) ) );
+                *i.second.skipFlush = true;
+            }
 
             IOHandler->flush();
 
@@ -584,16 +758,20 @@ Series::flushGroupBased()
             IOHandler->enqueue(IOTask(this, fCreate));
         }
 
-        iterations.flush(auxiliary::replace_first(basePath(), "%T/", ""));
+        iterations.flush( auxiliary::replace_first( basePath(), "%T/", "" ) );
 
-        for( auto& i : iterations )
+        for( auto & i : iterations )
         {
+            if( *i.second.skipFlush )
+            {
+                continue;
+            }
             if( !i.second.written )
             {
-                i.second.m_writable->parent = getWritable(&iterations);
-                i.second.parent = getWritable(&iterations);
+                i.second.m_writable->parent = getWritable( &iterations );
+                i.second.parent = getWritable( &iterations );
             }
-            i.second.flushGroupBased(i.first);
+            i.second.flushGroupBased( i.first );
         }
 
         flushAttributes();
@@ -709,54 +887,52 @@ Series::readFileBased()
 }
 
 void
-Series::readGroupBased()
+Series::readGroupBased( bool init )
 {
     Parameter< Operation::OPEN_FILE > fOpen;
     fOpen.name = *m_name;
     IOHandler->enqueue(IOTask(this, fOpen));
     IOHandler->flush();
 
-    readBase();
-
-    using DT = Datatype;
-    Parameter< Operation::READ_ATT > aRead;
-    aRead.name = "iterationEncoding";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
-    if( *aRead.dtype == DT::STRING )
+    if( init )
     {
-        std::string encoding = Attribute(*aRead.resource).get< std::string >();
-        if( encoding == "groupBased" )
-            *m_iterationEncoding = IterationEncoding::groupBased;
-        else if( encoding == "fileBased" )
+        readBase();
+
+        using DT = Datatype;
+        Parameter< Operation::READ_ATT > aRead;
+        aRead.name = "iterationEncoding";
+        IOHandler->enqueue(IOTask(this, aRead));
+        IOHandler->flush();
+        if( *aRead.dtype == DT::STRING )
         {
-            *m_iterationEncoding = IterationEncoding::fileBased;
-            std::cerr << "Series constructor called with explicit iteration suggests loading a "
-                      << "single file with groupBased iteration encoding. Loaded file is fileBased.\n";
-        } else
-            throw std::runtime_error("Unknown iterationEncoding: " + encoding);
-        setAttribute("iterationEncoding", encoding);
-    }
-    else
-        throw std::runtime_error("Unexpected Attribute datatype for 'iterationEncoding'");
+            std::string encoding = Attribute(*aRead.resource).get< std::string >();
+            if( encoding == "groupBased" )
+                *m_iterationEncoding = IterationEncoding::groupBased;
+            else if( encoding == "fileBased" )
+            {
+                *m_iterationEncoding = IterationEncoding::fileBased;
+                std::cerr << "Series constructor called with explicit iteration suggests loading a "
+                          << "single file with groupBased iteration encoding. Loaded file is fileBased.\n";
+            } else
+                throw std::runtime_error("Unknown iterationEncoding: " + encoding);
+            setAttribute("iterationEncoding", encoding);
+        }
+        else
+            throw std::runtime_error("Unexpected Attribute datatype for 'iterationEncoding'");
 
-    aRead.name = "iterationFormat";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
-    if( *aRead.dtype == DT::STRING )
-    {
-        written = false;
-        setIterationFormat(Attribute(*aRead.resource).get< std::string >());
-        written = true;
-    }
-    else
-        throw std::runtime_error("Unexpected Attribute datatype for 'iterationFormat'");
+        aRead.name = "iterationFormat";
+        IOHandler->enqueue(IOTask(this, aRead));
+        IOHandler->flush();
+        if( *aRead.dtype == DT::STRING )
+        {
+            written = false;
+            setIterationFormat(Attribute(*aRead.resource).get< std::string >());
+            written = true;
+        }
+        else
+            throw std::runtime_error("Unexpected Attribute datatype for 'iterationFormat'");
 
-    /* do not use the public checked version
-     * at this point we can guarantee clearing the container won't break anything */
-    written = false;
-    iterations.clear_unchecked();
-    written = true;
+    }
 
     read();
 }
@@ -847,22 +1023,99 @@ Series::read()
         throw std::runtime_error("Unknown openPMD version - " + version);
     IOHandler->enqueue(IOTask(&iterations, pOpen));
 
+    readAttributes();
     iterations.readAttributes();
 
     /* obtain all paths inside the basepath (i.e. all iterations) */
     Parameter< Operation::LIST_PATHS > pList;
     IOHandler->enqueue(IOTask(&iterations, pList));
     IOHandler->flush();
-
+    
     for( auto const& it : *pList.paths )
     {
         Iteration& i = iterations[std::stoull(it)];
+        if ( i.finalized( ) )
+        {
+            continue;
+        }
         pOpen.path = it;
         IOHandler->enqueue(IOTask(&i, pOpen));
         i.read();
     }
+}
 
-    readAttributes();
+std::string
+Series::iterationFilename( uint64_t i )
+{
+    std::stringstream iteration( "" );
+    iteration << std::setw( *m_filenamePadding ) << std::setfill( '0' )
+              << i;
+    return *m_filenamePrefix + iteration.str() + *m_filenamePostfix;
+}
+
+auxiliary::ConsumingFuture< AdvanceStatus >
+Series::advance( AdvanceMode mode, std::string )
+// file parameter maybe for an open_file command later on
+{
+    // resolve AdvanceMode
+    AccessType at = IOHandler->accessTypeFrontend;
+    AdvanceMode actualMode = mode;
+    switch( mode )
+    {
+        case AdvanceMode::AUTO:
+            switch( at )
+            {
+                case AccessType::READ_WRITE:
+                    throw std::runtime_error(
+                        "Series::advance(): Please specify "
+                        "advance mode explicitly." );
+                case AccessType::READ_ONLY:
+                    actualMode = AdvanceMode::READ;
+                    break;
+                case AccessType::CREATE:
+                    actualMode = AdvanceMode::WRITE;
+                    break;
+            }
+            break;
+        case AdvanceMode::READ:
+            if( at == AccessType::CREATE )
+            {
+                throw std::runtime_error(
+                    "Cannot use advance mode 'read' in combination with "
+                    "access type 'create'" );
+            }
+            else
+            {
+                actualMode = AdvanceMode::READ;
+            }
+            break;
+        case AdvanceMode::WRITE:
+            if( at == AccessType::READ_ONLY )
+            {
+                throw std::runtime_error(
+                    "Cannot use advance mode 'write' in combination with "
+                    "access type 'read only'" );
+            }
+            else
+            {
+                actualMode = AdvanceMode::WRITE;
+            }
+            break;
+    }
+    Parameter< Operation::ADVANCE > param;
+    param.mode = actualMode;
+    IOTask task( this, param );
+    IOHandler->enqueue( task );
+    // this flush will
+    // (1) flush all actions that are still queued up
+    // (2) finally run the advance task
+
+    auto first_future = IOHandler->flush();
+    return auxiliary::chain_futures< 
+        void,
+        AdvanceStatus >(
+        std::move( first_future ),
+        std::move( *param.task ) );
 }
 
 Format

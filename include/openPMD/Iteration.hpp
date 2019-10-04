@@ -87,6 +87,11 @@ public:
      */
     Iteration& setTimeUnitSI(double newTimeUnitSI);
 
+    Iteration& setFinalized( bool finalized = true );
+
+    bool
+    finalized() const;
+
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
 
@@ -98,6 +103,8 @@ private:
     void flushGroupBased(uint64_t);
     void flush();
     void read();
+    std::shared_ptr< bool > skipFlush =
+        std::make_shared< bool >( false );
 
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
 };  //Iteration

@@ -28,12 +28,15 @@
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/IterationEncoding.hpp"
+#include "openPMD/Streaming.hpp"
 
 #if openPMD_HAVE_MPI
 #   include <mpi.h>
 #endif
 
 #include <string>
+#include <future>
+#include <map>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -199,6 +202,60 @@ public:
     Series& setMachine(std::string const& newMachine);
 
     /**
+     * @throw   no_such_attribute_error If optional attribute is not present.
+     * @return  Vector with a String per (writing) MPI rank, indicating user-
+     *          defined meta information per rank. Example: host name.
+     */
+    chunk_assignment::RankMeta
+    mpiRanksMetaInfo( ) const;
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfo( chunk_assignment::RankMeta );
+
+#if openPMD_HAVE_MPI
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfo( std::string const & myRankInfo );
+#endif
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *        This vector is read from the given file line by line.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfoByFile( std::string const & pathToMetaFile );
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *        This vector is read from a file whose location is found
+     *        in an environment variable.
+     *
+     * @return Reference to modified series.
+     */
+    Series &
+    setMpiRanksMetaInfoByEnvvar(
+        std::string const & envvar = chunk_assignment::HOSTFILE_VARNAME );
+
+    /**
      * @return  Current encoding style for multiple iterations in this series.
      */
     IterationEncoding iterationEncoding() const;
@@ -238,7 +295,11 @@ public:
 
     /** Execute all required remaining IO operations to write or read data.
      */
-    void flush();
+    void
+    flush();
+    
+    ConsumingFuture< AdvanceStatus > advance(
+        AdvanceMode = AdvanceMode::AUTO );
 
     Container< Iteration, uint64_t > iterations;
 
@@ -252,9 +313,12 @@ OPENPMD_private:
     void flushMeshesPath();
     void flushParticlesPath();
     void readFileBased();
-    void readGroupBased();
+    void readGroupBased( bool init = true );
     void readBase();
     void read();
+    std::string iterationFilename(uint64_t i);
+    auxiliary::ConsumingFuture< AdvanceStatus >
+    advance( AdvanceMode, std::string file );
 
     static constexpr char const * const OPENPMD = "1.1.0";
     static constexpr char const * const BASEPATH = "/data/%T/";
@@ -266,5 +330,8 @@ OPENPMD_private:
     std::shared_ptr< std::string > m_filenamePrefix;
     std::shared_ptr< std::string > m_filenamePostfix;
     std::shared_ptr< int > m_filenamePadding;
+#if openPMD_HAVE_MPI
+    MPI_Comm m_communicator;
+#endif
 }; // Series
 } // namespace openPMD
