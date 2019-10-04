@@ -455,6 +455,23 @@ Series::flush()
     IOHandler->flush();
 }
 
+static void
+dropFinalizedIterations( Container< Iteration, uint64_t > & iterations )
+{
+    std::list< uint64_t > dropMe;
+    for( auto const & iteration : iterations )
+    {
+        if( iteration.second.finalized() )
+        {
+            dropMe.emplace_back( iteration.first );
+        }
+    }
+    for( auto iterationIndex : dropMe )
+    {
+        iterations.erase( iterationIndex );
+    }
+}
+
 ConsumingFuture< AdvanceStatus >
 Series::advance( AdvanceMode mode )
 {
@@ -475,19 +492,22 @@ Series::advance( AdvanceMode mode )
             flushGroupBased();
             auxiliary::ConsumingFuture< AdvanceStatus > future =
                 advance( mode, *m_name );
-            // re-read -> new datasets might be available
-            if( IOHandler->accessTypeFrontend == AccessType::READ_ONLY ||
-                IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
-            {
-                // capture this by reference since the destructor will issue a
-                // flush
-                // https://github.com/openPMD/openPMD-api/issues/534
-                std::packaged_task< AdvanceStatus( AdvanceStatus ) >
-                    postProcessing( [this]( AdvanceStatus status ) mutable {
-                        if ( status != AdvanceStatus::OK )
-                        {
-                            return status;
-                        }
+            // capture this by reference since the destructor will issue a
+            // flush
+            // https://github.com/openPMD/openPMD-api/issues/534
+            std::packaged_task< AdvanceStatus( AdvanceStatus ) > postProcessing(
+                [this]( AdvanceStatus status ) mutable {
+                    if( status != AdvanceStatus::OK )
+                    {
+                        return status;
+                    }
+
+                    // re-read -> new datasets might be available
+                    if( this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_ONLY ||
+                        this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_WRITE )
+                    {
                         bool previous = this->iterations.written;
                         this->iterations.written = false;
                         auto oldType = this->IOHandler->accessTypeFrontend;
@@ -497,20 +517,27 @@ Series::advance( AdvanceMode mode )
                         this->readGroupBased( false );
                         *newType = oldType;
                         this->iterations.written = previous;
-                        return status;
-                    } );
-                auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
-                    auxiliary::chain_futures<
-                        AdvanceStatus,
-                        AdvanceStatus,
-                        auxiliary::RunFuture<
-                            auxiliary::RunFutureStrategy::RunNonThreaded > >(
-                        std::move( future ), std::move( postProcessing ) );
-                futurePost.run_as_thread( );
-                return futurePost;
-            }
-            future.run_as_thread( );
-            return future;
+                    }
+
+                    if( this->IOHandler->accessTypeFrontend ==
+                            AccessType::CREATE ||
+                        this->IOHandler->accessTypeFrontend ==
+                            AccessType::READ_WRITE )
+                    {
+                        dropFinalizedIterations( this->iterations );
+                    }
+                    
+                    return status;
+                } );
+            auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
+                auxiliary::chain_futures<
+                    AdvanceStatus,
+                    AdvanceStatus,
+                    auxiliary::RunFuture<
+                        auxiliary::RunFutureStrategy::RunNonThreaded > >(
+                    std::move( future ), std::move( postProcessing ) );
+            futurePost.run_as_thread();
+            return futurePost;
     }
 }
 

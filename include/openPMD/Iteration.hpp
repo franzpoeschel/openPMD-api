@@ -88,7 +88,8 @@ public:
 
     Iteration& setFinalized( bool finalized = true );
 
-    bool finalized();
+    bool
+    finalized() const;
 
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
