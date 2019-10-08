@@ -113,10 +113,17 @@ public:
                     case O::AVAILABLE_CHUNKS:
                         availableChunks(i.writable, *dynamic_cast< Parameter< O::AVAILABLE_CHUNKS >* >(i.parameter.get()));
                         break;
+                    case O::STALE_GROUP:
+                        staleGroup(
+                            i.writable,
+                            *dynamic_cast< Parameter< O::STALE_GROUP > * >(
+                                i.parameter.get() ) );
+                        break;
                 }
-            } catch (unsupported_data_error&)
+            }
+            catch( unsupported_data_error & )
             {
-                (*m_handler).m_work.pop();
+                ( *m_handler ).m_work.pop();
                 throw;
             }
             (*m_handler).m_work.pop();
@@ -132,11 +139,24 @@ public:
   virtual void advance(Writable*, Parameter< Operation::ADVANCE > &)
   {} // TODO remove default implementation
 
-  virtual void availableChunks(Writable*, Parameter< Operation::AVAILABLE_CHUNKS > &)
-  {} // TODO remove default implementation
+  virtual void
+  availableChunks( Writable *, Parameter< Operation::AVAILABLE_CHUNKS > & )
+  {
+  } // TODO remove default implementation
 
-  virtual void closeFile(Writable*, Parameter< Operation::CLOSE_FILE > const &)
-  {}
+  virtual void
+  closeFile( Writable *, Parameter< Operation::CLOSE_FILE > const & )
+  {
+  }
+
+  /**
+   * @brief must be written
+   *
+   */
+  virtual void
+  staleGroup( Writable *, Parameter< Operation::STALE_GROUP > const & )
+  {
+  }
 
 
   /** Create a new file in physical storage, possibly overriding an existing file.

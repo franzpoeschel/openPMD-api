@@ -80,8 +80,9 @@ enum class EXPORT Operation
     LIST_ATTS,
 
     ADVANCE,
-    AVAILABLE_CHUNKS
-};  //Operation
+    AVAILABLE_CHUNKS,
+    STALE_GROUP
+}; // Operation
 
 struct EXPORT AbstractParameter
 {
@@ -527,6 +528,28 @@ struct EXPORT Parameter< Operation::AVAILABLE_CHUNKS > : public AbstractParamete
     // output parameter
     std::shared_ptr< ChunkTable > chunks
         = std::make_shared< ChunkTable > ();
+};
+
+template<>
+struct EXPORT Parameter< Operation::STALE_GROUP > : public AbstractParameter
+{
+    Parameter() = default;
+    Parameter( Parameter const & ) : AbstractParameter()
+    {
+    }
+
+    Parameter &
+    operator=( Parameter const & )
+    {
+        return *this;
+    }
+
+    std::unique_ptr< AbstractParameter >
+    clone() const override
+    {
+        return std::unique_ptr< AbstractParameter >(
+            new Parameter< Operation::STALE_GROUP >( *this ) );
+    }
 };
 
 
