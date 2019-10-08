@@ -455,23 +455,6 @@ Series::flush()
     IOHandler->flush();
 }
 
-static void
-dropFinalizedIterations( Container< Iteration, uint64_t > & iterations )
-{
-    std::list< uint64_t > dropMe;
-    for( auto const & iteration : iterations )
-    {
-        if( iteration.second.finalized() )
-        {
-            dropMe.emplace_back( iteration.first );
-        }
-    }
-    for( auto iterationIndex : dropMe )
-    {
-        iterations.erase( iterationIndex );
-    }
-}
-
 ConsumingFuture< AdvanceStatus >
 Series::advance( AdvanceMode mode )
 {
@@ -524,9 +507,18 @@ Series::advance( AdvanceMode mode )
                         this->IOHandler->accessTypeFrontend ==
                             AccessType::READ_WRITE )
                     {
-                        dropFinalizedIterations( this->iterations );
+                        for( auto & i : iterations )
+                        {
+                            if( !*i.second.skipFlush && i.second.finalized() )
+                            {
+                                Parameter< Operation::STALE_GROUP > fStale;
+                                IOHandler->enqueue(
+                                    IOTask( &i.second, std::move( fStale ) ) );
+                                *i.second.skipFlush = true;
+                            }
+                        }
                     }
-                    
+
                     return status;
                 } );
             auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
@@ -762,16 +754,20 @@ Series::flushGroupBased()
             IOHandler->enqueue(IOTask(this, fCreate));
         }
 
-        iterations.flush(auxiliary::replace_first(basePath(), "%T/", ""));
+        iterations.flush( auxiliary::replace_first( basePath(), "%T/", "" ) );
 
-        for( auto& i : iterations )
+        for( auto & i : iterations )
         {
+            if( *i.second.skipFlush )
+            {
+                continue;
+            }
             if( !i.second.written )
             {
-                i.second.m_writable->parent = getWritable(&iterations);
-                i.second.parent = getWritable(&iterations);
+                i.second.m_writable->parent = getWritable( &iterations );
+                i.second.parent = getWritable( &iterations );
             }
-            i.second.flushGroupBased(i.first);
+            i.second.flushGroupBased( i.first );
         }
 
         flushAttributes();
