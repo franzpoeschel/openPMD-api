@@ -177,6 +177,10 @@ public:
     availableChunks( Writable*,
                      Parameter< Operation::AVAILABLE_CHUNKS > &) override;
 
+    void
+    staleGroup( Writable *, Parameter< Operation::STALE_GROUP > const & )
+        override;
+
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
      * within this instance.
@@ -615,7 +619,8 @@ namespace detail
         detail::WriteDataset const m_writeDataset;
         detail::DatasetReader const m_readDataset;
         detail::AttributeReader const m_attributeReader;
-        
+        bool isStreaming = false;
+
         size_t currentStep = 0;
 
         using extent_t = Extent::value_type;

@@ -569,21 +569,53 @@ ADIOS2IOHandlerImpl::availableChunks(
         ba.currentStep );
 }
 
-adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
+void
+ADIOS2IOHandlerImpl::staleGroup(
+    Writable * writable,
+    Parameter< Operation::STALE_GROUP > const & )
 {
-    switch ( m_handler->accessTypeBackend )
+    VERIFY_ALWAYS(
+        writable->written,
+        "Cannot put a group in stale mode that has not been written yet." );
+    VERIFY_ALWAYS(
+        m_handler->accessTypeBackend != AccessType::READ_ONLY,
+        "Cannot put a group in stale while in read-only mode." );
+    auto file = refreshFileFromParent( writable );
+    auto & fileData = getFileData( file );
+    if( !fileData.isStreaming )
     {
-    case AccessType::CREATE:
-        return adios2::Mode::Write;
-    case AccessType::READ_ONLY:
-        return adios2::Mode::Read;
-    case AccessType::READ_WRITE:
-        std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
-                     "(Append) mode."
-                  << "Replacing with Read mode." << std::endl;
-        return adios2::Mode::Read;
-    default:
-        return adios2::Mode::Undefined;
+        return;
+    }
+    auto position = setAndGetFilePosition( writable );
+    auto const positionString = filePositionToString( position );
+    VERIFY(
+        !auxiliary::ends_with( positionString, '/' ),
+        "ADIOS2 backend: Position string has unexpected format. This is a bug "
+        "in the openPMD API." );
+
+    for( auto const & var :
+         fileData.availableAttributesBuffered( positionString ) )
+    {
+        fileData.m_IO.RemoveAttribute( positionString + '/' + var.first );
+    }
+}
+
+adios2::Mode
+ADIOS2IOHandlerImpl::adios2Accesstype()
+{
+    switch( m_handler->accessTypeBackend )
+    {
+        case AccessType::CREATE:
+            return adios2::Mode::Write;
+        case AccessType::READ_ONLY:
+            return adios2::Mode::Read;
+        case AccessType::READ_WRITE:
+            std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
+                         "(Append) mode."
+                      << "Replacing with Read mode." << std::endl;
+            return adios2::Mode::Read;
+        default:
+            return adios2::Mode::Undefined;
     }
 }
 
@@ -1276,10 +1308,12 @@ namespace detail
                 auto it = streamingEngines.find( type );
                 if( it != streamingEngines.end() )
                 {
+                    isStreaming = true;
                     *streamStatus = StreamStatus::OutsideOfStep;
                 }
                 else
                 {
+                    isStreaming = false;
                     it = fileEngines.find( type );
                     if( it != fileEngines.end() )
                     {
