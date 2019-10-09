@@ -42,6 +42,14 @@ namespace chunk_assignment
 
     using RankMeta = std::vector< std::string >;
 
+    /**
+     * @brief First pass of the chunk assignment procedure. We split this in two
+     *        phases, since we may use heuristic algorithms for the first phase
+     *        that may not always work out perfectly and require clean-up in a
+     *        second phase. The second phase is not necessary if the first phase
+     *        is guaranteed to yield a full result.
+     * 
+     */
     struct FirstPass
     {
         struct Result
@@ -50,27 +58,71 @@ namespace chunk_assignment
             ChunkTable leftOver;
         };
 
+        /**
+         * @brief Reverse the information in RankMeta. RankMeta is 
+         *        (semantically) a map from rank to hostname, compute from this 
+         *        a map from hostname to rank.
+         * 
+         * @return std::unordered_map< std::string, std::list< int > > 
+         */
         static std::unordered_map< std::string, std::list< int > >
         ranksPerHost( RankMeta const & );
 
+        /**
+         * @brief Perform the first pass.
+         * 
+         * @param chunkTable The chunktable as presented by the data source.
+         * @param in The source hostnames per rank.
+         * @param out The sink hostnames per rank.
+         * @return Result An intermediate result, possibly containing unassigned
+         *                chunks.
+         */
         virtual Result
         firstPass(
-            ChunkTable const &,
+            ChunkTable const & chunkTable,
             RankMeta const & in,
             RankMeta const & out ) = 0;
     };
 
+    /**
+     * @brief The second pass in the aforementioned procedure. Take care of
+     *        chunks that have not been assigned in the first phase.
+     * 
+     */
     struct SecondPass
     {
+        /**
+         * @brief Assign leftover chunks from the first phase.
+         * 
+         * @param intermediate The intermediate result.
+         * @param in The source hostnames per rank.
+         * @param out The sink hostnames per rank.
+         * @return ChunkTable The final result with every input chunk assigned
+         *                    to some sink rank.
+         */
         virtual ChunkTable
         assignLeftovers(
-            FirstPass::Result,
+            FirstPass::Result intermediate,
             RankMeta const & in,
             RankMeta const & out ) = 0;
     };
 
+    /**
+     * @brief Assign chunks without taking rank meta information into
+     *        consideration.
+     * 
+     */
     struct SplitEgalitarian
     {
+        /**
+         * @brief Merge unassigned chunks into a (possibly partially filled)
+         *        ChunkTable.
+         * 
+         * @param sourceChunks The unassigned source chunks.
+         * @param destinationRanks The sink ranks to take into consideration. Do
+         *                         not put chunks into ranks other than these.
+         * @param sinkChunks Partial assignment to merge new chunks into.
+         */
         virtual void
         splitEgalitarian(
             ChunkTable const & sourceChunks,
