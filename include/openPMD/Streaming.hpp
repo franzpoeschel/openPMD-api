@@ -31,6 +31,9 @@ struct ChunkTable
     using T_chunkTable = std::map< int, T_perRank >;
 
     T_chunkTable chunkTable;
+
+    using T_sizedChunk = std::pair< T_chunk, size_t >;
+    std::vector< T_sizedChunk > splitToSizeSorted( size_t );
 };
 
 using Chunk = ChunkTable::T_chunk;
@@ -130,6 +133,15 @@ namespace chunk_assignment
             ChunkTable & sinkChunks ) = 0;
 
         virtual ~SplitEgalitarian() = default;
+    };
+
+    struct SplitEgalitarianSliceIncomingChunks : SplitEgalitarian
+    {
+        void
+        splitEgalitarian(
+            ChunkTable const & sourceChunks,
+            std::list< int > const & destinationRanks,
+            ChunkTable & sinkChunks ) override;
     };
 
     struct SplitEgalitarianByCuboidSlice : SplitEgalitarian
