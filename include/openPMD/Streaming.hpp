@@ -33,7 +33,7 @@ struct ChunkTable
     T_chunkTable chunkTable;
 
     using T_sizedChunk = std::pair< T_chunk, size_t >;
-    std::vector< T_sizedChunk > splitToSizeSorted( size_t );
+    std::vector< T_sizedChunk > splitToSizeSorted( size_t ) const;
 };
 
 using Chunk = ChunkTable::T_chunk;
