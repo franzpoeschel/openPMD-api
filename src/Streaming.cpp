@@ -1,5 +1,6 @@
 #include "openPMD/Streaming.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <map>
 #include <unistd.h>
@@ -8,8 +9,107 @@
 
 namespace openPMD
 {
+std::vector< ChunkTable::T_sizedChunk >
+ChunkTable::splitToSizeSorted( size_t maxSize )
+{
+    constexpr size_t dimension = 0;
+    std::vector< T_sizedChunk > res;
+    for( auto const & perRank : chunkTable )
+    {
+        for( auto const & chunk : perRank.second )
+        {
+            auto const & extent = chunk.second;
+            size_t sliceSize = 1;
+            for( size_t i = 0; i < extent.size(); ++i )
+            {
+                if( i == dimension )
+                {
+                    continue;
+                }
+                sliceSize *= extent[ i ];
+            }
+            if( sliceSize == 0 )
+            {
+                std::cerr << "Chunktable::splitToSizeSorted: encountered "
+                             "zero-sized chunk" << std::endl;
+                continue;
+            }
+
+            // this many slices go in one packet before it exceeds the max size
+            size_t streakLength = maxSize / sliceSize;
+            if( streakLength == 0 )
+            {
+                // otherwise we get caught in an endless loop
+                ++streakLength;
+            }
+            size_t const slicedDimensionExtent = extent[ dimension ];
+
+            for( size_t currentPosition = 0;; currentPosition += streakLength )
+            {
+                T_chunk newChunk = chunk;
+                newChunk.first[ dimension ] += currentPosition;
+                if( currentPosition + streakLength >= slicedDimensionExtent )
+                {
+                    newChunk.second[ dimension ] =
+                        slicedDimensionExtent - currentPosition;
+                    size_t chunkSize = newChunk.second[ dimension ] * sliceSize;
+                    res.emplace_back( std::move( newChunk ), chunkSize );
+                    break;
+                }
+                else
+                {
+                    newChunk.second[ dimension ] = streakLength;
+                    res.emplace_back(
+                        std::move( newChunk ), streakLength * sliceSize );
+                }
+            }
+        }
+    }
+    std::sort(
+        res.begin(),
+        res.end(),
+        []( T_sizedChunk const & left, T_sizedChunk const & right ) {
+            return right.second < left.second; // decreasing order
+        } );
+    for( auto const & chunk : res )
+    {
+        std::cout << chunk.second << "\t";
+        for( auto offs : chunk.first.first )
+        {
+            std::cout << offs << ", ";
+        }
+        std::cout << "\t";
+        for( auto ext : chunk.first.second )
+        {
+            std::cout << ext << ", ";
+        }
+        std::cout << std::endl;
+    }
+    return res;
+}
+
 namespace chunk_assignment
 {
+    void
+    SplitEgalitarianSliceIncomingChunks::splitEgalitarian(
+        ChunkTable const & sourceChunks,
+        std::list< int > const & destinationRanks,
+        ChunkTable & sinkChunks )
+    {
+        size_t totalExtent = 0;
+        for( auto const & perRank : sourceChunks.chunkTable )
+        {
+            for( auto const & chunk : perRank.second )
+            {
+                size_t chunkExtent = 1;
+                for( auto ext : chunk.second )
+                {
+                    chunkExtent *= ext;
+                }
+            }
+        }
+    }
+
     void
     SplitEgalitarianTrivial::splitEgalitarian(
         ChunkTable const & sourceChunks,
