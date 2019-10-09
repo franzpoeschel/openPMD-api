@@ -10,7 +10,7 @@
 namespace openPMD
 {
 std::vector< ChunkTable::T_sizedChunk >
-ChunkTable::splitToSizeSorted( size_t maxSize )
+ChunkTable::splitToSizeSorted( size_t maxSize ) const
 {
     constexpr size_t dimension = 0;
     std::vector< T_sizedChunk > res;
@@ -106,8 +106,51 @@ namespace chunk_assignment
                 {
                     chunkExtent *= ext;
                 }
+                totalExtent += chunkExtent;
             }
         }
+        size_t const idealSize = totalExtent / destinationRanks.size();
+        std::vector< ChunkTable::T_sizedChunk > digestibleChunks =
+            sourceChunks.splitToSizeSorted( idealSize );
+
+        for( auto destRank : destinationRanks )
+        {
+            auto & perRank = sinkChunks.chunkTable[ destRank ];
+            size_t leftoverSize = idealSize;
+            {
+                auto it = digestibleChunks.begin();
+                while( it != digestibleChunks.end() )
+                {
+                    if( it->second >= idealSize )
+                    {
+                        perRank.emplace_back( std::move( it->first ) );
+                        digestibleChunks.erase( it );
+                        break;
+                    }
+                    else if( it->second <= leftoverSize )
+                    {
+                        perRank.emplace_back( std::move( it->first ) );
+                        leftoverSize -= it->second;
+                        it = digestibleChunks.erase( it );
+                    }
+                    else
+                    {
+                        ++it;
+                    }
+                }
+            }
+        }
+
+        // distribute leftovers
+        SplitEgalitarianTrivial set;
+        ChunkTable dummyTable;
+        std::list< ChunkTable::T_chunk > leftoverChunks;
+        for( auto const & chunk : digestibleChunks )
+        {
+            leftoverChunks.emplace_back( std::move( chunk.first ) );
+        }
+        dummyTable.chunkTable.emplace( 0, std::move( leftoverChunks ) );
+        set.splitEgalitarian( dummyTable, destinationRanks, sinkChunks );
     }
 
     void
