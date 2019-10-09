@@ -1,5 +1,6 @@
 #include "openPMD/Streaming.hpp"
 
+#include <iostream>
 #include <map>
 #include <unistd.h>
 
@@ -86,32 +87,48 @@ namespace chunk_assignment
         return res;
     }
 
-    FirstPassByCuboidSlice::FirstPassByCuboidSlice(
+    SplitEgalitarianByCuboidSlice::SplitEgalitarianByCuboidSlice(
         std::unique_ptr< BlockSlicer > _blockSlicer,
         Extent _totalExtent,
-        int _mpi_rank,
-        int _mpi_size )
+        int _mpi_rank )
         : blockSlicer( std::move( _blockSlicer ) )
         , totalExtent( std::move( _totalExtent ) )
         , mpi_rank( _mpi_rank )
-        , mpi_size( _mpi_size )
     {
     }
 
-    FirstPass::Result
-    FirstPassByCuboidSlice::firstPass(
-        ChunkTable const & availableChunks,
-        RankMeta const &,
-        RankMeta const & )
+    void
+    SplitEgalitarianByCuboidSlice::splitEgalitarian(
+        ChunkTable const & sourceChunks,
+        std::list< int > const & destinationRanks,
+        ChunkTable & result )
     {
-        ChunkTable sinkSide;
-        auto & onMyRank = sinkSide.chunkTable[ mpi_rank ];
+        // We calculate based on mpi_rank's position in destinationRanks
+        auto mapped_size = destinationRanks.size();
+        auto mapped_rank = mapped_size;
+        {
+            size_t i = 0;
+            for( auto rank : destinationRanks )
+            {
+                if( rank == mpi_rank )
+                {
+                    mapped_rank = i;
+                }
+                ++i;
+            }
+        }
+        if( mapped_rank == mapped_size )
+        {
+            std::cerr << "Rank " << mpi_rank
+                      << " does not participate in chunk mapping." << std::endl;
+        }
+        auto & onMyRank = result.chunkTable[ mapped_rank ];
         Offset myOffset;
         Extent myExtent;
         std::tie( myOffset, myExtent ) =
-            blockSlicer->sliceBlock( totalExtent, mpi_size, mpi_rank );
+            blockSlicer->sliceBlock( totalExtent, mapped_size, mapped_rank );
 
-        for( auto const & perRank : availableChunks.chunkTable )
+        for( auto const & perRank : sourceChunks.chunkTable )
         {
             for( auto chunk : perRank.second )
             {
@@ -128,11 +145,8 @@ namespace chunk_assignment
             outer_loop:;
             }
         }
-
-        Result result;
-        result.sinkSide = std::move( sinkSide );
-        return result;
     }
+
 
     std::unordered_map< std::string, std::list< int > >
     FirstPass::ranksPerHost( RankMeta const & rankMeta )
@@ -182,6 +196,41 @@ namespace chunk_assignment
             destinationRanks,
             intermediateResult.sinkSide );
         return intermediateResult.sinkSide;
+    }
+
+    FirstPassBySplitEgalitarian::FirstPassBySplitEgalitarian(
+        std::unique_ptr< SplitEgalitarian > _splitter )
+        : splitter( std::move( _splitter ) )
+    {
+    }
+
+    FirstPass::Result
+    FirstPassBySplitEgalitarian::firstPass(
+        ChunkTable const & chunkTable,
+        RankMeta const & /*in*/,
+        RankMeta const & out )
+    {
+        std::list< int > destinationRanks;
+        for( int i = 0; i < static_cast< int >( out.size() ); ++i )
+        {
+            destinationRanks.emplace_back( i );
+        }
+        Result res;
+        splitter->splitEgalitarian(
+            chunkTable, destinationRanks, res.sinkSide );
+        return res;
+    }
+
+    FirstPassByCuboidSlice::FirstPassByCuboidSlice(
+        std::unique_ptr< BlockSlicer > _blockSlicer,
+        Extent _totalExtent,
+        int _mpi_rank )
+        : FirstPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian >(
+              new SplitEgalitarianByCuboidSlice(
+                  std::move( _blockSlicer ),
+                  std::move( _totalExtent ),
+                  _mpi_rank ) ) )
+    {
     }
 } // namespace chunk_assignment
 
