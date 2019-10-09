@@ -132,6 +132,25 @@ namespace chunk_assignment
         virtual ~SplitEgalitarian() = default;
     };
 
+    struct SplitEgalitarianByCuboidSlice : SplitEgalitarian
+    {
+        SplitEgalitarianByCuboidSlice(
+            std::unique_ptr< BlockSlicer > blockSlicer,
+            Extent totalExtent,
+            int mpi_rank );
+
+        void
+        splitEgalitarian(
+            ChunkTable const & sourceChunks,
+            std::list< int > const & destinationRanks,
+            ChunkTable & sinkChunks ) override;
+
+    private:
+        std::unique_ptr< BlockSlicer > blockSlicer;
+        Extent totalExtent;
+        int mpi_rank;
+    };
+
 
     ChunkTable
     assignChunks(
@@ -164,6 +183,7 @@ namespace chunk_assignment
         std::unique_ptr< SplitEgalitarian > splitter;
     };
 
+#if 0
     struct FirstPassByCuboidSlice : FirstPass
     {
         FirstPassByCuboidSlice(
@@ -183,6 +203,7 @@ namespace chunk_assignment
         Extent totalExtent;
         int mpi_rank, mpi_size;
     };
+#endif
 
     struct SecondPassBySplitEgalitarian : SecondPass
     {
@@ -196,6 +217,28 @@ namespace chunk_assignment
 
     private:
         std::unique_ptr< SplitEgalitarian > splitter;
+    };
+
+    struct FirstPassBySplitEgalitarian : FirstPass
+    {
+        FirstPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian > );
+
+        Result
+        firstPass(
+            ChunkTable const & chunkTable,
+            RankMeta const & in,
+            RankMeta const & out ) override;
+    
+    private:
+        std::unique_ptr< SplitEgalitarian > splitter;
+    };
+
+    struct FirstPassByCuboidSlice : FirstPassBySplitEgalitarian
+    {
+        FirstPassByCuboidSlice(
+            std::unique_ptr< BlockSlicer > blockSlicer,
+            Extent totalExtent,
+            int mpi_rank );
     };
 } // namespace chunk_assignment
 
