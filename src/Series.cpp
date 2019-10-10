@@ -105,6 +105,7 @@ Series::Series(
     std::string const & options )
     : iterations{ Container< Iteration, uint64_t >() }
     , m_iterationEncoding{ std::make_shared< IterationEncoding >() }
+    , m_communicator{comm}
 {
     auto input = parseInput( filepath );
     auto handler =
