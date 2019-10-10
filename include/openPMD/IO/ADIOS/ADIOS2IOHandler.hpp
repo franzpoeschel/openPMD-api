@@ -163,12 +163,6 @@ public:
     listAttributes( Writable *,
                     Parameter< Operation::LIST_ATTS > & parameters ) override;
 
-    void
-    notifyOption(
-        std::string const & key,
-        std::string const & value,
-        bool setAfterConstruction = true );
-
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
      * within this instance.

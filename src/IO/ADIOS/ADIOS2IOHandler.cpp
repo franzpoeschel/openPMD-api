@@ -512,36 +512,6 @@ void ADIOS2IOHandlerImpl::listAttributes(
     }
 }
 
-void
-ADIOS2IOHandlerImpl::notifyOption(
-    std::string const & key,
-    std::string const & value,
-    bool setAfterConstruction )
-{
-    if( key == "EngineType" )
-    {
-        if( setAfterConstruction )
-        {
-            std::cerr << "Warning: setting 'EngineType' = '" << value
-                      << "' after construction time. "
-                         "This will not apply for ADIOS2 engines that "
-                         "data has been written to or read from nor will"
-                         "it override previously chosen engine types."
-                      << std::endl;
-            for( auto & pair : m_fileData )
-            {
-                pair.second->m_IO.SetEngine( value );
-            }
-        }
-    }
-    else
-    {
-        std::cerr << "ADIOS2 backend: unknown configuration option '" << key
-                  << "'. Ignoring." << std::endl;
-    }
-}
-
-
 adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
 {
     switch ( m_handler->accessTypeBackend )
@@ -1216,7 +1186,7 @@ namespace detail
                 m_IO.SetParameter( "Profile", "Off" );
             }
         }
-#    if openPMD_HAVE_MPI
+#if openPMD_HAVE_MPI
         {
             auto num_substreams =
                 auxiliary::getEnvNum( "OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0 );
@@ -1226,7 +1196,7 @@ namespace detail
                     "SubStreams", std::to_string( num_substreams ) );
             }
         }
-#    endif
+#endif
     }
 
     adios2::Engine &
@@ -1302,7 +1272,7 @@ ADIOS2IOHandler::ADIOS2IOHandler(
 {
 }
 
-#    endif
+#endif
 
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
