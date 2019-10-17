@@ -64,26 +64,36 @@ namespace openPMD
 
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     AbstractIOHandler * handler,
-    MPI_Comm communicator,
-    nlohmann::json cfg )
+    MPI_Comm communicator
+#       if openPMD_HAVE_JSON
+    , nlohmann::json cfg
+#       endif // openPMD_HAVE_JSON
+)
     : AbstractIOHandlerImplCommon( handler )
     , m_comm{ communicator }
     , m_ADIOS{ communicator, ADIOS2_DEBUG_MODE }
 {
+#       if openPMD_HAVE_JSON
     init( std::move( cfg ) );
+#       endif // openPMD_HAVE_JSON
 }
 
 #    endif // openPMD_HAVE_MPI
 
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
-    AbstractIOHandler * handler,
-    nlohmann::json cfg )
+    AbstractIOHandler * handler
+#       if openPMD_HAVE_JSON
+    , nlohmann::json cfg
+#       endif // openPMD_HAVE_JSON
+)
     : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ ADIOS2_DEBUG_MODE }
 {
+#       if openPMD_HAVE_JSON
     init( std::move( cfg ) );
+#       endif // openPMD_HAVE_JSON
 }
 
-
+#       if openPMD_HAVE_JSON
 void
 ADIOS2IOHandlerImpl::init( nlohmann::json cfg )
 {
@@ -92,6 +102,7 @@ ADIOS2IOHandlerImpl::init( nlohmann::json cfg )
         m_config = std::move( cfg[ "adios2" ] );
     }
 }
+#       endif // openPMD_HAVE_JSON
 
 std::future< void > ADIOS2IOHandlerImpl::flush( )
 {
@@ -531,7 +542,9 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2Accesstype( )
     }
 }
 
+#       if openPMD_HAVE_JSON
 nlohmann::json ADIOS2IOHandlerImpl::nullvalue = nlohmann::json();
+#       endif // openPMD_HAVE_JSON
 
 std::string ADIOS2IOHandlerImpl::filePositionToString(
     std::shared_ptr< ADIOS2FilePosition > filepos )
@@ -1150,7 +1163,9 @@ namespace detail
     void
     BufferedActions::configure_IO( ADIOS2IOHandlerImpl & impl )
     {
+        (void)impl;
         std::set< std::string > alreadyConfigured;
+#if openPMD_HAVE_JSON
         auto & engine = impl.config( detail::str_engine );
         if( !engine.is_null() )
         {
@@ -1165,7 +1180,7 @@ namespace detail
                 }
             }
         }
-
+#endif // openPMD_HAVE_JSON
         auto notYetConfigured =
             [&alreadyConfigured]( std::string const & param ) {
                 auto it = alreadyConfigured.find( param );
@@ -1366,11 +1381,18 @@ namespace detail
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
     openPMD::AccessType at,
-    MPI_Comm comm,
-    nlohmann::json options )
+    MPI_Comm comm
+#   if openPMD_HAVE_JSON
+    , nlohmann::json options
+#   endif
+)
     : AbstractIOHandler( std::move( path ), at, comm )
-    , m_impl{ this, comm, std::move( options )
-
+    , m_impl{
+        this,
+        comm
+#   if openPMD_HAVE_JSON
+        , std::move( options )
+#   endif
     }
 {
 }
@@ -1379,10 +1401,18 @@ ADIOS2IOHandler::ADIOS2IOHandler(
 
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
-    AccessType at,
-    nlohmann::json options )
+    AccessType at
+#   if openPMD_HAVE_JSON
+    , nlohmann::json options
+#   endif
+)
     : AbstractIOHandler( std::move( path ), at )
-    , m_impl{ this, std::move( options ) }
+    , m_impl{
+        this
+#   if openPMD_HAVE_JSON
+        , std::move( options )
+#   endif
+    }
 {
 }
 
@@ -1397,18 +1427,24 @@ std::future< void > ADIOS2IOHandler::flush( )
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
     AccessType at,
-    MPI_Comm comm,
-    nlohmann::json )
+    MPI_Comm comm
+#   if openPMD_HAVE_JSON
+    , nlohmann::json
+#   endif
+)
     : AbstractIOHandler( std::move( path ), at, comm )
 {
 }
 
-#    endif
+#endif // openPMD_HAVE_MPI
 
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
-    AccessType at,
-    nlohmann::json )
+    AccessType at
+#if openPMD_HAVE_JSON
+    , nlohmann::json
+#endif
+)
     : AbstractIOHandler( std::move( path ), at )
 {
 }

@@ -38,7 +38,9 @@
 #   include <mpi.h>
 #endif
 
-#include <nlohmann/json.hpp>
+#if openPMD_HAVE_JSON
+#   include <nlohmann/json.hpp>
+#endif
 
 #include <array>
 #include <future>
@@ -93,13 +95,24 @@ public:
 
 #if openPMD_HAVE_MPI
 
-    ADIOS2IOHandlerImpl( AbstractIOHandler *, MPI_Comm, nlohmann::json config );
+    ADIOS2IOHandlerImpl(
+        AbstractIOHandler *,
+        MPI_Comm
+#   if openPMD_HAVE_JSON
+        , nlohmann::json config
+#   endif
+    );
 
     MPI_Comm m_comm;
 
 #endif // openPMD_HAVE_MPI
 
-    explicit ADIOS2IOHandlerImpl( AbstractIOHandler *, nlohmann::json config );
+    explicit ADIOS2IOHandlerImpl(
+        AbstractIOHandler *
+#   if openPMD_HAVE_JSON
+        , nlohmann::json config
+#   endif
+    );
 
 
     ~ADIOS2IOHandlerImpl( ) override = default;
@@ -172,6 +185,8 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+
+#   if openPMD_HAVE_JSON
     nlohmann::json m_config;
     static nlohmann::json nullvalue;
 
@@ -198,7 +213,7 @@ private:
     {
         return config< Key >( std::forward< Key >( key ), m_config );
     }
-
+#   endif // openPMD_HAVE_JSON
     /*
      * We need to give names to IO objects. These names are irrelevant
      * within this application, since:
@@ -690,13 +705,21 @@ public:
     ADIOS2IOHandler(
         std::string path,
         AccessType,
-        MPI_Comm,
-        nlohmann::json options );
+        MPI_Comm
+#   if openPMD_HAVE_JSON
+        , nlohmann::json options
+#   endif
+    );
 
 #endif
 
-    ADIOS2IOHandler( std::string path, AccessType,
-        nlohmann::json options);
+    ADIOS2IOHandler(
+        std::string path,
+        AccessType
+#if openPMD_HAVE_JSON
+        , nlohmann::json options
+#endif
+    );
 
     std::future< void > flush( ) override;
 }; // ADIOS2IOHandler
