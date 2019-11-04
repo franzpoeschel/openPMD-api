@@ -90,7 +90,7 @@ ChunkTable::splitToSizeSorted( size_t maxSize ) const
 
 namespace chunk_assignment
 {
-    void
+    ChunkTable &
     SplitEgalitarianSliceIncomingChunks::splitEgalitarian(
         ChunkTable const & sourceChunks,
         std::list< int > const & destinationRanks,
@@ -151,9 +151,10 @@ namespace chunk_assignment
         }
         dummyTable.chunkTable.emplace( 0, std::move( leftoverChunks ) );
         set.splitEgalitarian( dummyTable, destinationRanks, sinkChunks );
+        return sinkChunks;
     }
 
-    void
+    ChunkTable &
     SplitEgalitarianTrivial::splitEgalitarian(
         ChunkTable const & sourceChunks,
         std::list< int > const & destinationRanks,
@@ -177,10 +178,11 @@ namespace chunk_assignment
                     std::move( chunk ) );
             }
         }
+        return sinkChunks;
     }
 
     FirstPassByHostname::FirstPassByHostname(
-        std::unique_ptr< SplitEgalitarian > _splitter )
+        std::unique_ptr< SecondPass > _splitter )
         : splitter( std::move( _splitter ) )
     {
     }
@@ -240,7 +242,7 @@ namespace chunk_assignment
     {
     }
 
-    void
+    ChunkTable &
     SplitEgalitarianByCuboidSlice::splitEgalitarian(
         ChunkTable const & sourceChunks,
         std::list< int > const & destinationRanks,
@@ -288,6 +290,7 @@ namespace chunk_assignment
             outer_loop:;
             }
         }
+        return result;
     }
 
 
@@ -313,36 +316,20 @@ namespace chunk_assignment
     {
         FirstPass::Result intermediateAssignment =
             firstPass.firstPass( table, rankIn, rankOut );
-        return secondPass.assignLeftovers(
-            intermediateAssignment, rankIn, rankOut );
-    }
-
-    SecondPassBySplitEgalitarian::SecondPassBySplitEgalitarian(
-        std::unique_ptr< SplitEgalitarian > _splitter )
-        : splitter( std::move( _splitter ) )
-    {
-    }
-
-    ChunkTable
-    SecondPassBySplitEgalitarian::assignLeftovers(
-        FirstPass::Result intermediateResult,
-        RankMeta const &,
-        RankMeta const & out )
-    {
-        std::list< int > destinationRanks;
-        for( size_t rank = 0; rank < out.size(); ++rank )
+        std::list< int > destRanks;
+        for( unsigned int rank = 0; rank < rankOut.size(); ++rank )
         {
-            destinationRanks.push_back( rank );
+            destRanks.push_back( rank );
         }
-        splitter->splitEgalitarian(
-            intermediateResult.leftOver,
-            destinationRanks,
-            intermediateResult.sinkSide );
-        return intermediateResult.sinkSide;
+        secondPass.splitEgalitarian(
+            intermediateAssignment.leftOver,
+            destRanks,
+            intermediateAssignment.sinkSide );
+        return intermediateAssignment.sinkSide;
     }
 
     FirstPassBySplitEgalitarian::FirstPassBySplitEgalitarian(
-        std::unique_ptr< SplitEgalitarian > _splitter )
+        std::unique_ptr< SecondPass > _splitter )
         : splitter( std::move( _splitter ) )
     {
     }
@@ -368,8 +355,8 @@ namespace chunk_assignment
         std::unique_ptr< BlockSlicer > _blockSlicer,
         Extent _totalExtent,
         int _mpi_rank )
-        : FirstPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian >(
-              new SplitEgalitarianByCuboidSlice(
+        : FirstPassBySplitEgalitarian(
+              std::unique_ptr< SecondPass >( new SplitEgalitarianByCuboidSlice(
                   std::move( _blockSlicer ),
                   std::move( _totalExtent ),
                   _mpi_rank ) ) )

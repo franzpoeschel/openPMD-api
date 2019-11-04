@@ -95,63 +95,40 @@ namespace chunk_assignment
     struct SecondPass
     {
         /**
-         * @brief Assign leftover chunks from the first phase.
-         * 
-         * @param intermediate The intermediate result.
-         * @param in The source hostnames per rank.
-         * @param out The sink hostnames per rank.
-         * @return ChunkTable The final result with every input chunk assigned
-         *                    to some sink rank.
-         */
-        virtual ChunkTable
-        assignLeftovers(
-            FirstPass::Result intermediate,
-            RankMeta const & in,
-            RankMeta const & out ) = 0;
-    };
-
-    /**
-     * @brief Assign chunks without taking rank meta information into
-     *        consideration.
-     * 
-     */
-    struct SplitEgalitarian
-    {
-        /**
          * @brief Merge unassigned chunks into a (possibly partially filled)
          *        ChunkTable.
-         * 
+         *
          * @param sourceChunks The unassigned source chunks.
          * @param destinationRanks The sink ranks to take into consideration. Do
          *                         not put chunks into ranks other than these.
          * @param sinkChunks Partial assignment to merge new chunks into.
          */
-        virtual void
+        virtual ChunkTable &
         splitEgalitarian(
             ChunkTable const & sourceChunks,
             std::list< int > const & destinationRanks,
             ChunkTable & sinkChunks ) = 0;
 
-        virtual ~SplitEgalitarian() = default;
+        virtual ~SecondPass() = default;
     };
 
-    struct SplitEgalitarianSliceIncomingChunks : SplitEgalitarian
+    struct SplitEgalitarianSliceIncomingChunks : SecondPass
     {
-        void
+        ChunkTable &
         splitEgalitarian(
             ChunkTable const & sourceChunks,
             std::list< int > const & destinationRanks,
             ChunkTable & sinkChunks ) override;
     };
 
-    struct SplitEgalitarianByCuboidSlice : SplitEgalitarian
+    struct SplitEgalitarianByCuboidSlice : SecondPass
     {
         SplitEgalitarianByCuboidSlice(
             std::unique_ptr< BlockSlicer > blockSlicer,
             Extent totalExtent,
             int mpi_rank );
 
-        void
+        ChunkTable &
         splitEgalitarian(
             ChunkTable const & sourceChunks,
             std::list< int > const & destinationRanks,
@@ -172,9 +149,9 @@ namespace chunk_assignment
         FirstPass & firstPass,
         SecondPass & secondPass );
 
-    struct SplitEgalitarianTrivial : SplitEgalitarian
+    struct SplitEgalitarianTrivial : SecondPass
     {
-        void
+        ChunkTable &
         splitEgalitarian(
             ChunkTable const & sourceChunks,
             std::list< int > const & destinationRanks,
@@ -183,7 +160,7 @@ namespace chunk_assignment
 
     struct FirstPassByHostname : FirstPass
     {
-        FirstPassByHostname( std::unique_ptr< SplitEgalitarian > );
+        FirstPassByHostname( std::unique_ptr< SecondPass > );
 
         Result
         firstPass(
@@ -192,57 +169,21 @@ namespace chunk_assignment
             RankMeta const & out ) override;
 
     private:
-        std::unique_ptr< SplitEgalitarian > splitter;
-    };
-
-#if 0
-    struct FirstPassByCuboidSlice : FirstPass
-    {
-        FirstPassByCuboidSlice(
-            std::unique_ptr< BlockSlicer > blockSlicer,
-            Extent totalExtent,
-            int mpi_rank,
-            int mpi_size );
-
-        Result
-        firstPass(
-            ChunkTable const &,
-            RankMeta const & in,
-            RankMeta const & out ) override;
-
-    private:
-        std::unique_ptr< BlockSlicer > blockSlicer;
-        Extent totalExtent;
-        int mpi_rank, mpi_size;
-    };
-#endif
-
-    struct SecondPassBySplitEgalitarian : SecondPass
-    {
-        SecondPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian > );
-
-        ChunkTable
-        assignLeftovers(
-            FirstPass::Result,
-            RankMeta const & in,
-            RankMeta const & out ) override;
-
-    private:
-        std::unique_ptr< SplitEgalitarian > splitter;
+        std::unique_ptr< SecondPass > splitter;
     };
 
     struct FirstPassBySplitEgalitarian : FirstPass
     {
-        FirstPassBySplitEgalitarian( std::unique_ptr< SplitEgalitarian > );
+        FirstPassBySplitEgalitarian( std::unique_ptr< SecondPass > );
 
         Result
         firstPass(
             ChunkTable const & chunkTable,
             RankMeta const & in,
             RankMeta const & out ) override;
-    
+
     private:
-        std::unique_ptr< SplitEgalitarian > splitter;
+        std::unique_ptr< SecondPass > splitter;
     };
 
     struct FirstPassByCuboidSlice : FirstPassBySplitEgalitarian
