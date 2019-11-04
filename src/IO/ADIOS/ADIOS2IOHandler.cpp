@@ -1554,10 +1554,11 @@ namespace detail
                 } );
         }
         case AdvanceMode::AUTO:
-            throw std::runtime_error(
-                    "Internal error: Advance mode should be explicitly"
-                    " chosen by the front-end.");
+            break;
         }
+        throw std::runtime_error(
+            "Internal error: Advance mode should be explicitly"
+            " chosen by the front-end." );
     }
 
     void BufferedActions::drop( )

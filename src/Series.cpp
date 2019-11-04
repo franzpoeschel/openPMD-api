@@ -532,6 +532,8 @@ Series::advance( AdvanceMode mode )
             futurePost.run_as_thread();
             return futurePost;
     }
+    throw std::runtime_error(
+        "Bug in the openPMD API: This path cannot be taken." );
 }
 
 std::unique_ptr< Series::ParsedInput >
