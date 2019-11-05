@@ -656,8 +656,8 @@ namespace detail
          */
         void drop( );
 
-        std::map< std::string, adios2::Params > const & 
-            availableAttributesBuffered( std::string const & variable );
+        std::map< std::string, adios2::Params > const &
+        availableAttributesNonvar( std::string const & variable );
 
     private:
         enum class StreamStatus{

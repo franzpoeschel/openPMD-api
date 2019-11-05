@@ -449,7 +449,7 @@ void ADIOS2IOHandlerImpl::listPaths(
     }
 
     std::vector< std::string > attrs;
-    for ( auto const & p : fileData.availableAttributesBuffered( "" ) )
+    for( auto const & p : fileData.availableAttributesNonvar( "" ) )
     {
         attrs.emplace_back( p.first );
     }
@@ -526,13 +526,17 @@ void ADIOS2IOHandlerImpl::listAttributes(
         attributePrefix = "";
     }
     auto & ba = getFileData( file );
-    ba.requireActiveStep( ); // make sure that the attributes are present
-    auto const & attrs = ba.availableAttributesBuffered( attributePrefix );
-    for ( auto & pair : attrs )
+    ba.requireActiveStep(); // make sure that the attributes are present
+
+    auto const & attrs = ba.availableAttributesNonvar( attributePrefix );
+    for( auto & pair : attrs )
     {
         auto attr = auxiliary::removeSlashes( pair.first );
-        if ( attr.find_last_of( '/' ) == std::string::npos )
+        if( attr.find_last_of( '/' ) == std::string::npos )
         {
+            // std::cout << "ATTRIBUTE at " << attributePrefix << ": " << attr
+            // <<
+            //   std::endl;
             parameters.attributes->push_back( std::move( attr ) );
         }
     }
@@ -595,7 +599,7 @@ ADIOS2IOHandlerImpl::staleGroup(
         "in the openPMD API." );
 
     for( auto const & var :
-         fileData.availableAttributesBuffered( positionString ) )
+         fileData.availableAttributesNonvar( positionString ) )
     {
         fileData.m_IO.RemoveAttribute( positionString + '/' + var.first );
     }
@@ -1563,32 +1567,55 @@ namespace detail
 
     void BufferedActions::drop( )
     {
-        m_buffer.clear( );
+        m_buffer.clear();
     }
 
-    std::map< std::string, adios2::Params > const & 
-        BufferedActions::availableAttributesBuffered( 
-            std::string const & variable ){
-        if ( m_mode != adios2::Mode::Read )
+    std::map< std::string, adios2::Params > const &
+    BufferedActions::availableAttributesNonvar( std::string const & variable )
+    {
+        std::string var =
+            auxiliary::ends_with( variable, '/' ) ? variable : variable + '/';
+        auto & IO = m_IO;
+        auto getAttributes = [&var, &IO, this]() {
+            auto attributes = availableAttributesNonvar( "" );
+            decltype( attributes ) ret;
+            for( auto & pair : attributes )
+            {
+                if( auxiliary::starts_with( pair.first, var ) )
+                {
+                    ret.emplace(
+                        auxiliary::replace_first( pair.first, var, "" ),
+                        std::move( pair.second ) );
+                }
+            }
+            return ret;
+        };
+        if( m_mode != adios2::Mode::Read )
         {
-            auto it = m_availableAttributes->emplace(
-                variable,
-                m_IO.AvailableAttributes( variable ) ).first;
+            auto it = m_availableAttributes
+                          ->emplace(
+                              "",
+                              variable.empty() ? m_IO.AvailableAttributes()
+                                               : getAttributes() )
+                          .first;
             return it->second;
         }
-        auto it = m_availableAttributes->find( variable );
-        if ( it == m_availableAttributes->end( ) )
+        auto it = m_availableAttributes->find( var );
+        if( it == m_availableAttributes->end() )
         {
-            it = m_availableAttributes->emplace(
-                variable,
-                m_IO.AvailableAttributes( variable ) ).first;
+            it = m_availableAttributes
+                     ->emplace(
+                         var,
+                         variable.empty() ? m_IO.AvailableAttributes()
+                                          : getAttributes() )
+                     .first;
         }
         return it->second;
     }
-    
+
 } // namespace detail
 
-#if openPMD_HAVE_MPI
+#    if openPMD_HAVE_MPI
 
 ADIOS2IOHandler::ADIOS2IOHandler(
     std::string path,
