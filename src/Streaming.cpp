@@ -115,44 +115,45 @@ namespace chunk_assignment
             std::vector< ChunkTable::T_sizedChunk > digestibleChunks =
                 sourceChunks.splitToSizeSorted( idealSize );
 
-            for( auto destRank : destinationRanks )
-            {
-                auto & perRank = sinkChunks.chunkTable[ destRank ];
-                size_t leftoverSize = idealSize;
+            auto worker = [&destinationRanks,
+                           &digestibleChunks,
+                           &sinkChunks,
+                           idealSize]() {
+                for( auto destRank : destinationRanks )
                 {
-                    auto it = digestibleChunks.begin();
-                    while( it != digestibleChunks.end() )
+                    auto & perRank = sinkChunks.chunkTable[ destRank ];
+                    size_t leftoverSize = idealSize;
                     {
-                        if( it->second >= idealSize )
+                        auto it = digestibleChunks.begin();
+                        while( it != digestibleChunks.end() )
                         {
-                            perRank.emplace_back( std::move( it->first ) );
-                            digestibleChunks.erase( it );
-                            break;
-                        }
-                        else if( it->second <= leftoverSize )
-                        {
-                            perRank.emplace_back( std::move( it->first ) );
-                            leftoverSize -= it->second;
-                            it = digestibleChunks.erase( it );
-                        }
-                        else
-                        {
-                            ++it;
+                            if( it->second >= idealSize )
+                            {
+                                perRank.emplace_back( std::move( it->first ) );
+                                digestibleChunks.erase( it );
+                                break;
+                            }
+                            else if( it->second <= leftoverSize )
+                            {
+                                perRank.emplace_back( std::move( it->first ) );
+                                leftoverSize -= it->second;
+                                it = digestibleChunks.erase( it );
+                            }
+                            else
+                            {
+                                ++it;
+                            }
                         }
                     }
                 }
-            }
+            };
 
-            // distribute leftovers
-            RoundRobin set;
-            ChunkTable dummyTable;
-            std::list< ChunkTable::T_chunk > leftoverChunks;
-            for( auto const & chunk : digestibleChunks )
-            {
-                leftoverChunks.emplace_back( std::move( chunk.first ) );
-            }
-            dummyTable.chunkTable.emplace( 0, std::move( leftoverChunks ) );
-            set.assignLeftovers( dummyTable, destinationRanks, sinkChunks );
+            // sic!
+            // run the worker twice to implement a factor-two approximation
+            // of the bin packing problem
+            worker();
+            worker();
+
             return sinkChunks;
         }
 
