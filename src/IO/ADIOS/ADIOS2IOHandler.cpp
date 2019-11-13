@@ -297,6 +297,7 @@ void ADIOS2IOHandlerImpl::deleteDataset(
 void ADIOS2IOHandlerImpl::deleteAttribute(
     Writable *, const Parameter< Operation::DELETE_ATT > & )
 {
+    // Call BufferedActions::invalidateAttributesMap() in here
     throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
@@ -1259,13 +1260,19 @@ namespace detail
         m_availableAttributesValid = false;
         auto const & attributes = this->availableAttributes();
         AttributeMap_t ret;
-        for( auto const & pair : attributes )
+        ;
+        for( auto it = attributes.lower_bound( prefix ); it != attributes.end();
+             ++it )
         {
-            if( auxiliary::starts_with( pair.first, var ) )
+            if( auxiliary::starts_with( it->first, var ) )
             {
                 ret.emplace(
-                    auxiliary::replace_first( pair.first, var, "" ),
-                    pair.second );
+                    auxiliary::replace_first( it->first, var, "" ),
+                    it->second );
+            }
+            else
+            {
+                break;
             }
         }
         return ret;
