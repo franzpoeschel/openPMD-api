@@ -490,7 +490,7 @@ void ADIOS2IOHandlerImpl::listAttributes(
     }
     auto & ba = getFileData( file );
     ba.getEngine( ); // make sure that the attributes are present
-    auto const & attrs = ba.availableAttributesTemporary( attributePrefix );
+    auto const & attrs = ba.availableAttributesPrefixed( attributePrefix );
     for( auto & pair : attrs )
     {
         auto attr = auxiliary::removeSlashes( pair.first );
@@ -741,7 +741,9 @@ namespace detail
         auto fullName = impl->nameOfAttribute( writable, parameters.name );
         auto prefix = impl->filePositionToString( pos );
 
-        adios2::IO IO = impl->getFileData( file ).m_IO;
+        auto & filedata = impl->getFileData( file );
+        filedata.invalidateAttributesMap();
+        adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace( std::move( file ) );
 
         std::string t = IO.AttributeType( fullName );
@@ -1223,20 +1225,47 @@ namespace detail
         m_buffer.clear();
     }
 
-    std::map< std::string, adios2::Params >
-    BufferedActions::availableAttributesTemporary( std::string const & variable )
+    void
+    BufferedActions::invalidateAttributesMap()
     {
-        std::string var =
-            auxiliary::ends_with( variable, '/' ) ? variable : variable + '/';
-        auto attributes = m_IO.AvailableAttributes( "" );
-        decltype( attributes ) ret;
-        for( auto & pair : attributes )
+        m_availableAttributesValid = false;
+        m_availableAttributes.clear( );
+    }
+
+    BufferedActions::AttributeMap_t const &
+    BufferedActions::availableAttributes()
+    {
+        if( m_availableAttributesValid )
+        {
+            return m_availableAttributes;
+        }
+        else
+        {
+            m_availableAttributes = m_IO.AvailableAttributes();
+            m_availableAttributesValid = true;
+            return m_availableAttributes;
+        }
+    }
+
+    std::map< std::string, adios2::Params >
+    BufferedActions::availableAttributesPrefixed( std::string const & prefix )
+    {
+        if( prefix.empty( ) )
+        {
+            return this->availableAttributes( );
+        }
+        std::string var = auxiliary::ends_with( prefix, '/' ) ? prefix
+                                                              : prefix + '/';
+        m_availableAttributesValid = false;
+        auto const & attributes = this->availableAttributes();
+        AttributeMap_t ret;
+        for( auto const & pair : attributes )
         {
             if( auxiliary::starts_with( pair.first, var ) )
             {
                 ret.emplace(
                     auxiliary::replace_first( pair.first, var, "" ),
-                    std::move( pair.second ) );
+                    pair.second );
             }
         }
         return ret;

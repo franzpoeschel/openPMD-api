@@ -580,7 +580,24 @@ namespace detail
         void drop( );
 
         std::map< std::string, adios2::Params >
-        availableAttributesTemporary( std::string const & variable );
+        availableAttributesPrefixed( std::string const & prefix );
+
+        void
+        invalidateAttributesMap();
+
+    private:
+        using AttributeMap_t = std::map< std::string, adios2::Params >;
+        /*
+         * Revisit once https://github.com/openPMD/openPMD-api/issues/563 has
+         * been resolved
+         * If null, the buffered map has been invalidated and needs to be
+         * queried from ADIOS2 again.
+         */
+        bool m_availableAttributesValid = false;
+        AttributeMap_t m_availableAttributes;
+
+        AttributeMap_t const &
+        availableAttributes();
     };
 
 
