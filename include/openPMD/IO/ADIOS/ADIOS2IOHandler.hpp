@@ -633,13 +633,13 @@ namespace detail
         size_t currentStep = 0;
 
         using extent_t = Extent::value_type;
+        using AttributeMap_t = std::map< std::string, adios2::Params >;
         
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
         ~BufferedActions();
 
         adios2::Engine & getEngine( );
-
         adios2::Engine & requireActiveStep( );
 
         template < typename BA > void enqueue( BA && ba );
@@ -656,35 +656,52 @@ namespace detail
          */
         void drop( );
 
-        std::map< std::string, adios2::Params > const &
-        availableAttributesNonvar( std::string const & variable );
+        AttributeMap_t const &
+        availableAttributes();
+
+        std::vector< std::string >
+        availableAttributesPrefixed( std::string const & prefix );
+
+        void
+        invalidateAttributesMap();
+
+        AttributeMap_t const &
+        availableVariables();
+
+        std::vector< std::string >
+        availableVariablesPrefixed( std::string const & prefix );
+
+        void
+        invalidateVariablesMap();
 
     private:
-        enum class StreamStatus{
-            NoStream, DuringStep, OutsideOfStep, StreamOver, 
+        enum class StreamStatus
+        {
+            NoStream,
+            DuringStep,
+            OutsideOfStep,
+            StreamOver,
             TemporarilyInvalid
         };
-        std::shared_ptr< StreamStatus > streamStatus
-            = std::make_shared< StreamStatus >( StreamStatus::NoStream );
+        std::shared_ptr< StreamStatus > streamStatus =
+            std::make_shared< StreamStatus >( StreamStatus::NoStream );
         int mpi_rank, mpi_size;
-        /**
-         * @brief std::optional would be more idiomatic, but it's not in
-         *        the C++11 standard
-         * @todo replace with std::optional upon switching to C++17
-         */
         std::shared_ptr< adios2::Engine > m_engine;
-        using AttributeMap_t = std::map< std::string, adios2::Params >;
-        std::shared_ptr< 
-            std::map< 
-                std::string, 
-                AttributeMap_t > >
-            m_availableAttributes =
-                std::make_shared< std::map< std::string, AttributeMap_t > >( );
         /*
-         * Format: /openPMD_internal/chunkTablesPerStepAndRank/step/dataset/rank
+         * Revisit once https://github.com/openPMD/openPMD-api/issues/563 has
+         * been resolved
+         * If null, the buffered map has been invalidated and needs to be
+         * queried from ADIOS2 again.
          */
+        bool m_availableAttributesValid = false;
+        AttributeMap_t m_availableAttributes;
 
-        void configure_IO(ADIOS2IOHandlerImpl& impl);
+        bool m_availableVariablesValid = false;
+        AttributeMap_t m_availableVariables;
+
+
+        void
+        configure_IO( ADIOS2IOHandlerImpl & impl );
     };
 
 

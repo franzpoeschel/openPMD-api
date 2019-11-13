@@ -215,9 +215,15 @@ void ADIOS2IOHandlerImpl::createDataset(
         {
             compression = getCompressionOperator( parameters.compression );
         }
-        switchType( parameters.dtype, detail::VariableDefiner( ),
-                    getFileData( file ).m_IO, varName,
-                    std::move( compression ), parameters.extent );
+        auto & fileData = getFileData( file );
+        switchType(
+            parameters.dtype,
+            detail::VariableDefiner(),
+            fileData.m_IO,
+            varName,
+            std::move( compression ),
+            parameters.extent );
+        fileData.invalidateVariablesMap();
         writable->written = true;
         m_dirty.emplace( file );
     }
@@ -321,15 +327,19 @@ void ADIOS2IOHandlerImpl::deletePath(
     throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
-void ADIOS2IOHandlerImpl::deleteDataset(
-    Writable *, const Parameter< Operation::DELETE_DATASET > & )
+void
+ADIOS2IOHandlerImpl::deleteDataset(
+    Writable *,
+    const Parameter< Operation::DELETE_DATASET > & )
 {
+    // call filedata.invalidateVariablesMap
     throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
 void ADIOS2IOHandlerImpl::deleteAttribute(
     Writable *, const Parameter< Operation::DELETE_ATT > & )
 {
+    // call filedata.invalidateAttributesMap
     throw std::runtime_error( "ADIOS2 backend does not support deletion." );
 }
 
@@ -405,8 +415,7 @@ void ADIOS2IOHandlerImpl::listPaths(
      */
 
     auto & fileData = getFileData( file );
-    fileData.requireActiveStep( );
-    auto & IO = fileData.m_IO;
+    fileData.requireActiveStep();
 
     std::unordered_set< std::string > subdirs;
     /*
@@ -424,34 +433,30 @@ void ADIOS2IOHandlerImpl::listPaths(
     std::vector< std::string > delete_me;
     auto f = [myName, &subdirs, &delete_me](
                  std::vector< std::string > & varsOrAttrs, bool variables ) {
-        for ( auto var : varsOrAttrs )
+        for( auto var : varsOrAttrs )
         {
-            if ( auxiliary::starts_with( var, myName ) )
+            auto firstSlash = var.find_first_of( '/' );
+            if( firstSlash != std::string::npos )
             {
-                var = auxiliary::replace_first( var, myName, "" );
-                auto firstSlash = var.find_first_of( '/' );
-                if ( firstSlash != std::string::npos )
-                {
-                    var = var.substr( 0, firstSlash );
-                    subdirs.emplace( std::move( var ) );
-                }
-                else if ( variables )
-                { // var is a dataset at the current level
-                    delete_me.push_back( std::move( var ) );
-                }
+                var = var.substr( 0, firstSlash );
+                subdirs.emplace( std::move( var ) );
+            }
+            else if( variables )
+            { // var is a dataset at the current level
+                delete_me.push_back( std::move( var ) );
             }
         }
     };
     std::vector< std::string > vars;
-    for ( auto const & p : IO.AvailableVariables( ) )
+    for( auto const & p : fileData.availableVariablesPrefixed( myName ) )
     {
-        vars.emplace_back( p.first );
+        vars.emplace_back( std::move( p ) );
     }
 
     std::vector< std::string > attrs;
-    for( auto const & p : fileData.availableAttributesNonvar( "" ) )
+    for( auto const & p : fileData.availableAttributesPrefixed( myName ) )
     {
-        attrs.emplace_back( p.first );
+        attrs.emplace_back( std::move( p ) );
     }
     f( vars, true );
     f( attrs, false );
@@ -487,26 +492,21 @@ void ADIOS2IOHandlerImpl::listDatasets(
      */
 
     auto & fileData = getFileData( file );
-    fileData.requireActiveStep( );
+    fileData.requireActiveStep();
     std::map< std::string, adios2::Params > vars =
-        fileData.m_IO.AvailableVariables( );
+        fileData.availableVariables();
 
     std::unordered_set< std::string > subdirs;
-    for ( auto & pair : vars )
+    for( auto & var : fileData.availableVariablesPrefixed( myName ) )
     {
-        std::string var = pair.first;
-        if ( auxiliary::starts_with( var, myName ) )
+        auto firstSlash = var.find_first_of( '/' );
+        if( firstSlash == std::string::npos )
         {
-            var = auxiliary::replace_first( var, myName, "" );
-            auto firstSlash = var.find_first_of( '/' );
-            if ( firstSlash == std::string::npos )
-            {
-                subdirs.emplace( std::move( var ) );
-            } // else: var is a path or a dataset in a group below the current
-            // group
-        }
+            subdirs.emplace( std::move( var ) );
+        } // else: var is a path or a dataset in a group below the current
+          // group
     }
-    for ( auto & dataset : subdirs )
+    for( auto & dataset : subdirs )
     {
         parameters.datasets->emplace_back( std::move( dataset ) );
     }
@@ -528,10 +528,10 @@ void ADIOS2IOHandlerImpl::listAttributes(
     auto & ba = getFileData( file );
     ba.requireActiveStep(); // make sure that the attributes are present
 
-    auto const & attrs = ba.availableAttributesNonvar( attributePrefix );
-    for( auto & pair : attrs )
+    auto const & attrs = ba.availableAttributesPrefixed( attributePrefix );
+    for( auto & rawAttr : attrs )
     {
-        auto attr = auxiliary::removeSlashes( pair.first );
+        auto attr = auxiliary::removeSlashes( rawAttr );
         if( attr.find_last_of( '/' ) == std::string::npos )
         {
             // std::cout << "ATTRIBUTE at " << attributePrefix << ": " << attr
@@ -598,10 +598,10 @@ ADIOS2IOHandlerImpl::staleGroup(
         "ADIOS2 backend: Position string has unexpected format. This is a bug "
         "in the openPMD API." );
 
-    for( auto const & var :
-         fileData.availableAttributesNonvar( positionString ) )
+    for( auto const & attr :
+         fileData.availableAttributesPrefixed( positionString ) )
     {
-        fileData.m_IO.RemoveAttribute( positionString + '/' + var.first );
+        fileData.m_IO.RemoveAttribute( positionString + '/' + attr );
     }
 }
 
@@ -841,7 +841,9 @@ namespace detail
         auto fullName = impl->nameOfAttribute( writable, parameters.name );
         auto prefix = impl->filePositionToString( pos );
 
-        adios2::IO IO = impl->getFileData( file ).m_IO;
+        auto & filedata = impl->getFileData( file );
+        filedata.invalidateAttributesMap();
+        adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace( std::move( file ) );
 
         std::string t = IO.AttributeType( fullName );
@@ -1287,6 +1289,50 @@ namespace detail
         }
     }
 
+    void
+    BufferedActions::invalidateAttributesMap()
+    {
+        m_availableAttributesValid = false;
+        m_availableAttributes.clear( );
+    }
+
+    BufferedActions::AttributeMap_t const &
+    BufferedActions::availableAttributes()
+    {
+        if( m_availableAttributesValid )
+        {
+            return m_availableAttributes;
+        }
+        else
+        {
+            m_availableAttributes = m_IO.AvailableAttributes();
+            m_availableAttributesValid = true;
+            return m_availableAttributes;
+        }
+    }
+
+    void
+    BufferedActions::invalidateVariablesMap()
+    {
+        m_availableVariablesValid = false;
+        m_availableVariables.clear();
+    }
+
+    BufferedActions::AttributeMap_t const &
+    BufferedActions::availableVariables()
+    {
+        if( m_availableVariablesValid )
+        {
+            return m_availableVariables;
+        }
+        else
+        {
+            m_availableVariables = m_IO.AvailableVariables();
+            m_availableVariablesValid = true;
+            return m_availableVariables;
+        }
+    }
+
     void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
         static std::set< std::string > streamingEngines = {
             "sst",
@@ -1541,17 +1587,17 @@ namespace detail
             auto _streamStatus = streamStatus;
             getEngine();
             auto engine = m_engine;
-            auto _availableAttributes = m_availableAttributes;
+            invalidateAttributesMap();
+            invalidateVariablesMap();
             *streamStatus = StreamStatus::TemporarilyInvalid;
             return std::packaged_task< AdvanceStatus() >(
-                [engine, _streamStatus, _availableAttributes]() mutable {
+                [engine, _streamStatus]() mutable {
                     switch( engine->BeginStep() )
                     {
                         case adios2::StepStatus::EndOfStream:
                             *_streamStatus = StreamStatus::StreamOver;
                             return AdvanceStatus::OVER;
                         default:
-                            _availableAttributes->clear( );
                             *_streamStatus = StreamStatus::DuringStep;
                             return AdvanceStatus::OK;
                     }
@@ -1570,47 +1616,50 @@ namespace detail
         m_buffer.clear();
     }
 
-    std::map< std::string, adios2::Params > const &
-    BufferedActions::availableAttributesNonvar( std::string const & variable )
+    static std::vector< std::string >
+    availableAttributesOrVariablesPrefixed(
+        std::string const & prefix,
+        BufferedActions::AttributeMap_t const & (
+            BufferedActions::*getBasicMap )(),
+        BufferedActions & ba )
     {
-        std::string var =
-            auxiliary::ends_with( variable, '/' ) ? variable : variable + '/';
-        auto & IO = m_IO;
-        auto getAttributes = [&var, &IO, this]() {
-            auto attributes = availableAttributesNonvar( "" );
-            decltype( attributes ) ret;
-            for( auto & pair : attributes )
+        std::string var = auxiliary::ends_with( prefix, '/' ) ? prefix
+                                                              : prefix + '/';
+        BufferedActions::AttributeMap_t const & attributes =
+            ( ba.*getBasicMap )();
+        std::vector< std::string > ret;
+        for( auto it = attributes.lower_bound( prefix ); it != attributes.end();
+             ++it )
+        {
+            if( auxiliary::starts_with( it->first, var ) )
             {
-                if( auxiliary::starts_with( pair.first, var ) )
-                {
-                    ret.emplace(
-                        auxiliary::replace_first( pair.first, var, "" ),
-                        std::move( pair.second ) );
-                }
+                ret.emplace_back(
+                    auxiliary::replace_first( it->first, var, "" ) );
             }
-            return ret;
-        };
-        if( m_mode != adios2::Mode::Read )
-        {
-            auto it = m_availableAttributes
-                          ->emplace(
-                              "",
-                              variable.empty() ? m_IO.AvailableAttributes()
-                                               : getAttributes() )
-                          .first;
-            return it->second;
+            else
+            {
+                break;
+            }
         }
-        auto it = m_availableAttributes->find( var );
-        if( it == m_availableAttributes->end() )
-        {
-            it = m_availableAttributes
-                     ->emplace(
-                         var,
-                         variable.empty() ? m_IO.AvailableAttributes()
-                                          : getAttributes() )
-                     .first;
-        }
-        return it->second;
+        return ret;
+    }
+
+    std::vector< std::string >
+    BufferedActions::availableAttributesPrefixed( std::string const & prefix )
+    {
+        return availableAttributesOrVariablesPrefixed(
+            prefix,
+            &BufferedActions::availableAttributes,
+            *this );
+    }
+
+    std::vector< std::string >
+    BufferedActions::availableVariablesPrefixed( std::string const & prefix )
+    {
+        return availableAttributesOrVariablesPrefixed(
+            prefix,
+            &BufferedActions::availableVariables,
+            *this );
     }
 
 } // namespace detail
