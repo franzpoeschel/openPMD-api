@@ -1703,16 +1703,22 @@ std::future< void > ADIOS2IOHandler::flush( )
 #else // openPMD_HAVE_ADIOS2
 
 #if openPMD_HAVE_MPI
-ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at,
-                                  MPI_Comm comm )
-: AbstractIOHandler( std::move( path ), at, comm )
+ADIOS2IOHandler::ADIOS2IOHandler(
+    std::string path,
+    AccessType at,
+    MPI_Comm comm,
+    nlohmann::json )
+    : AbstractIOHandler( std::move( path ), at, comm )
 {
 }
 
-#endif
+#    endif
 
-ADIOS2IOHandler::ADIOS2IOHandler( std::string path, AccessType at )
-: AbstractIOHandler( std::move( path ), at )
+ADIOS2IOHandler::ADIOS2IOHandler(
+    std::string path,
+    AccessType at,
+    nlohmann::json )
+    : AbstractIOHandler( std::move( path ), at )
 {
 }
 
