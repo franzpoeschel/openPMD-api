@@ -72,9 +72,10 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
 
 #    endif // openPMD_HAVE_MPI
 
-ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl( 
-    AbstractIOHandler * handler, nlohmann::json cfg )
-: AbstractIOHandlerImplCommon( handler ), m_ADIOS{ADIOS2_DEBUG_MODE}
+ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
+    AbstractIOHandler * handler,
+    nlohmann::json cfg )
+    : AbstractIOHandlerImplCommon( handler ), m_ADIOS{ ADIOS2_DEBUG_MODE }
 {
     init( std::move( cfg ) );
 }
@@ -259,9 +260,10 @@ void ADIOS2IOHandlerImpl::openFile(
     writable->abstractFilePosition = std::make_shared< ADIOS2FilePosition >( );
 }
 
-void 
-ADIOS2IOHandlerImpl::closeFile( 
-    Writable * writable, Parameter< Operation::CLOSE_FILE > const & parameters )
+void
+ADIOS2IOHandlerImpl::closeFile(
+    Writable * writable,
+    Parameter< Operation::CLOSE_FILE > const & parameters )
 {
     std::cerr << "Closing file " << parameters.name << std::endl;
     std::string name = parameters.name;
@@ -565,11 +567,11 @@ ADIOS2IOHandlerImpl::availableChunks(
     auto datatype = detail::fromADIOS2Type( ba.m_IO.VariableType( varName ) );
     static detail::RetrieveBlocksInfo rbi;
     switchType(
-        datatype, 
-        rbi, 
-        parameters, 
-        ba.m_IO, 
-        ba.requireActiveStep( ), 
+        datatype,
+        rbi,
+        parameters,
+        ba.m_IO,
+        ba.requireActiveStep(),
         varName,
         ba.currentStep );
 }
@@ -1240,12 +1242,17 @@ namespace detail
         *param.dtype = ret;
     }
 
-    BufferedActions::BufferedActions( ADIOS2IOHandlerImpl & impl,
-                                      InvalidatableFile file )
-    : m_file( impl.fullPath( std::move( file ) ) ),
-      m_IO( impl.m_ADIOS.DeclareIO( std::to_string( impl.nameCounter++ ) ) ),
-      m_mode( impl.adios2Accesstype( ) ), m_writeDataset( &impl ),
-      m_readDataset( &impl ), m_attributeReader( )
+    BufferedActions::BufferedActions(
+        ADIOS2IOHandlerImpl & impl,
+        InvalidatableFile file )
+        : m_file( impl.fullPath( std::move( file ) ) )
+        , m_IOName( std::to_string( impl.nameCounter++ ) )
+        , m_ADIOS( impl.m_ADIOS )
+        , m_IO( impl.m_ADIOS.DeclareIO( m_IOName ) )
+        , m_mode( impl.adios2Accesstype() )
+        , m_writeDataset( &impl )
+        , m_readDataset( &impl )
+        , m_attributeReader()
     {
         if ( impl.m_isSerial )
         {
@@ -1280,12 +1287,13 @@ namespace detail
         }
         if( m_engine )
         {
-            if ( *streamStatus == StreamStatus::DuringStep )
+            if( *streamStatus == StreamStatus::DuringStep )
             {
                 m_engine->EndStep();
             }
             std::cerr << "Closing ADIOS2 engine " << m_file << std::endl;
             m_engine->Close( );
+            m_ADIOS.RemoveIO( m_IOName );
         }
     }
 
@@ -1334,16 +1342,11 @@ namespace detail
     }
 
     void BufferedActions::configure_IO(ADIOS2IOHandlerImpl& impl){
-        static std::set< std::string > streamingEngines = {
-            "sst",
-            "insitumpi",
-            "inline"
-        };
-        static std::set< std::string > fileEngines = {
-            "bp3",
-            "hdf5"
-        };
-        
+        static std::set< std::string > streamingEngines = { "sst",
+                                                            "insitumpi",
+                                                            "inline" };
+        static std::set< std::string > fileEngines = { "bp3", "hdf5" };
+
         std::set< std::string > alreadyConfigured;
         auto & engine = impl.config( detail::str_engine );
         if( !engine.is_null() )
@@ -1367,9 +1370,9 @@ namespace detail
                     }
                     else
                     {
-                        std::cerr << "Unknown engine type (" << 
-                            type << "). Defaulting to non-streaming mode."
-                            << std::endl;
+                        std::cerr << "Unknown engine type (" << type
+                                  << "). Defaulting to non-streaming mode."
+                                  << std::endl;
                         *streamStatus = StreamStatus::NoStream;
                     }
                 }
@@ -1558,7 +1561,7 @@ namespace detail
              * until one is actually needed:
              * (1) The engine is accessed in BufferedActions::flush
              * (2) A new step is opened before the currently active step
-             *     has seen an access. See the following lines: open the 
+             *     has seen an access. See the following lines: open the
              *     step just to skip it again.
              */
             if( *streamStatus == StreamStatus::OutsideOfStep )

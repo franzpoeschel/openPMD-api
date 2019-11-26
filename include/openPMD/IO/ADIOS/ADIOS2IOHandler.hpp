@@ -622,6 +622,8 @@ namespace detail
         BufferedActions( BufferedActions const & ) = delete;
 
         std::string m_file;
+        std::string const m_IOName;
+        adios2::ADIOS & m_ADIOS;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
         adios2::Mode m_mode;
