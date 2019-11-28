@@ -1345,7 +1345,7 @@ namespace detail
         static std::set< std::string > streamingEngines = { "sst",
                                                             "insitumpi",
                                                             "inline" };
-        static std::set< std::string > fileEngines = { "bp3", "hdf5" };
+        static std::set< std::string > fileEngines = { "bp4", "bp3", "hdf5" };
 
         std::set< std::string > alreadyConfigured;
         auto & engine = impl.config( detail::str_engine );
@@ -1387,14 +1387,16 @@ namespace detail
                 }
             }
         }
+        else
+        {
+            m_IO.SetEngine( "bp3" );
+        }
 
         auto notYetConfigured =
-            [&alreadyConfigured]
-            ( std::string const & param )
-        {
-            auto it = alreadyConfigured.find( param );
-            return it == alreadyConfigured.end();
-        };
+            [&alreadyConfigured]( std::string const & param ) {
+                auto it = alreadyConfigured.find( param );
+                return it == alreadyConfigured.end();
+            };
 
         // read parameters from environment
         if( notYetConfigured( "CollectiveMetadata" ) )
