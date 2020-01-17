@@ -197,7 +197,13 @@ private:
      * @param d The dataset description. Must have nonzero dimensions.
      * @return Reference to this RecordComponent instance.
      */
-    RecordComponent& makeEmpty( Dataset d );
+    RecordComponent& makeEmpty( Dataset );
+
+protected:
+    /*
+    * Make sure to parse a RecordComponent only once.
+    */
+    std::shared_ptr< bool > hasBeenRead = std::make_shared< bool >( false );
 }; // RecordComponent
 
 
