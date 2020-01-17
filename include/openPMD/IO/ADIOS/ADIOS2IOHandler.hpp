@@ -128,6 +128,9 @@ public:
     void openFile( Writable *,
                    Parameter< Operation::OPEN_FILE > const & ) override;
 
+    void closeFile( Writable *,
+                   Parameter< Operation::CLOSE_FILE > const & ) override;
+
     void openPath( Writable *,
                    Parameter< Operation::OPEN_PATH > const & ) override;
 
@@ -168,6 +171,17 @@ public:
     listAttributes( Writable *,
                     Parameter< Operation::LIST_ATTS > & parameters ) override;
 
+    void
+    advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
+
+    void
+    availableChunks( Writable*,
+                     Parameter< Operation::AVAILABLE_CHUNKS > &) override;
+
+    void
+    staleGroup( Writable *, Parameter< Operation::STALE_GROUP > const & )
+        override;
+
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
      * within this instance.
@@ -177,6 +191,7 @@ public:
 
 private:
     adios2::ADIOS m_ADIOS;
+    bool m_isSerial = true;
 
     struct ParameterizedOperator
     {
@@ -403,11 +418,17 @@ namespace detail
         operator()( Params &&... );
     };
 
+    struct RetrieveBlocksInfo
+    {
+        template < typename T, typename... Params >
+        void operator( )( Params &&... );
 
+        template < int n, typename... Params >
+        void operator( )( Params &&... );
+    };
 
     // Helper structs to help distinguish valid attribute/variable
     // datatypes from invalid ones
-
 
     /*
      * This struct's purpose is to have specialisations
@@ -558,6 +579,13 @@ namespace detail
             bool const constantDims = false );
 
         void writeDataset( BufferedPut &, adios2::IO &, adios2::Engine & );
+
+        static void blocksInfo(
+            Parameter< Operation::AVAILABLE_CHUNKS > & params,
+            adios2::IO IO,
+            adios2::Engine engine,
+            std::string const & varName,
+            size_t step );
     };
 
     template < typename T >
@@ -577,6 +605,8 @@ namespace detail
         static void defineVariable( Params &&... );
 
         template < typename... Params > void writeDataset( Params &&... );
+
+        template < typename... Params > static void blocksInfo( Params &&... );
     };
 
     // Other datatypes used in the ADIOS2IOHandler implementation
@@ -628,35 +658,34 @@ namespace detail
         BufferedActions( BufferedActions const & ) = delete;
 
         std::string m_file;
+        std::string const m_IOName;
+        adios2::ADIOS & m_ADIOS;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
-        /**
-         * @brief std::optional would be more idiomatic, but it's not in
-         *        the C++11 standard
-         * @todo replace with std::optional upon switching to C++17
-         */
-        std::unique_ptr< adios2::Engine > m_engine;
         adios2::Mode m_mode;
-        detail::WriteDataset m_writeDataset;
-        detail::DatasetReader m_readDataset;
-        detail::AttributeReader m_attributeReader;
-        ADIOS2IOHandlerImpl & m_impl;
+        detail::WriteDataset const m_writeDataset;
+        detail::DatasetReader const m_readDataset;
+        detail::AttributeReader const m_attributeReader;
+        bool isStreaming = false;
 
         using AttributeMap_t = std::map< std::string, adios2::Params >;
+        size_t currentStep = 0;
 
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
 
         ~BufferedActions( );
 
-        void
-        configure_IO( ADIOS2IOHandlerImpl & impl );
-
         adios2::Engine & getEngine( );
+        adios2::Engine & requireActiveStep( );
 
         template < typename BA > void enqueue( BA && ba );
 
+        template < typename BA > void enqueue( BA && ba, decltype( m_buffer ) & );
+
 
         void flush( );
+
+        std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
@@ -688,6 +717,19 @@ namespace detail
         invalidateVariablesMap();
 
     private:
+        enum class StreamStatus
+        {
+            NoStream,
+            DuringStep,
+            OutsideOfStep,
+            StreamOver,
+            TemporarilyInvalid
+        };
+        std::shared_ptr< StreamStatus > streamStatus =
+            std::make_shared< StreamStatus >( StreamStatus::NoStream );
+        int mpi_rank, mpi_size;
+        std::shared_ptr< adios2::Engine > m_engine;
+
         /*
          * ADIOS2 does not give direct access to its internal attribute and 
          * variable maps, but will instead give access to copies of them.
@@ -707,6 +749,9 @@ namespace detail
 
         bool m_availableVariablesValid = false;
         AttributeMap_t m_availableVariables;
+
+        void
+        configure_IO( ADIOS2IOHandlerImpl & impl );
     };
 
 

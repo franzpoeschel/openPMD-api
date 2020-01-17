@@ -490,25 +490,25 @@ Series::advance( AdvanceMode mode )
                     }
 
                     // re-read -> new datasets might be available
-                    if( this->IOHandler->accessTypeFrontend ==
+                    if( this->IOHandler->m_frontendAccess ==
                             AccessType::READ_ONLY ||
-                        this->IOHandler->accessTypeFrontend ==
+                        this->IOHandler->m_frontendAccess ==
                             AccessType::READ_WRITE )
                     {
                         bool previous = this->iterations.written;
                         this->iterations.written = false;
-                        auto oldType = this->IOHandler->accessTypeFrontend;
-                        auto newType = const_cast< AccessType * >(
-                            &this->IOHandler->accessTypeFrontend );
+                        auto oldType = this->IOHandler->m_frontendAccess;
+                        auto newType = const_cast< Access * >(
+                            &this->IOHandler->m_frontendAccess );
                         *newType = AccessType::READ_WRITE;
                         this->readGroupBased( false );
                         *newType = oldType;
                         this->iterations.written = previous;
                     }
 
-                    if( this->IOHandler->accessTypeFrontend ==
+                    if( this->IOHandler->m_frontendAccess ==
                             AccessType::CREATE ||
-                        this->IOHandler->accessTypeFrontend ==
+                        this->IOHandler->m_frontendAccess ==
                             AccessType::READ_WRITE )
                     {
                         for( auto & i : iterations )
@@ -1074,7 +1074,7 @@ Series::advance( AdvanceMode mode, std::string )
 // file parameter maybe for an open_file command later on
 {
     // resolve AdvanceMode
-    AccessType at = IOHandler->accessTypeFrontend;
+    Access at = IOHandler->m_frontendAccess;
     AdvanceMode actualMode = mode;
     switch( mode )
     {
