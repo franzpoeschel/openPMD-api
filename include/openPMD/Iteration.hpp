@@ -110,12 +110,10 @@ private:
     void read();
 
     /*
-     * Once an iteration is declared finalized, we do not flush it any longer
-     * to avoid reading undefined data if a backend implements optimizations
-     * based on this information.
+     * Once an iteration has been closed, no further flushes shall be performed.
+     * If flushing a closed file, the old file may otherwise be overwritten.
      */
-    std::shared_ptr< bool > skipFlush =
-        std::make_shared< bool >( false );
+    std::shared_ptr< bool > isClosed = std::make_shared< bool >( false );
 
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
 };  //Iteration

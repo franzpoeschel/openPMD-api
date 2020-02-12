@@ -513,12 +513,15 @@ Series::advance( AdvanceMode mode )
                     {
                         for( auto & i : iterations )
                         {
-                            if( !*i.second.skipFlush && i.second.finalized() )
+                            if( !*i.second.isClosed && i.second.finalized() )
                             {
                                 Parameter< Operation::STALE_GROUP > fStale;
                                 IOHandler->enqueue(
                                     IOTask( &i.second, std::move( fStale ) ) );
-                                // *i.second.skipFlush = true;
+                                // In group-based iteration layout, files are
+                                // not closed on a per-iteration basis
+                                // We will treat it as such nonetheless
+                                *i.second.isClosed = true;
                             }
                         }
                     }
@@ -723,7 +726,7 @@ Series::flushFileBased()
         bool allDirty = dirty;
         for( auto& i : iterations )
         {
-            if ( *i.second.skipFlush )
+            if( *i.second.isClosed )
             {
                 continue;
             }
@@ -746,7 +749,7 @@ Series::flushFileBased()
                 Parameter< Operation::CLOSE_FILE > fClose;
                 fClose.name = filename;
                 IOHandler->enqueue( IOTask( &i.second, std::move( fClose ) ) );
-                *i.second.skipFlush = true;
+                *i.second.isClosed = true;
             }
 
             IOHandler->flush();
@@ -778,7 +781,7 @@ Series::flushGroupBased()
 
         for( auto & i : iterations )
         {
-            if( *i.second.skipFlush )
+            if( *i.second.isClosed )
             {
                 continue;
             }
