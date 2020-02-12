@@ -1133,7 +1133,7 @@ Series::read()
     for( auto const& it : *pList.paths )
     {
         Iteration& i = iterations[std::stoull(it)];
-        if ( i.closed( ) )
+        if ( i.closedByWriter( ) )
         {
             continue;
         }
