@@ -148,7 +148,7 @@ Iteration::advance( AdvanceMode mode )
                     &this->IOHandler->accessTypeFrontend );
                 *newType = AccessType::READ_WRITE;
 
-                throw std::runtime_error( "unimplemented" ); // TODO
+                series.readFileBased( /* init = */ false );
 
                 *newType = oldType;
                 this->written = previous;
