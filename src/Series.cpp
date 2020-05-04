@@ -1004,6 +1004,14 @@ Series::iterationFilename( uint64_t i )
 AdvanceStatus
 Series::advance( AdvanceMode mode, Attributable & file )
 {
+    /*
+     * @todo For BeginStep, this is necessary so that openPMD setup tasks
+     *       don't get preceded by the advance task (they are not yet in the
+     *       queue, but will be pushed during flushGroup/FileBased).
+     *       For EndStep, it is necessary, but I have not yet investigated why.
+     *       1. Investigate that.
+     *       2. Maybe refactor things so that double flushing isn't necessary.
+     */
     flush();
 
     Parameter< Operation::ADVANCE > param;
