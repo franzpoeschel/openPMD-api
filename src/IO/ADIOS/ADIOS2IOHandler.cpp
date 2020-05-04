@@ -611,7 +611,7 @@ ADIOS2IOHandlerImpl::advance(
 {
     auto file = refreshFileFromParent( writable );
     auto & ba = getFileData( file );
-    *parameters.task = ba.advance( parameters.mode );
+    *parameters.status = ba.advance( parameters.mode );
 }
 
 void
@@ -1583,7 +1583,7 @@ namespace detail
         m_buffer.clear( );
     }
 
-    std::packaged_task< AdvanceStatus() >
+    AdvanceStatus
     BufferedActions::advance( AdvanceMode mode )
     {
         switch( mode )
@@ -1607,8 +1607,7 @@ namespace detail
                 getEngine().EndStep();
                 currentStep++;
                 *streamStatus = StreamStatus::OutsideOfStep;
-                return std::packaged_task< AdvanceStatus() >(
-                    []() { return AdvanceStatus::OK; } );
+                return AdvanceStatus::OK;
             }
             case AdvanceMode::BEGINSTEP:
             {
@@ -1638,8 +1637,7 @@ namespace detail
                 }
                 invalidateAttributesMap();
                 invalidateVariablesMap();
-                return std::packaged_task< AdvanceStatus() >(
-                    [ res ]() { return res; } );
+                return res;
             }
         }
         throw std::runtime_error(

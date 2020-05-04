@@ -23,7 +23,6 @@
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/Streaming.hpp"
-#include "openPMD/auxiliary/Future.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
 

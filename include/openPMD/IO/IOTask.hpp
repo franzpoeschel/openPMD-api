@@ -474,7 +474,7 @@ struct OPENPMDAPI_EXPORT Parameter< Operation::ADVANCE > : public AbstractParame
 {
     Parameter() = default;
     Parameter( Parameter const & p )
-        : AbstractParameter(), mode( p.mode ), task( p.task )
+        : AbstractParameter(), mode( p.mode ), status( p.status )
     {
     }
 
@@ -488,8 +488,8 @@ struct OPENPMDAPI_EXPORT Parameter< Operation::ADVANCE > : public AbstractParame
     // input parameter
     AdvanceMode mode;
     // output parameter
-    std::shared_ptr< std::packaged_task< AdvanceStatus() > > task =
-        std::make_shared< std::packaged_task< AdvanceStatus() > >();
+    std::shared_ptr< AdvanceStatus > status =
+        std::make_shared< AdvanceStatus >( AdvanceStatus::OK );
 };
 
 template<>

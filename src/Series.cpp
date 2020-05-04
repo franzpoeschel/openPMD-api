@@ -1003,7 +1003,6 @@ Series::iterationFilename( uint64_t i )
 
 AdvanceStatus
 Series::advance( AdvanceMode mode, Attributable & file )
-// file parameter maybe for an open_file command later on
 {
     flush();
 
@@ -1011,11 +1010,8 @@ Series::advance( AdvanceMode mode, Attributable & file )
     param.mode = mode;
     IOTask task( &file, param );
     IOHandler->enqueue( task );
-
     flush();
-
-    param.task->operator()();
-    return param.task->get_future().get();
+    return *param.status;
 }
 
 std::string

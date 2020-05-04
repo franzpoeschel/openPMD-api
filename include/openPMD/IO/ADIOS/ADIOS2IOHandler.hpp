@@ -685,7 +685,8 @@ namespace detail
 
         void flush( );
 
-        std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
+        AdvanceStatus
+        advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
