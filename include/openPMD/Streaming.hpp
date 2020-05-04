@@ -19,9 +19,8 @@ enum class AdvanceStatus
 
 enum class AdvanceMode
 {
-    AUTO, // according to accesstype
-    READ,
-    WRITE
+    BEGINSTEP,
+    ENDSTEP
 };
 
 struct ChunkTable

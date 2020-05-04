@@ -99,8 +99,11 @@ public:
     bool
     finalized() const;
 
-    ConsumingFuture< AdvanceStatus >
-    advance( AdvanceMode mode = AdvanceMode::AUTO );
+    AdvanceStatus
+    beginStep();
+
+    void
+    endStep();
 
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; // particleSpecies?

@@ -459,89 +459,8 @@ Series::flush()
     return IOHandler->flush();
 }
 
-ConsumingFuture< AdvanceStatus >
-Series::advance( AdvanceMode mode )
-{
-    switch( *m_iterationEncoding )
-    {
-        case IterationEncoding::fileBased:
-        {
-            std::cerr << "Advancing not yet implemented in file-based mode, "
-                "defaulting to performing a flush." << std::endl;
-            flush();
-            auto res = ConsumingFuture< AdvanceStatus >(
-                std::packaged_task< AdvanceStatus() >(
-                    [](){ return AdvanceStatus::OK; } ) );
-            res( );
-            return res;
-        }
-        case IterationEncoding::groupBased:
-            auxiliary::ConsumingFuture< AdvanceStatus > future =
-                advance( mode, *this );
-            // capture this by reference since the destructor will issue a
-            // flush
-            // https://github.com/openPMD/openPMD-api/issues/534
-            std::packaged_task< AdvanceStatus( AdvanceStatus ) > postProcessing(
-                [this]( AdvanceStatus status ) mutable {
-                    if( status != AdvanceStatus::OK )
-                    {
-                        return status;
-                    }
-
-                    // re-read -> new datasets might be available
-                    if( this->IOHandler->m_frontendAccess ==
-                            AccessType::READ_ONLY ||
-                        this->IOHandler->m_frontendAccess ==
-                            AccessType::READ_WRITE )
-                    {
-                        bool previous = this->iterations.written;
-                        this->iterations.written = false;
-                        auto oldType = this->IOHandler->m_frontendAccess;
-                        auto newType = const_cast< Access * >(
-                            &this->IOHandler->m_frontendAccess );
-                        *newType = AccessType::READ_WRITE;
-                        this->readGroupBased( false );
-                        *newType = oldType;
-                        this->iterations.written = previous;
-                    }
-
-                    if( this->IOHandler->m_frontendAccess ==
-                            AccessType::CREATE ||
-                        this->IOHandler->m_frontendAccess ==
-                            AccessType::READ_WRITE )
-                    {
-                        for( auto & i : iterations )
-                        {
-                            if( !*i.second.isClosed && i.second.finalized() )
-                            {
-                                Parameter< Operation::STALE_GROUP > fStale;
-                                IOHandler->enqueue(
-                                    IOTask( &i.second, std::move( fStale ) ) );
-                                // In group-based iteration layout, files are
-                                // not closed on a per-iteration basis
-                                // We will treat it as such nonetheless
-                                *i.second.isClosed = true;
-                            }
-                        }
-                    }
-
-                    return status;
-                } );
-            auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
-                auxiliary::chain_futures<
-                    AdvanceStatus,
-                    AdvanceStatus,
-                    auxiliary::RunFutureNonThreaded >(
-                    std::move( future ), std::move( postProcessing ) );
-            futurePost.run_as_thread();
-            return futurePost;
-    }
-    throw std::runtime_error(
-        "Bug in the openPMD API: This path cannot be taken." );
-}
-
 std::unique_ptr< Series::ParsedInput >
-Series::parseInput(std::string filepath)
+Series::parseInput( std::string filepath )
 {
     std::unique_ptr< Series::ParsedInput > input{new Series::ParsedInput};
 
@@ -1082,69 +1001,21 @@ Series::iterationFilename( uint64_t i )
     return *m_filenamePrefix + iteration.str() + *m_filenamePostfix;
 }
 
-auxiliary::ConsumingFuture< AdvanceStatus >
+AdvanceStatus
 Series::advance( AdvanceMode mode, Attributable & file )
 // file parameter maybe for an open_file command later on
 {
-    // resolve AdvanceMode
-    Access at = IOHandler->m_frontendAccess;
-    AdvanceMode actualMode = mode;
-    switch( mode )
-    {
-        case AdvanceMode::AUTO:
-            switch( at )
-            {
-                case AccessType::READ_WRITE:
-                    throw std::runtime_error(
-                        "Series::advance(): Please specify "
-                        "advance mode explicitly." );
-                case AccessType::READ_ONLY:
-                    actualMode = AdvanceMode::READ;
-                    break;
-                case AccessType::CREATE:
-                    actualMode = AdvanceMode::WRITE;
-                    break;
-            }
-            break;
-        case AdvanceMode::READ:
-            if( at == AccessType::CREATE )
-            {
-                throw std::runtime_error(
-                    "Cannot use advance mode 'read' in combination with "
-                    "access type 'create'" );
-            }
-            else
-            {
-                actualMode = AdvanceMode::READ;
-            }
-            break;
-        case AdvanceMode::WRITE:
-            if( at == AccessType::READ_ONLY )
-            {
-                throw std::runtime_error(
-                    "Cannot use advance mode 'write' in combination with "
-                    "access type 'read only'" );
-            }
-            else
-            {
-                actualMode = AdvanceMode::WRITE;
-            }
-            break;
-    }
+    flush();
+
     Parameter< Operation::ADVANCE > param;
-    param.mode = actualMode;
+    param.mode = mode;
     IOTask task( &file, param );
     IOHandler->enqueue( task );
-    // this flush will
-    // (1) flush all actions that are still queued up
-    // (2) finally run the advance task
 
-    auto first_future = flush();
-    return auxiliary::chain_futures< 
-        void,
-        AdvanceStatus >(
-        std::move( first_future ),
-        std::move( *param.task ) );
+    flush();
+
+    param.task->operator()();
+    return param.task->get_future().get();
 }
 
 std::string

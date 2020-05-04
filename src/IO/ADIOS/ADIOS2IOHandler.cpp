@@ -1515,7 +1515,7 @@ namespace detail
         adios2::Engine & eng = getEngine( );
         if ( *streamStatus == StreamStatus::OutsideOfStep )
         {
-            eng.BeginStep( );
+            *m_lastStepStatus = eng.BeginStep();
             *streamStatus = StreamStatus::DuringStep;
         }
         return eng;
@@ -1545,17 +1545,19 @@ namespace detail
         /*
          * Only open a new step if it is necessary.
          */
-        if ( *streamStatus == StreamStatus::OutsideOfStep && !m_buffer.empty() )
+        if( *streamStatus == StreamStatus::OutsideOfStep )
         {
-            eng.BeginStep();
-            *streamStatus = StreamStatus::DuringStep;
+            if( m_buffer.empty() )
+            {
+                return;
+            }
+            else
+            {
+                requireActiveStep();
+            }
         }
-        else if ( *streamStatus == StreamStatus::TemporarilyInvalid )
         {
-            return; // no flush heh
-        }
-        {
-            for ( auto & ba : m_buffer )
+            for( auto & ba : m_buffer )
             {
                 ba->run( *this );
             }
@@ -1584,62 +1586,61 @@ namespace detail
     std::packaged_task< AdvanceStatus() >
     BufferedActions::advance( AdvanceMode mode )
     {
-        switch (mode) {
-        case AdvanceMode::WRITE:
+        switch( mode )
         {
-            /*
-             * Advance mode write:
-             * Close the current step, defer opening the new step
-             * until one is actually needed:
-             * (1) The engine is accessed in BufferedActions::flush
-             * (2) A new step is opened before the currently active step
-             *     has seen an access. See the following lines: open the
-             *     step just to skip it again.
-             */
-            if( *streamStatus == StreamStatus::OutsideOfStep )
+            case AdvanceMode::ENDSTEP:
             {
-                getEngine().BeginStep();
-            }
-            flush();
-            getEngine().EndStep();
-            currentStep++;
-            *streamStatus = StreamStatus::OutsideOfStep;
-            return std::packaged_task< AdvanceStatus() >(
-                []() {
-                    return AdvanceStatus::OK;
-                } );
-        }
-        case AdvanceMode::READ:
-        {
-            if ( *streamStatus == StreamStatus::DuringStep )
-            {
+                /*
+                 * Advance mode write:
+                 * Close the current step, defer opening the new step
+                 * until one is actually needed:
+                 * (1) The engine is accessed in BufferedActions::flush
+                 * (2) A new step is opened before the currently active step
+                 *     has seen an access. See the following lines: open the
+                 *     step just to skip it again.
+                 */
+                if( *streamStatus == StreamStatus::OutsideOfStep )
+                {
+                    getEngine().BeginStep();
+                }
                 flush();
                 getEngine().EndStep();
+                currentStep++;
+                *streamStatus = StreamStatus::OutsideOfStep;
+                return std::packaged_task< AdvanceStatus() >(
+                    []() { return AdvanceStatus::OK; } );
             }
-            currentStep++;
-            // c++ won't allow capturing class members, so we make intermediate
-            // copies
-            auto _streamStatus = streamStatus;
-            getEngine();
-            auto engine = m_engine;
-            invalidateAttributesMap();
-            invalidateVariablesMap();
-            *streamStatus = StreamStatus::TemporarilyInvalid;
-            return std::packaged_task< AdvanceStatus() >(
-                [engine, _streamStatus]() mutable {
-                    switch( engine->BeginStep() )
-                    {
-                        case adios2::StepStatus::EndOfStream:
-                            *_streamStatus = StreamStatus::StreamOver;
-                            return AdvanceStatus::OVER;
-                        default:
-                            *_streamStatus = StreamStatus::DuringStep;
-                            return AdvanceStatus::OK;
-                    }
-                } );
-        }
-        case AdvanceMode::AUTO:
-            break;
+            case AdvanceMode::BEGINSTEP:
+            {
+                adios2::StepStatus adiosStatus = *m_lastStepStatus;
+
+                // Step might have been opened implicitly already
+                // by requireActiveStep()
+                // In that case, streamStatus is DuringStep and Adios
+                // return status is stored in m_lastStepStatus
+                if( *streamStatus != StreamStatus::DuringStep )
+                {
+                    flush();
+                    adiosStatus = getEngine().BeginStep();
+                }
+                currentStep++;
+                AdvanceStatus res = AdvanceStatus::OK;
+                switch( adiosStatus )
+                {
+                    case adios2::StepStatus::EndOfStream:
+                        *streamStatus = StreamStatus::StreamOver;
+                        res = AdvanceStatus::OVER;
+                        break;
+                    default:
+                        *streamStatus = StreamStatus::DuringStep;
+                        res = AdvanceStatus::OK;
+                        break;
+                }
+                invalidateAttributesMap();
+                invalidateVariablesMap();
+                return std::packaged_task< AdvanceStatus() >(
+                    [ res ]() { return res; } );
+            }
         }
         throw std::runtime_error(
             "Internal error: Advance mode should be explicitly"

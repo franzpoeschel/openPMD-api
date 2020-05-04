@@ -117,55 +117,97 @@ Iteration::finalized() const
     }
 }
 
-ConsumingFuture< AdvanceStatus >
-Iteration::advance( AdvanceMode mode )
+AdvanceStatus
+Iteration::beginStep()
 {
     Series & series =
         *dynamic_cast< Series * >( parent->attributable->parent->attributable );
-    if( *series.m_iterationEncoding == IterationEncoding::groupBased )
+    // Initialize file with this to quiet warnings
+    // The following switch is comprehensive
+    Attributable * file = this;
+    switch( *series.m_iterationEncoding )
     {
-        return series.advance( mode );
+        using IE = IterationEncoding;
+        case IE::fileBased:
+            file = this;
+            break;
+        case IE::groupBased:
+            file = &series;
+            break;
     }
-    auxiliary::ConsumingFuture< AdvanceStatus > future =
-        series.advance( mode, *this );
-    // capture series by reference since the destructor will issue a flush
-    // https://github.com/openPMD/openPMD-api/issues/534
-    std::packaged_task< AdvanceStatus( AdvanceStatus ) > postProcessing(
-        [this, &series]( AdvanceStatus status ) mutable {
-            if( status != AdvanceStatus::OK )
+    AdvanceStatus status = series.advance( AdvanceMode::BEGINSTEP, *file );
+    if( status != AdvanceStatus::OK )
+    {
+        return status;
+    }
+
+    // re-read -> new datasets might be available
+    if( this->IOHandler->m_frontendAccess == Access::READ_ONLY ||
+        this->IOHandler->m_frontendAccess == Access::READ_WRITE )
+    {
+        bool previous = series.iterations.written;
+        series.iterations.written = false;
+        auto oldType = this->IOHandler->m_frontendAccess;
+        auto newType =
+            const_cast< Access * >( &this->IOHandler->m_frontendAccess );
+        *newType = Access::READ_WRITE;
+        series.readGroupBased( false );
+        *newType = oldType;
+        series.iterations.written = previous;
+    }
+
+    return status;
+}
+
+void
+Iteration::endStep()
+{
+    Series & series =
+        *dynamic_cast< Series * >( parent->attributable->parent->attributable );
+    // Initialize file with this to quiet warnings
+    // The following switch is comprehensive
+    Attributable * file = this;
+    switch( *series.m_iterationEncoding )
+    {
+        using IE = IterationEncoding;
+        case IE::fileBased:
+            file = this;
+            break;
+        case IE::groupBased:
+            file = &series;
+            break;
+    }
+    // @todo filebased check
+    AdvanceStatus status = series.advance( AdvanceMode::ENDSTEP, *file );
+    if( status != AdvanceStatus::OK )
+    {
+        return;
+    }
+
+    if( *series.m_iterationEncoding == IterationEncoding::fileBased )
+    {
+        return;
+    }
+
+    // We can now put some groups to rest
+    if( this->IOHandler->m_frontendAccess == Access::CREATE ||
+        this->IOHandler->m_frontendAccess == Access::READ_WRITE )
+    {
+        for( auto & i : series.iterations )
+        {
+            if( !*i.second.isClosed && i.second.finalized() )
             {
-                return status;
+                Parameter< Operation::STALE_GROUP > fStale;
+                IOHandler->enqueue( IOTask( &i.second, std::move( fStale ) ) );
+                // In group-based iteration layout, files are
+                // not closed on a per-iteration basis
+                // We will treat it as such nonetheless
+                *i.second.isClosed = true;
             }
+        }
+    }
 
-            // re-read -> new datasets might be available
-            if( this->IOHandler->accessTypeFrontend == AccessType::READ_ONLY ||
-                this->IOHandler->accessTypeFrontend == AccessType::READ_WRITE )
-            {
-                bool previous = this->written;
-                this->written = false;
-                auto oldType = this->IOHandler->accessTypeFrontend;
-                auto newType = const_cast< AccessType * >(
-                    &this->IOHandler->accessTypeFrontend );
-                *newType = AccessType::READ_WRITE;
-
-                series.readFileBased( /* init = */ false );
-
-                *newType = oldType;
-                this->written = previous;
-            }
-
-            // If file has been finalized, it has been closed by the last flush
-
-            return status;
-        } );
-    auxiliary::ConsumingFuture< AdvanceStatus > futurePost =
-        auxiliary::chain_futures<
-            AdvanceStatus,
-            AdvanceStatus,
-            auxiliary::RunFutureNonThreaded >(
-            std::move( future ), std::move( postProcessing ) );
-    futurePost.run_as_thread();
-    return futurePost;
+    return;
 }
 
 void

@@ -722,16 +722,17 @@ namespace detail
             NoStream,
             DuringStep,
             OutsideOfStep,
-            StreamOver,
-            TemporarilyInvalid
+            StreamOver
         };
         std::shared_ptr< StreamStatus > streamStatus =
             std::make_shared< StreamStatus >( StreamStatus::NoStream );
         int mpi_rank, mpi_size;
         std::shared_ptr< adios2::Engine > m_engine;
+        std::shared_ptr< adios2::StepStatus > m_lastStepStatus =
+            std::make_shared< adios2::StepStatus >( adios2::StepStatus::OK );
 
         /*
-         * ADIOS2 does not give direct access to its internal attribute and 
+         * ADIOS2 does not give direct access to its internal attribute and
          * variable maps, but will instead give access to copies of them.
          * In order to avoid unnecessary copies, we buffer the returned map.
          * The downside of this is that we need to pay attention to invalidate
@@ -741,7 +742,7 @@ namespace detail
          * been resolved
          * If false, the buffered map has been invalidated and needs to be
          * queried from ADIOS2 again. If true, the buffered map is equivalent to
-         * the map that would be returned by a call to 
+         * the map that would be returned by a call to
          * IO::Available(Attributes|Variables).
          */
         bool m_availableAttributesValid = false;

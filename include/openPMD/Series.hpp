@@ -317,9 +317,6 @@ public:
     std::future< void >
     flush();
 
-    ConsumingFuture< AdvanceStatus > advance(
-        AdvanceMode = AdvanceMode::AUTO );
-
     Container< Iteration, uint64_t > iterations;
 
 OPENPMD_private:
@@ -333,10 +330,13 @@ OPENPMD_private:
     void flushParticlesPath();
     void readFileBased( bool init = true );
     void readGroupBased( bool init = true );
-    void readBase();
-    void read();
-    std::string iterationFilename(uint64_t i);
-    auxiliary::ConsumingFuture< AdvanceStatus >
+    void
+    readBase();
+    void
+    read();
+    std::string
+    iterationFilename( uint64_t i );
+    AdvanceStatus
     advance( AdvanceMode, Attributable & file );
 
     static constexpr char const * const BASEPATH = "/data/%T/";
