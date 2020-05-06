@@ -23,20 +23,22 @@ enum class AdvanceMode
     ENDSTEP
 };
 
-struct ChunkTable
+struct Chunk
 {
-    using T_chunk = std::pair< Offset, Extent >;
-    using T_perRank = std::list< T_chunk >;
-    using T_chunkTable = std::map< int, T_perRank >;
+    Offset offset;
+    Extent extent;
+    int rank;
 
-    T_chunkTable chunkTable;
+    Chunk( Offset, Extent, int rank );
+};
 
-    using T_sizedChunk = std::pair< T_chunk, size_t >;
+struct ChunkTable : std::vector< Chunk >
+{
+    using T_sizedChunk = std::pair< Chunk, size_t >;
     std::vector< T_sizedChunk > splitToSizeSorted( size_t ) const;
 };
 
-using Chunk = ChunkTable::T_chunk;
-using ChunkList = ChunkTable::T_perRank;
+// using ChunkList = ChunkTable::T_perRank;
 
 namespace chunk_assignment
 {

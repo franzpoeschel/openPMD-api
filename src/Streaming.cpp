@@ -4,64 +4,69 @@
 #include <iostream>
 #include <map>
 #include <unistd.h>
+#include <utility> // std::move
 
 #include "openPMD/Dataset.hpp"
 
 namespace openPMD
 {
+Chunk::Chunk( Offset _offset, Extent _extent, int _rank )
+    : offset{ std::move( _offset ) },
+      extent{ std::move( _extent ) },
+      rank{ _rank }
+{
+}
+
 std::vector< ChunkTable::T_sizedChunk >
 ChunkTable::splitToSizeSorted( size_t maxSize ) const
 {
     constexpr size_t dimension = 0;
     std::vector< T_sizedChunk > res;
-    for( auto const & perRank : chunkTable )
+    for( auto const & chunk : *this )
     {
-        for( auto const & chunk : perRank.second )
+        auto const & extent = chunk.extent;
+        size_t sliceSize = 1;
+        for( size_t i = 0; i < extent.size(); ++i )
         {
-            auto const & extent = chunk.second;
-            size_t sliceSize = 1;
-            for( size_t i = 0; i < extent.size(); ++i )
+            if( i == dimension )
             {
-                if( i == dimension )
-                {
-                    continue;
-                }
-                sliceSize *= extent[ i ];
-            }
-            if( sliceSize == 0 )
-            {
-                std::cerr << "Chunktable::splitToSizeSorted: encountered "
-                             "zero-sized chunk" << std::endl;
                 continue;
             }
+            sliceSize *= extent[ i ];
+        }
+        if( sliceSize == 0 )
+        {
+            std::cerr << "Chunktable::splitToSizeSorted: encountered "
+                            "zero-sized chunk" << std::endl;
+            continue;
+        }
 
-            // this many slices go in one packet before it exceeds the max size
-            size_t streakLength = maxSize / sliceSize;
-            if( streakLength == 0 )
+        // this many slices go in one packet before it exceeds the max size
+        size_t streakLength = maxSize / sliceSize;
+        if( streakLength == 0 )
+        {
+            // otherwise we get caught in an endless loop
+            ++streakLength;
+        }
+        size_t const slicedDimensionExtent = extent[ dimension ];
+
+        for( size_t currentPosition = 0;; currentPosition += streakLength )
+        {
+            Chunk newChunk = chunk;
+            newChunk.offset[ dimension ] += currentPosition;
+            if( currentPosition + streakLength >= slicedDimensionExtent )
             {
-                // otherwise we get caught in an endless loop
-                ++streakLength;
+                newChunk.extent[ dimension ] =
+                    slicedDimensionExtent - currentPosition;
+                size_t chunkSize = newChunk.extent[ dimension ] * sliceSize;
+                res.emplace_back( std::move( newChunk ), chunkSize );
+                break;
             }
-            size_t const slicedDimensionExtent = extent[ dimension ];
-
-            for( size_t currentPosition = 0;; currentPosition += streakLength )
+            else
             {
-                T_chunk newChunk = chunk;
-                newChunk.first[ dimension ] += currentPosition;
-                if( currentPosition + streakLength >= slicedDimensionExtent )
-                {
-                    newChunk.second[ dimension ] =
-                        slicedDimensionExtent - currentPosition;
-                    size_t chunkSize = newChunk.second[ dimension ] * sliceSize;
-                    res.emplace_back( std::move( newChunk ), chunkSize );
-                    break;
-                }
-                else
-                {
-                    newChunk.second[ dimension ] = streakLength;
-                    res.emplace_back(
-                        std::move( newChunk ), streakLength * sliceSize );
-                }
+                newChunk.extent[ dimension ] = streakLength;
+                res.emplace_back(
+                    std::move( newChunk ), streakLength * sliceSize );
             }
         }
     }
@@ -71,20 +76,20 @@ ChunkTable::splitToSizeSorted( size_t maxSize ) const
         []( T_sizedChunk const & left, T_sizedChunk const & right ) {
             return right.second < left.second; // decreasing order
         } );
-    for( auto const & chunk : res )
-    {
-        std::cout << chunk.second << "\t";
-        for( auto offs : chunk.first.first )
-        {
-            std::cout << offs << ", ";
-        }
-        std::cout << "\t";
-        for( auto ext : chunk.first.second )
-        {
-            std::cout << ext << ", ";
-        }
-        std::cout << std::endl;
-    }
+    // for( auto const & chunk : res )
+    // {
+    //     std::cout << chunk.second << "\t";
+    //     for( auto offs : chunk.first.offset )
+    //     {
+    //         std::cout << offs << ", ";
+    //     }
+    //     std::cout << "\t";
+    //     for( auto ext : chunk.first.extent )
+    //     {
+    //         std::cout << ext << ", ";
+    //     }
+    //     std::cout << std::endl;
+    // }
     return res;
 }
 
@@ -99,17 +104,14 @@ namespace chunk_assignment
             ChunkTable & sinkChunks )
         {
             size_t totalExtent = 0;
-            for( auto const & perRank : sourceChunks.chunkTable )
+            for( auto const & chunk : sourceChunks )
             {
-                for( auto const & chunk : perRank.second )
+                size_t chunkExtent = 1;
+                for( auto ext : chunk.extent )
                 {
-                    size_t chunkExtent = 1;
-                    for( auto ext : chunk.second )
-                    {
-                        chunkExtent *= ext;
-                    }
-                    totalExtent += chunkExtent;
+                    chunkExtent *= ext;
                 }
+                totalExtent += chunkExtent;
             }
             size_t const idealSize = totalExtent / destinationRanks.size();
             std::vector< ChunkTable::T_sizedChunk > digestibleChunks =
@@ -121,21 +123,27 @@ namespace chunk_assignment
                            idealSize]() {
                 for( auto destRank : destinationRanks )
                 {
-                    auto & perRank = sinkChunks.chunkTable[ destRank ];
                     size_t leftoverSize = idealSize;
                     {
                         auto it = digestibleChunks.begin();
                         while( it != digestibleChunks.end() )
                         {
+                            // should only be ==
+                            // big chunks always come first in digestibleChunks
+                            // so we need not check whether they fit
                             if( it->second >= idealSize )
                             {
-                                perRank.emplace_back( std::move( it->first ) );
+                                it->first.rank = destRank;
+                                sinkChunks.emplace_back(
+                                    std::move( it->first ) );
                                 digestibleChunks.erase( it );
                                 break;
                             }
                             else if( it->second <= leftoverSize )
                             {
-                                perRank.emplace_back( std::move( it->first ) );
+                                it->first.rank = destRank;
+                                sinkChunks.emplace_back(
+                                    std::move( it->first ) );
                                 leftoverSize -= it->second;
                                 it = digestibleChunks.erase( it );
                             }
@@ -165,7 +173,7 @@ namespace chunk_assignment
             ChunkTable & sinkChunks )
         {
             auto it = destinationRanks.begin();
-            auto nextRank = [&it, &destinationRanks]() {
+            auto nextRank = [ &it, &destinationRanks ]() {
                 if( it == destinationRanks.end() )
                 {
                     it = destinationRanks.begin();
@@ -174,13 +182,10 @@ namespace chunk_assignment
                 it++;
                 return res;
             };
-            for( auto const & pair : sourceChunks.chunkTable )
+            for( auto chunk : sourceChunks )
             {
-                for( auto chunk : pair.second )
-                {
-                    sinkChunks.chunkTable[ nextRank() ].push_back(
-                        std::move( chunk ) );
-                }
+                chunk.rank = nextRank();
+                sinkChunks.push_back( std::move( chunk ) );
             }
             return sinkChunks;
         }
@@ -220,29 +225,28 @@ namespace chunk_assignment
                 std::cerr << "Rank " << mpi_rank
                           << " does not participate in chunk mapping."
                           << std::endl;
+                return result;
             }
-            auto & onMyRank = result.chunkTable[ mapped_rank ];
             Offset myOffset;
             Extent myExtent;
             std::tie( myOffset, myExtent ) = blockSlicer->sliceBlock(
                 totalExtent, mapped_size, mapped_rank );
 
-            for( auto const & perRank : sourceChunks.chunkTable )
+            for( auto chunk : sourceChunks )
             {
-                for( auto chunk : perRank.second )
+                restrictToSelection(
+                    chunk.offset, chunk.extent, myOffset, myExtent );
+                for( auto ext : chunk.extent )
                 {
-                    restrictToSelection(
-                        chunk.first, chunk.second, myOffset, myExtent );
-                    for( auto ext : chunk.second )
+                    if( ext == 0 )
                     {
-                        if( ext == 0 )
-                        {
-                            goto outer_loop;
-                        }
+                        // poor man's labeled continue
+                        goto outer_loop;
                     }
-                    onMyRank.push_back( std::move( chunk ) );
-                outer_loop:;
                 }
+                chunk.rank = mpi_rank;
+                result.push_back( std::move( chunk ) );
+            outer_loop:;
             }
             return result;
         }
@@ -274,15 +278,11 @@ namespace chunk_assignment
         {
             std::unordered_map< std::string, ChunkTable > chunkGroups;
             FirstPass::Result res;
-            for( auto const & pair : table.chunkTable )
+            for( auto chunk : table )
             {
-                std::string hostname = metaIn[ pair.first ];
+                std::string hostname = metaIn[ chunk.rank ];
                 auto & hostTable = chunkGroups[ hostname ];
-                for( auto chunk : pair.second )
-                {
-                    hostTable.chunkTable[ pair.first ].emplace_back(
-                        std::move( chunk ) );
-                }
+                hostTable.emplace_back( std::move( chunk ) );
             }
             // chunkGroups will now contain chunks by hostname
             // the ranks are the source ranks
@@ -296,10 +296,9 @@ namespace chunk_assignment
                 auto it = ranksPerHostSink.find( chunkGroup.first );
                 if( it == ranksPerHostSink.end() || it->second.empty() )
                 {
-                    for( auto & chunksPerRank : chunkGroup.second.chunkTable )
+                    for( auto & chunk : chunkGroup.second )
                     {
-                        res.leftOver.chunkTable[ chunksPerRank.first ] =
-                            chunksPerRank.second;
+                        res.leftOver.push_back( chunk );
                     }
                 }
                 else

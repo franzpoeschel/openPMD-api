@@ -1223,10 +1223,8 @@ namespace detail
         {
             Offset offset = info.Start;
             Extent extent = info.Count;
-            params.chunks->chunkTable[ info.WriterID ]
-                .emplace_back(
-                    std::make_pair< Offset, Extent >(
-                        std::move( offset ), std::move( extent ) ) );
+            params.chunks->emplace_back( Chunk{
+                std::move( offset ), std::move( extent ), info.WriterID } );
         }
     }
 

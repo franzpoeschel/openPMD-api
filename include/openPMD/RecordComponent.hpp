@@ -223,7 +223,7 @@ public:
     std::list< TaggedChunk< T > >
     loadChunksContiguous(
         Fun provideBuffer,
-        ChunkList chunks,
+        std::vector< Chunk > chunks,
         double targetUnitSI = std::numeric_limits< double >::quiet_NaN() );
 
     template< typename T >
@@ -402,34 +402,27 @@ RecordComponent::loadAvailableChunks(
 {
     ChunkTable table = availableChunks();
     std::list< TaggedChunk< T > > res;
-    for( auto & perRank : table.chunkTable )
+    for( auto & chunk : table )
     {
-        for( auto & chunk : perRank.second )
+        auto offset = std::move( chunk.offset );
+        auto extent = std::move( chunk.extent );
+        restrictToSelection( offset, extent, withinOffset, withinExtent );
+        bool load = true;
+        for( auto ext : extent )
         {
-            Offset offset;
-            Extent extent;
-            std::tie( offset, extent ) = chunk;
-            restrictToSelection( offset, extent, withinOffset, withinExtent );
-            bool load = true;
-            for ( auto ext : extent )
+            if( ext == 0 )
             {
-                if ( ext == 0 )
-                {
-                    // nothing to load
-                    load = false;
-                }
+                // nothing to load
+                load = false;
             }
-            if ( !load )
-            {
-                continue;
-            }
-            auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
-            res.push_back(
-                TaggedChunk< T >(
-                    std::move( offset ),
-                    std::move( extent ),
-                    std::move( ptr ) ) );
         }
+        if( !load )
+        {
+            continue;
+        }
+        auto ptr = loadChunk< T >( offset, extent, targetUnitSI );
+        res.push_back( TaggedChunk< T >(
+            std::move( offset ), std::move( extent ), std::move( ptr ) ) );
     }
     return res;
 }
@@ -444,59 +437,53 @@ RecordComponent::loadAvailableChunksContiguous(
 {
     ChunkTable table = availableChunks();
     std::list< Chunk > loadTheseChunks;
-    for( auto & perRank : table.chunkTable )
+    for( auto chunk : table )
     {
-        for( auto chunk : perRank.second )
+        Offset offset = std::move( chunk.offset );
+        Extent extent = std::move( chunk.extent );
+        restrictToSelection( offset, extent, withinOffset, withinExtent );
+        bool load = true;
+        for( auto ext : extent )
         {
-            Offset offset = std::move( chunk.first );
-            Extent extent = std::move( chunk.second );
-            restrictToSelection( offset, extent, withinOffset, withinExtent );
-            bool load = true;
-            for ( auto ext : extent )
+            if( ext == 0 )
             {
-                if ( ext == 0 )
-                {
-                    // nothing to load
-                    load = false;
-                }
+                // nothing to load
+                load = false;
             }
-            if ( load )
-            {
-                loadTheseChunks.push_back(
-                    Chunk( std::move( offset ), std::move( extent ) ) );
-            }
+        }
+        if( load )
+        {
+            loadTheseChunks.push_back(
+                Chunk( std::move( offset ), std::move( extent ) ) );
         }
     }
     return loadChunksContiguous< T, Fun & >(
-        provideBuffer,
-        std::move( loadTheseChunks ),
-        targetUnitSI );
+        provideBuffer, std::move( loadTheseChunks ), targetUnitSI );
 }
 
 template< typename T, typename Fun >
 std::list< TaggedChunk< T > >
 RecordComponent::loadChunksContiguous(
     Fun provideBuffer,
-    ChunkList chunks,
+    std::vector< Chunk > chunks,
     double targetUnitSI )
 {
     std::list< TaggedChunk< T > > res;
     for( auto & chunk : chunks )
     {
-        auto ptr = provideBuffer( chunk.first, chunk.second );
-        loadChunk< T >( ptr, chunk.first, chunk.second, targetUnitSI );
-        res.push_back(
-            TaggedChunk< T >(
-                std::move( chunk.first ),
-                std::move( chunk.second ),
-                std::move( ptr ) ) );
+        auto ptr = provideBuffer( chunk.offset, chunk.extent );
+        loadChunk< T >( ptr, chunk.offset, chunk.extent, targetUnitSI );
+        res.push_back( TaggedChunk< T >(
+            std::move( chunk.offset ),
+            std::move( chunk.extent ),
+            std::move( ptr ) ) );
     }
     return res;
 }
 
 template< typename T >
 inline void
-RecordComponent::storeChunk(std::shared_ptr<T> data, Offset o, Extent e)
+RecordComponent::storeChunk( std::shared_ptr< T > data, Offset o, Extent e )
 {
     if( constant() )
         throw std::runtime_error("Chunks cannot be written for a constant RecordComponent.");
