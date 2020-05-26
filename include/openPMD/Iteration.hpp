@@ -20,10 +20,13 @@
  */
 #pragma once
 
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
+#include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/Streaming.hpp"
 
 
 namespace openPMD
@@ -41,6 +44,8 @@ class Iteration : public Attributable
     >
     friend class Container;
     friend class Series;
+    friend class WriteIterations;
+    friend class SeriesIterator;
 
 public:
     Iteration(Iteration const&);
@@ -125,6 +130,26 @@ public:
     bool
     closedByWriter() const;
 
+    /**
+     * @brief Begin an IO step on the IO file (or file-like object)
+     *        containing this iteration. In case of group-based iteration
+     *        layout, this will be the complete Series.
+     * 
+     * @return AdvanceStatus 
+     */
+    AdvanceStatus
+    beginStep();
+
+    /**
+     * @brief End an IO step on the IO file (or file-like object)
+     *        containing this iteration. In case of group-based iteration
+     *        layout, this will be the complete Series.
+     * 
+     * @return AdvanceStatus 
+     */
+    void
+    endStep();
+
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
 
@@ -155,9 +180,38 @@ private:
      * but not necessarily yet in the backend.
      * Will be propagated to the backend upon next flush.
      * Store the current status.
+     * Once an iteration has been closed, no further flushes shall be performed.
+     * If flushing a closed file, the old file may otherwise be overwritten.
      */
     std::shared_ptr< CloseStatus > m_closed =
         std::make_shared< CloseStatus >( CloseStatus::Open );
+
+    /**
+     * Steps may be opened manually or automatically.
+     * If opened automatically, they should close
+     * automatically upon Iteration::close.
+     * Used for file-based iteration layout, see Series.hpp for
+     * group-based layout.
+     */
+    std::shared_ptr< StepStatus > m_stepStatus =
+        std::make_shared< StepStatus >( StepStatus::NoStep );
+
+    /*
+     * We cannot give the return type yet, since Iteration is still an
+     * incomplete type.
+     * It's decltype(Series::iterations)::iterator.
+     */
+    template< typename Iterator >
+    Iterator myIteration( );
+
+    /**
+     * @brief Has a step been opened automatically? Returns a pointer to the
+     * corresponding flag. Either this iteration's flag if file-based layout is
+     * being used, or the complete Series' flag for group-based layout.
+     *
+     */
+    StepStatus *
+    stepStatus();
 
     /*
      * @brief Check recursively whether this Iteration is dirty.
@@ -171,7 +225,7 @@ private:
     dirtyRecursive() const;
 
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
-};  // Iteration
+};  //Iteration
 
 extern template
 float
@@ -207,4 +261,4 @@ template< typename T >
 inline T
 Iteration::dt() const
 { return Attributable::readFloatingpoint< T >("dt"); }
-} // openPMD
+} // namespace openPMD

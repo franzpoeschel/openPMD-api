@@ -1232,7 +1232,7 @@ class APITest(unittest.TestCase):
     def makeCloseIterationRoundTrip(self, backend, file_ending):
         # write
         series = io.Series(
-            "unittest_closeIteration_%T." + file_ending,
+            "../samples/unittest_closeIteration_%T." + file_ending,
             io.Access_Type.create
         )
         DS = io.Dataset
@@ -1247,7 +1247,7 @@ class APITest(unittest.TestCase):
 
         if backend != 'adios1':
             read = io.Series(
-                "unittest_closeIteration_%T." + file_ending,
+                "../samples/unittest_closeIteration_%T." + file_ending,
                 io.Access_Type.read_only
             )
             it0 = read.iterations[0]
@@ -1268,7 +1268,7 @@ class APITest(unittest.TestCase):
 
         if backend != 'adios1':
             read = io.Series(
-                "unittest_closeIteration_%T." + file_ending,
+                "../samples/unittest_closeIteration_%T." + file_ending,
                 io.Access_Type.read_only
             )
             it1 = read.iterations[1]
@@ -1291,6 +1291,66 @@ class APITest(unittest.TestCase):
         for b in io.variants:
             if io.variants[b] is True and b in backend_filesupport:
                 self.makeCloseIterationRoundTrip(b, backend_filesupport[b])
+
+    def makeIteratorRoundTrip(self, backend, file_ending):
+        # write
+        jsonConfig = """
+{
+  "adios2": {
+    "engine": {
+      "type": "bp4",
+      "usesteps": true
+    }
+  }
+}
+"""
+        series = io.Series(
+            "../samples/unittest_serialIterator." + file_ending,
+            io.Access_Type.create,
+            jsonConfig
+        )
+        DS = io.Dataset
+        data = np.array([2, 4, 6, 8], dtype=np.dtype("int"))
+        extent = [4]
+
+        for i in range(10):
+            it = series.write_iterations()[i]
+            E_x = it.meshes["E"]["x"]
+            E_x.reset_dataset(DS(np.dtype("int"), extent))
+            E_x.store_chunk(data, [0], extent)
+            it.close()
+            del it
+
+        del series
+
+        # read
+
+        read = io.Series(
+            "../samples/unittest_serialIterator." + file_ending,
+            io.Access_Type.read_only,
+            jsonConfig
+        )
+        for it in read.read_iterations():
+            lastIterationIndex = it.iteration_index
+            E_x = it.meshes["E"]["x"]
+            chunk = E_x.load_chunk([0], extent)
+            it.close()
+
+            for i in range(len(data)):
+                self.assertEqual(data[i], chunk[i])
+        del read
+        self.assertEqual(lastIterationIndex, 9)
+
+    def testIterator(self):
+        backend_filesupport = {
+            'json': 'json',
+            'hdf5': 'h5',
+            'adios1': 'bp',
+            'adios2': 'bp'
+        }
+        for b in io.variants:
+            if io.variants[b] is True and b in backend_filesupport:
+                self.makeIteratorRoundTrip(b, backend_filesupport[b])
 
 
 if __name__ == '__main__':

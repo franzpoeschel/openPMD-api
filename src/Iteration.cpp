@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
-
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Series.hpp"
@@ -41,11 +40,12 @@ Iteration::Iteration()
     setTimeUnitSI(1);
 }
 
-Iteration::Iteration(Iteration const& i)
-        : Attributable{i},
-          meshes{i.meshes},
-          particles{i.particles},
-          m_closed{i.m_closed}
+Iteration::Iteration( Iteration const & i )
+    : Attributable{ i },
+      meshes{ i.meshes },
+      particles{ i.particles },
+      m_closed{ i.m_closed },
+      m_stepStatus{ i.m_stepStatus }
 {
     IOHandler = i.IOHandler;
     parent = i.parent;
@@ -63,6 +63,7 @@ Iteration& Iteration::operator=(Iteration const& i)
     IOHandler = i.IOHandler;
     parent = i.parent;
     m_closed = i.m_closed;
+    m_stepStatus = i.m_stepStatus;
     meshes.IOHandler = IOHandler;
     meshes.parent = this->m_writable.get();
     particles.IOHandler = IOHandler;
@@ -103,6 +104,8 @@ Iteration::setTimeUnitSI(double newTimeUnitSI)
     return *this;
 }
 
+using iterator_t = Container< Iteration, uint64_t >::iterator;
+
 Iteration &
 Iteration::close( bool _flush )
 {
@@ -111,39 +114,34 @@ Iteration::close( bool _flush )
     {
         setAttribute< bool_type >( "closed", 1u );
     }
+    StepStatus * flag = stepStatus();
     *m_closed = CloseStatus::ClosedInFrontend;
     if( _flush )
     {
-        Series * s = &auxiliary::deref_dynamic_cast< Series >(
-            parent->attributable->parent->attributable );
-        // figure out my iteration number
-        uint64_t index;
-        bool found = false;
-        for( auto const & pair : s->iterations )
+        if( *flag == StepStatus::DuringStep )
         {
-            if( pair.second.m_writable.get() == this->m_writable.get() )
-            {
-                found = true;
-                index = pair.first;
-                break;
-            }
+            endStep();
+            *flag = StepStatus::NoStep;
         }
-        if( !found )
+        else
         {
-            throw std::runtime_error(
-                "[Iteration::close] Iteration not found in Series." );
+            // flush things manually
+            Series * s = &auxiliary::deref_dynamic_cast< Series >(
+                parent->attributable->parent->attributable );
+            // figure out my iteration number
+            auto begin = myIteration< iterator_t >();
+            auto end = begin;
+            ++end;
+
+            s->flush_impl( begin, end );
         }
-        std::map< uint64_t, Iteration > flushOnlyThisIteration{
-            { index, *this } };
-        switch( *s->m_iterationEncoding )
+    }
+    else
+    {
+        if( *flag == StepStatus::DuringStep )
         {
-            using IE = IterationEncoding;
-            case IE::fileBased:
-                s->flushFileBased( flushOnlyThisIteration );
-                break;
-            case IE::groupBased:
-                s->flushGroupBased( flushOnlyThisIteration );
-                break;
+            throw std::runtime_error( "Using deferred Iteration::close "
+                                      "unimplemented in auto-stepping mode." );
         }
     }
     return *this;
@@ -169,13 +167,81 @@ Iteration::closedByWriter() const
     }
 }
 
+AdvanceStatus
+Iteration::beginStep()
+{
+    using IE = IterationEncoding;
+    Series & series =
+        *dynamic_cast< Series * >( parent->attributable->parent->attributable );
+    // Initialize file with this to quiet warnings
+    // The following switch is comprehensive
+    Attributable * file = this;
+    switch( *series.m_iterationEncoding )
+    {
+        case IE::fileBased:
+            file = this;
+            break;
+        case IE::groupBased:
+            file = &series;
+            break;
+    }
+    AdvanceStatus status = series.advance(
+        AdvanceMode::BEGINSTEP, *file, myIteration< iterator_t >(), *this );
+    if( status != AdvanceStatus::OK )
+    {
+        return status;
+    }
+
+    // re-read -> new datasets might be available
+    if( *series.m_iterationEncoding == IE::groupBased &&
+        ( this->IOHandler->m_frontendAccess == Access::READ_ONLY ||
+          this->IOHandler->m_frontendAccess == Access::READ_WRITE ) )
+    {
+        bool previous = series.iterations.written;
+        series.iterations.written = false;
+        auto oldType = this->IOHandler->m_frontendAccess;
+        auto newType =
+            const_cast< Access * >( &this->IOHandler->m_frontendAccess );
+        *newType = Access::READ_WRITE;
+        series.readGroupBased( false );
+        *newType = oldType;
+        series.iterations.written = previous;
+    }
+
+    return status;
+}
+
+void
+Iteration::endStep()
+{
+    using IE = IterationEncoding;
+    Series & series =
+        *dynamic_cast< Series * >( parent->attributable->parent->attributable );
+    // Initialize file with this to quiet warnings
+    // The following switch is comprehensive
+    Attributable * file = this;
+    switch( *series.m_iterationEncoding )
+    {
+        case IE::fileBased:
+            file = this;
+            break;
+        case IE::groupBased:
+            file = &series;
+            break;
+    }
+    // @todo filebased check
+    series.advance(
+        AdvanceMode::ENDSTEP, *file, myIteration< iterator_t >(), *this );
+}
+
 void
 Iteration::flushFileBased(std::string const& filename, uint64_t i)
 {
+    Series * s =
+        dynamic_cast< Series * >( parent->attributable->parent->attributable );
     if( !written )
     {
         /* create file */
-        auto s = dynamic_cast< Series* >(parent->attributable->parent->attributable);
         Parameter< Operation::CREATE_FILE > fCreate;
         fCreate.name = filename;
         IOHandler->enqueue(IOTask(s, fCreate));
@@ -194,7 +260,6 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
         if((IOHandler->m_frontendAccess == Access::CREATE ) &&
            ( (IOHandler->backendName() == "MPI_ADIOS1") || (IOHandler->backendName() == "ADIOS1") ) )
         {
-            auto s = dynamic_cast< Series* >(parent->attributable->parent->attributable);
             Parameter< Operation::OPEN_FILE > fOpen;
             fOpen.name = filename;
             IOHandler->enqueue(IOTask(s, fOpen));
@@ -205,7 +270,6 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
 
         // operations for read/read-write mode
         /* open file */
-        auto s = dynamic_cast< Series* >(parent->attributable->parent->attributable);
         Parameter< Operation::OPEN_FILE > fOpen;
         fOpen.name = filename;
         IOHandler->enqueue(IOTask(s, fOpen));
@@ -431,6 +495,45 @@ Iteration::read()
     readAttributes();
 }
 
+template< typename Iterator >
+Iterator
+Iteration::myIteration()
+{
+    Series * s =
+        dynamic_cast< Series * >( parent->attributable->parent->attributable );
+    for( auto it = s->iterations.begin(); it != s->iterations.end(); ++it )
+    {
+        if( it->second.m_writable.get() == this->m_writable.get() )
+        {
+            return it;
+        }
+    }
+    throw std::runtime_error(
+        "[Iteration::close] Iteration not found in Series." );
+}
+
+
+StepStatus *
+Iteration::stepStatus()
+{
+    Series * s =
+        dynamic_cast< Series * >( parent->attributable->parent->attributable );
+    StepStatus * flag = nullptr;;
+    switch( *s->m_iterationEncoding )
+    {
+        using IE = IterationEncoding;
+        case IE::fileBased:
+            flag = &*this->m_stepStatus;
+            break;
+        case IE::groupBased:
+            flag = &*s->m_stepStatus;
+            break;
+        default:
+            throw std::runtime_error( "[Iteration] unreachable" );
+    }
+    return flag;
+}
+
 bool
 Iteration::dirtyRecursive() const
 {
@@ -463,15 +566,15 @@ Iteration::linkHierarchy(std::shared_ptr< Writable > const& w)
     particles.linkHierarchy(m_writable);
 }
 
-template float
-Iteration::time< float >() const;
-template double
-Iteration::time< double >() const;
-template long double
-Iteration::time< long double >() const;
+template
+float Iteration::time< float >() const;
+template
+double Iteration::time< double >() const;
+template
+long double Iteration::time< long double >() const;
 
-template float
-Iteration::dt< float >() const;
+template
+float Iteration::dt< float >() const;
 template
 double Iteration::dt< double >() const;
 template
@@ -490,4 +593,4 @@ template
 Iteration& Iteration::setDt< double >(double dt);
 template
 Iteration& Iteration::setDt< long double >(long double dt);
-} // openPMD
+} // namespace openPMD

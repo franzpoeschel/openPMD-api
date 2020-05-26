@@ -111,7 +111,11 @@ namespace detail
         size_t operator( )( Params &&... );
     };
 
-    Datatype attributeInfo( adios2::IO &, std::string const & attributeName );
+    Datatype
+    attributeInfo(
+        adios2::IO &,
+        std::string const & attributeName,
+        bool verbose );
 } // namespace detail
 
 } // namespace openPMD

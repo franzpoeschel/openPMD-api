@@ -44,6 +44,7 @@ auto const backends = getBackends();
 
 TEST_CASE( "multi_series_test", "[serial]" )
 {
+    std::cout << "STARTING TEST: multi_series_test" << std::endl;
     std::list< Series > allSeries;
 
     using StrBoolTuple = std::tuple< std::string, bool >;
@@ -175,12 +176,14 @@ TEST_CASE( "close_iteration_test", "[serial]" )
 #if openPMD_HAVE_ADIOS2
 TEST_CASE( "close_iteration_throws_test", "[serial" )
 {
+    std::cout << "STARTING TEST: close_iteration_throws_test" << std::endl;
     /*
      * Iterations should not be accessed any more after closing.
      * Test that the openPMD API detects that case and throws.
      */
     {
-        Series series( "close_iteration_throws_1.bp", Access::CREATE );
+        Series series(
+            "../samples/close_iteration_throws_1.bp", Access::CREATE );
         auto it0 = series.iterations[ 0 ];
         auto E_x = it0.meshes[ "E" ][ "x" ];
         E_x.resetDataset( { Datatype::INT, { 5 } } );
@@ -194,7 +197,8 @@ TEST_CASE( "close_iteration_throws_test", "[serial" )
         REQUIRE_THROWS( series.flush() );
     }
     {
-        Series series( "close_iteration_throws_2.bp", Access::CREATE );
+        Series series(
+            "../samples/close_iteration_throws_2.bp", Access::CREATE );
         auto it0 = series.iterations[ 0 ];
         auto E_x = it0.meshes[ "E" ][ "x" ];
         E_x.resetDataset( { Datatype::INT, { 5 } } );
@@ -208,7 +212,8 @@ TEST_CASE( "close_iteration_throws_test", "[serial" )
         REQUIRE_THROWS( series.flush() );
     }
     {
-        Series series( "close_iteration_throws_3.bp", Access::CREATE );
+        Series series(
+            "../samples/close_iteration_throws_3.bp", Access::CREATE );
         auto it0 = series.iterations[ 0 ];
         auto E_x = it0.meshes[ "E" ][ "x" ];
         E_x.resetDataset( { Datatype::INT, { 5 } } );
@@ -1388,11 +1393,13 @@ void optional_paths_110_test(const std::string & backend)
 #if openPMD_HAVE_HDF5
 TEST_CASE( "optional_paths_110_test", "[serial]" )
 {
+    std::cout << "STARTING TEST: optional_paths_110_test" << std::endl;
     optional_paths_110_test("h5"); // samples only present for hdf5
 }
 
 TEST_CASE( "git_hdf5_sample_structure_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: git_hdf5_sample_structure_test" << std::endl;
 #if openPMD_USE_INVASIVE_TESTS
     try
     {
@@ -1447,6 +1454,7 @@ TEST_CASE( "git_hdf5_sample_structure_test", "[serial][hdf5]" )
 
 TEST_CASE( "git_hdf5_sample_attribute_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: git_hdf5_sample_attribute_test" << std::endl;
     try
     {
         Series o = Series("../samples/git-sample/data%T.h5", Access::READ_ONLY);
@@ -1696,6 +1704,7 @@ TEST_CASE( "git_hdf5_sample_attribute_test", "[serial][hdf5]" )
 
 TEST_CASE( "git_hdf5_sample_content_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: git_hdf5_sample_content_test" << std::endl;
     try
     {
         Series o = Series("../samples/git-sample/data%T.h5", Access::READ_ONLY);
@@ -1746,6 +1755,7 @@ TEST_CASE( "git_hdf5_sample_content_test", "[serial][hdf5]" )
 
 TEST_CASE( "git_hdf5_sample_fileBased_read_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: git_hdf5_sample_fileBased_read_test" << std::endl;
     try
     {
         Series o = Series("../samples/git-sample/data%T.h5", Access::READ_ONLY);
@@ -1830,6 +1840,7 @@ TEST_CASE( "git_hdf5_sample_fileBased_read_test", "[serial][hdf5]" )
 
 TEST_CASE( "git_hdf5_sample_read_thetaMode", "[serial][hdf5][thetaMode]" )
 {
+    std::cout << "STARTING TEST: git_hdf5_sample_read_thetaMode" << std::endl;
     try
     {
         Series o = Series("../samples/git-sample/thetaMode/data%T.h5", Access::READ_ONLY);
@@ -1895,6 +1906,7 @@ TEST_CASE( "git_hdf5_sample_read_thetaMode", "[serial][hdf5][thetaMode]" )
 
 TEST_CASE( "hzdr_hdf5_sample_content_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: hzdr_hdf5_sample_content_test" << std::endl;
     // since this file might not be publicly available, gracefully handle errors
     try
     {
@@ -2331,21 +2343,25 @@ TEST_CASE( "hzdr_hdf5_sample_content_test", "[serial][hdf5]" )
 
 TEST_CASE( "hdf5_bool_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: hdf5_bool_test" << std::endl;
     bool_test("h5");
 }
 
 TEST_CASE( "hdf5_patch_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: hdf5_patch_test" << std::endl;
     patch_test("h5");
 }
 
 TEST_CASE( "hdf5_deletion_test", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: hdf5_deletion_test" << std::endl;
     deletion_test("h5");
 }
 #else
 TEST_CASE( "no_serial_hdf5", "[serial][hdf5]" )
 {
+    std::cout << "STARTING TEST: no_serial_hdf5" << std::endl;
     REQUIRE(true);
 }
 #endif
@@ -2353,6 +2369,7 @@ TEST_CASE( "no_serial_hdf5", "[serial][hdf5]" )
 
 TEST_CASE( "hzdr_adios1_sample_content_test", "[serial][adios1]" )
 {
+    std::cout << "STARTING TEST: hzdr_adios1_sample_content_test" << std::endl;
     // since this file might not be publicly available, gracefully handle errors
     /** @todo add bp example files to https://github.com/openPMD/openPMD-example-datasets */
     try
@@ -2515,6 +2532,7 @@ TEST_CASE( "hzdr_adios1_sample_content_test", "[serial][adios1]" )
 #else
 TEST_CASE( "no_serial_adios1", "[serial][adios]")
 {
+    std::cout << "STARTING TEST: no_serial_adios1" << std::endl;
     REQUIRE(true);
 }
 #endif
@@ -2522,6 +2540,7 @@ TEST_CASE( "no_serial_adios1", "[serial][adios]")
 #if openPMD_HAVE_ADIOS2
 TEST_CASE( "serial_adios2_json_config", "[serial][adios2]" )
 {
+    std::cout << "STARTING TEST: serial_adios2_json_config" << std::endl;
     if( auxiliary::getEnvString( "OPENPMD_BP_BACKEND", "NOT_SET" ) == "ADIOS1" )
     {
         // run this test for ADIOS2 only
@@ -2634,4 +2653,191 @@ TEST_CASE( "serial_adios2_json_config", "[serial][adios2]" )
     read( "../samples/jsonConfiguredBP3.bp", readConfigBP3 );
     read( "../samples/jsonConfiguredBP4.bp", readConfigBP4 );
 }
+
+void
+bp4_steps( std::string const & file, std::string const & options_write, std::string const & options_read )
+{
+    {
+        Series writeSeries( file, Access::CREATE, options_write );
+        auto iterations = writeSeries.writeIterations();
+        for( size_t i = 0; i < 10; ++i )
+        {
+            auto iteration = iterations[ i ];
+            auto E_x = iteration.meshes[ "E" ][ "x" ];
+            E_x.resetDataset(
+                openPMD::Dataset( openPMD::Datatype::INT, { 10 } ) );
+            std::vector< int > data( 10, i );
+            E_x.storeChunk( data, { 0 }, { 10 } );
+            iteration.close();
+        }
+    }
+
+    Series readSeries( file, Access::READ_ONLY, options_read );
+
+    size_t last_iteration_index = 0;
+    for( auto iteration : readSeries.readIterations() )
+    {
+        auto E_x = iteration.meshes[ "E" ][ "x" ];
+        REQUIRE( E_x.getDimensionality() == 1 );
+        REQUIRE( E_x.getExtent()[ 0 ] == 10 );
+        auto chunk = E_x.loadChunk< int >( { 0 }, { 10 } );
+        iteration.close(); // @todo replace with ::close()
+        for( size_t i = 0; i < 10; ++i )
+        {
+            REQUIRE( chunk.get()[ i ] == iteration.iterationIndex );
+        }
+        last_iteration_index = iteration.iterationIndex;
+    }
+    REQUIRE( last_iteration_index == 9 );
+}
+
+TEST_CASE( "bp4_steps", "[serial][adios2]" )
+{
+    std::cout << "STARTING TEST: bp4_steps" << std::endl;
+    std::string useSteps = R"(
+    {
+        "adios2": {
+            "engine": {
+                "type": "bp4",
+                "usesteps": true
+            }
+        }
+    }
+    )";
+    std::string dontUseSteps = R"(
+    {
+        "adios2": {
+            "engine": {
+                "type": "bp4",
+                "usesteps": false
+            }
+        }
+    }
+    )";
+    // sing the yes no song
+    bp4_steps( "../samples/bp4steps_yes_yes.bp", useSteps, useSteps );
+    bp4_steps( "../samples/bp4steps_no_yes.bp", dontUseSteps, useSteps );
+    bp4_steps( "../samples/bp4steps_yes_no.bp", useSteps, dontUseSteps );
+    bp4_steps( "../samples/bp4steps_no_no.bp", dontUseSteps, dontUseSteps );
+    bp4_steps("../samples/bp4steps_default.bp", "{}", "{}");
+}
 #endif
+
+void
+serial_iterator( std::string const & file )
+{
+    constexpr Extent::value_type extent = 50;
+    {
+        Series writeSeries( file, Access::CREATE );
+        auto iterations = writeSeries.writeIterations();
+        for( size_t i = 0; i < 10; ++i )
+        {
+            auto iteration = iterations[ i ];
+            auto E_x = iteration.meshes[ "E" ][ "x" ];
+            E_x.resetDataset(
+                openPMD::Dataset( openPMD::Datatype::INT, { extent } ) );
+            std::vector< int > data( extent, i );
+            E_x.storeChunk( data, { 0 }, { extent } );
+            iteration.close();
+        }
+    }
+
+    Series readSeries( file, Access::READ_ONLY );
+
+    size_t last_iteration_index = 0;
+    for( auto iteration : readSeries.readIterations() )
+    {
+        auto E_x = iteration.meshes[ "E" ][ "x" ];
+        REQUIRE( E_x.getDimensionality() == 1 );
+        REQUIRE( E_x.getExtent()[ 0 ] == extent );
+        auto chunk = E_x.loadChunk< int >( { 0 }, { extent } );
+        iteration.close();
+        for( size_t i = 0; i < extent; ++i )
+        {
+            REQUIRE( chunk.get()[ i ] == iteration.iterationIndex );
+        }
+        last_iteration_index = iteration.iterationIndex;
+    }
+    REQUIRE( last_iteration_index == 9 );
+}
+
+TEST_CASE( "serial_iterator", "[serial][adios2]" )
+{
+    std::cout << "STARTING TEST: serial_iterator" << std::endl;
+    for( auto const & t : getBackends() )
+    {
+        serial_iterator( "../samples/serial_iterator_filebased_%T." + std::get< 0 >( t ) );
+        serial_iterator( "../samples/serial_iterator_groupbased." + std::get< 0 >( t ) );
+    }
+}
+
+void
+iterate_nonstreaming_series( std::string const & file )
+{
+    constexpr size_t extent = 50;
+    {
+        Series writeSeries( file, Access::CREATE );
+        // use conventional API to write iterations
+        auto iterations = writeSeries.iterations;
+        for( size_t i = 0; i < 10; ++i )
+        {
+            auto iteration = iterations[ i ];
+            auto E_x = iteration.meshes[ "E" ][ "x" ];
+            E_x.resetDataset(
+                openPMD::Dataset( openPMD::Datatype::INT, { extent } ) );
+            std::vector< int > data( extent, i );
+            E_x.storeChunk( data, { 0 }, { extent } );
+            // we encourage manually closing iterations, but it should not matter
+            // so let's do the switcharoo for this test
+            if( i % 2 == 0 )
+            {
+                writeSeries.flush();
+            }
+            else
+            {
+                iteration.close();
+            }
+        }
+    }
+
+    Series readSeries( file, Access::READ_ONLY );
+
+    size_t last_iteration_index = 0;
+    // conventionally written Series must be readable with streaming-aware API!
+    for( auto iteration : readSeries.readIterations() )
+    {
+        auto E_x = iteration.meshes[ "E" ][ "x" ];
+        REQUIRE( E_x.getDimensionality() == 1 );
+        REQUIRE( E_x.getExtent()[ 0 ] == extent );
+        auto chunk = E_x.loadChunk< int >( { 0 }, { extent } );
+        // we encourage manually closing iterations, but it should not matter
+        // so let's do the switcharoo for this test
+        if( last_iteration_index % 2 == 0 )
+        {
+            readSeries.flush();
+        }
+        else
+        {
+            iteration.close();
+        }
+
+        for( size_t i = 0; i < extent; ++i )
+        {
+            REQUIRE( chunk.get()[ i ] == iteration.iterationIndex );
+        }
+        last_iteration_index = iteration.iterationIndex;
+    }
+    REQUIRE( last_iteration_index == 9 );
+}
+
+TEST_CASE( "iterate_nonstreaming_series", "[serial][adios2]" )
+{
+    std::cout << "STARTING TEST: iterate_nonstreaming_series" << std::endl;
+    for( auto const & t : getBackends() )
+    {
+        iterate_nonstreaming_series(
+            "../samples/iterate_nonstreaming_series_filebased_%T." + std::get< 0 >( t ) );
+        iterate_nonstreaming_series(
+            "../samples/iterate_nonstreaming_series_groupbased." + std::get< 0 >( t ) );
+    }
+}
