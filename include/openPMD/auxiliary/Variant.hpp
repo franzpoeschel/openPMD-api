@@ -91,8 +91,83 @@ public:
 
     T_DTYPES dtype;
 
-private:
+protected:
     resource m_data;
 };
-} // auxiliary
-} // openPMD
+
+namespace detail
+{
+    struct Empty
+    {
+    };
+
+    enum class OptionTag
+    {
+        FULL,
+        EMPTY
+    };
+} // namespace detail
+
+template< typename T >
+class Option : public Variant< detail::OptionTag, T, detail::Empty >
+{
+    using super_t = Variant< detail::OptionTag, T, detail::Empty >;
+
+public:
+    explicit Option() : super_t( detail::Empty() )
+    {
+    }
+    Option( T data ) : super_t( std::move( data ) )
+    {
+    }
+
+    Option( Option const & other ) = default;
+
+    Option &
+    operator=( Option && other )
+    {
+        if( other.has_value() )
+        {
+            super_t::m_data.template emplace< 0 >( std::move( other.get() ) );
+        }
+        else
+        {
+            super_t::m_data.template emplace< 1 >( detail::Empty() );
+        }
+        return *this;
+    }
+
+    Option &
+    operator=( Option const & other )
+    {
+        if( other.has_value() )
+        {
+            super_t::m_data.template emplace< 0 >( other.get() );
+        }
+        else
+        {
+            super_t::m_data.template emplace< 1 >( detail::Empty() );
+        }
+        return *this;
+    }
+
+    bool
+    has_value() const
+    {
+        return super_t::index() == 0;
+    }
+
+    T const &
+    get() const
+    {
+        return variantSrc::template get< T >( super_t::m_data );
+    }
+
+    T &
+    get()
+    {
+        return variantSrc::template get< T >( super_t::m_data );
+    }
+};
+} // namespace auxiliary
+} // namespace openPMD
