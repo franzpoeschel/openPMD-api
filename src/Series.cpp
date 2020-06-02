@@ -459,6 +459,23 @@ Series::flush()
     return IOHandler->flush();
 }
 
+SeriesIterable
+Series::readIterations()
+{
+    switch( *m_iterationEncoding )
+    {
+        using IE = IterationEncoding;
+        case IE::fileBased:
+            throw std::runtime_error( "[Series] readIterations unimplemented "
+                                      "for file-based iteration layout" );
+            break;
+        case IE::groupBased:
+            return SeriesIterable( *this );
+            break;
+    }
+    throw std::runtime_error( "[Series] unreachable!" );
+}
+
 std::unique_ptr< Series::ParsedInput >
 Series::parseInput( std::string filepath )
 {
@@ -1105,4 +1122,93 @@ matcher(std::string const& prefix, int padding, std::string const& postfix, Form
             return [](std::string const&) -> std::tuple< bool, int > { return std::tuple< bool, int >{false, 0}; };
     }
 }
-} // openPMD
+
+SeriesIterator::SeriesIterator() : m_series()
+{
+}
+
+SeriesIterator::SeriesIterator( Series & _series ) : m_series( _series )
+{
+    auto it = _series.iterations.begin();
+    if( it == _series.iterations.end() )
+    {
+        *this = end();
+        return;
+    }
+    m_currentIteration = it->first;
+}
+
+SeriesIterator &
+SeriesIterator::operator++()
+{
+    if( !m_series.has_value() )
+    {
+        *this = end();
+        return *this;
+    }
+    Series series = m_series.get();
+    auto & iterations = series.iterations;
+    AdvanceStatus status = series.iterations[ m_currentIteration ].beginStep();
+    if( status == AdvanceStatus::OVER )
+    {
+        *this = end();
+        return *this;
+    }
+    auto it = iterations.find( m_currentIteration );
+    auto itEnd = iterations.end();
+    if( it == itEnd )
+    {
+        *this = end();
+        return *this;
+    }
+    ++it;
+    if( it == itEnd )
+    {
+        *this = end();
+        return *this;
+    }
+    m_currentIteration = it->first;
+    return *this;
+}
+
+Iteration &
+SeriesIterator::operator*()
+{
+    return m_series.get().iterations[ m_currentIteration ];
+}
+
+bool
+SeriesIterator::operator==( SeriesIterator const & other ) const
+{
+    return this->m_currentIteration == other.m_currentIteration &&
+        this->m_series.has_value() == other.m_series.has_value();
+}
+
+bool
+SeriesIterator::operator!=( SeriesIterator const & other ) const
+{
+    return !operator==( other );
+}
+
+SeriesIterator
+SeriesIterator::end()
+{
+    return {};
+}
+
+SeriesIterable::SeriesIterable( Series _series ) : m_series( _series )
+{
+}
+
+SeriesIterable::iterator_t
+SeriesIterable::begin()
+{
+    return iterator_t{ m_series };
+}
+
+SeriesIterable::iterator_t
+SeriesIterable::end()
+{
+    return SeriesIterator::end();
+}
+} // namespace openPMD

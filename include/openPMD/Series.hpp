@@ -22,6 +22,7 @@
 
 #include "openPMD/config.hpp"
 #include "openPMD/auxiliary/Deprecated.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
@@ -48,12 +49,16 @@
 
 namespace openPMD
 {
+class SeriesIterable;
+
 /** @brief  Root level of the openPMD hierarchy.
  *
  * Entry point and common link between all iterations of particle and mesh data.
  *
- * @see https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file
- * @see https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
+ * @see
+ * https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#hierarchy-of-the-data-file
+ * @see
+ * https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#iterations-and-time-series
  */
 class Series : public Attributable
 {
@@ -316,10 +321,12 @@ public:
     std::future< void >
     flush();
 
+    SeriesIterable
+    readIterations();
+
     Container< Iteration, uint64_t > iterations;
 
-OPENPMD_private:
-    struct ParsedInput;
+    OPENPMD_private : struct ParsedInput;
     std::unique_ptr< ParsedInput > parseInput(std::string);
     void init(std::shared_ptr< AbstractIOHandler >, std::unique_ptr< ParsedInput >);
     void initDefaults();
@@ -351,4 +358,53 @@ OPENPMD_private:
     const MPI_Comm m_communicator = MPI_COMM_SELF;
 #endif
 }; // Series
+
+class SeriesIterator
+{
+    using iterations_t = decltype( Series::iterations );
+    using iteration_index_t = iterations_t::key_type;
+
+    using maybe_series_t = auxiliary::Option< Series >;
+
+    iteration_index_t m_currentIteration = 0;
+    maybe_series_t m_series;
+
+    // construct the end() iterator
+    SeriesIterator();
+
+public:
+    SeriesIterator( Series & );
+
+    SeriesIterator &
+    operator++();
+
+    Iteration &
+    operator*();
+
+    bool
+    operator==( SeriesIterator const & other ) const;
+
+    bool
+    operator!=( SeriesIterator const & other ) const;
+
+    static SeriesIterator
+    end();
+};
+
+class SeriesIterable
+{
+    using iterations_t = decltype( Series::iterations );
+    using iterator_t = SeriesIterator;
+
+    Series m_series;
+
+public:
+    SeriesIterable( Series );
+
+    iterator_t
+    begin();
+
+    iterator_t
+    end();
+};
 } // namespace openPMD

@@ -4,15 +4,11 @@
 #   define OPENPMD_protected public
 #endif
 
-#include "openPMD/auxiliary/Environment.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/openPMD.hpp"
-
-#include <catch2/catch.hpp>
-
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <list>
@@ -22,6 +18,11 @@
 #include <string>
 #include <tuple>
 #include <vector>
+
+#include "openPMD/auxiliary/Environment.hpp"
+#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/openPMD.hpp"
+#include <catch2/catch.hpp>
 
 using namespace openPMD;
 
@@ -2503,5 +2504,69 @@ TEST_CASE( "serial_adios2_json_config", "[serial][adios2]" )
     };
     read( "../samples/jsonConfiguredBP3.bp", readConfigBP3 );
     read( "../samples/jsonConfiguredBP4.bp", readConfigBP4 );
+}
+
+void
+serial_adios2_streaming()
+{
+    if( auxiliary::getEnvString( "OPENPMD_BP_BACKEND", "NOT_SET" ) == "ADIOS1" )
+    {
+        // run this test for ADIOS2 only
+        return;
+    }
+    std::string adios2Config = R"END(
+{
+  "adios2": {
+    "engine": {
+      "type": "sst"
+    }
+  }
+}
+)END";
+
+    auto const write = [ &adios2Config ]() {
+        Series writeSeries(
+            "../samples/adios2_stream.bp", AccessType::CREATE, adios2Config );
+        for( size_t i = 0; i < 10; ++i )
+        {
+            auto iteration = writeSeries.iterations[ i ];
+            iteration.beginStep();
+            auto E_x = iteration.meshes[ "E" ][ "x" ];
+            E_x.resetDataset(
+                openPMD::Dataset( openPMD::Datatype::INT, { 1000 } ) );
+            std::vector< int > data( 1000, 0 );
+            E_x.storeChunk( data, { 0 }, { 1000 } );
+            iteration.setFinalized(); // @todo replace with ::close
+            iteration.endStep();      // @todo replace with ::close
+        }
+    };
+
+    auto future = std::async( std::launch::async, write );
+
+    Series readSeries(
+        "../samples/adios2_stream.bp", AccessType::READ_ONLY, adios2Config );
+
+    size_t iteration_index = 0;
+    for( auto iteration : readSeries.readIterations() )
+    {
+        auto E_x = iteration.meshes[ "E" ][ "x" ];
+        REQUIRE( E_x.getDimensionality() == 1 );
+        REQUIRE( E_x.getExtent()[ 0 ] == 1000 );
+        auto chunk = E_x.loadChunk< int >( { 0 }, { 1000 } );
+        iteration.endStep(); // @todo replace with ::close()
+        for( size_t i = 0; i < 1000; ++i )
+        {
+            REQUIRE( chunk.get()[ i ] == 0 );
+        }
+        ++iteration_index;
+    }
+    REQUIRE( iteration_index == 10 );
+
+    future.wait();
+}
+
+TEST_CASE( "serial_adios2_streaming", "[serial][adios2]" )
+{
+    serial_adios2_streaming();
 }
 #endif

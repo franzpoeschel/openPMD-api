@@ -152,6 +152,32 @@ public:
     }
 
     bool
+    operator==( Option const & other ) const
+    {
+        if( has_value )
+        {
+            return !other.has_value();
+        }
+        else
+        {
+            if( !other.has_value() )
+            {
+                return false;
+            }
+            else
+            {
+                return get() == other.get();
+            }
+        }
+    }
+
+    bool
+    operator!=( Option const & other ) const
+    {
+        return !( *this == other );
+    }
+
+    bool
     has_value() const
     {
         return super_t::index() == 0;
