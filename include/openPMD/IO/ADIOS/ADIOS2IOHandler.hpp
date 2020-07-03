@@ -134,6 +134,9 @@ public:
     void openPath( Writable *,
                    Parameter< Operation::OPEN_PATH > const & ) override;
 
+    void closePath( Writable *,
+                    Parameter< Operation::CLOSE_PATH > const & ) override;
+
     void openDataset( Writable *,
                       Parameter< Operation::OPEN_DATASET > & ) override;
 
@@ -173,14 +176,6 @@ public:
 
     void
     advance( Writable*, Parameter< Operation::ADVANCE > & ) override;
-
-    void
-    availableChunks( Writable*,
-                     Parameter< Operation::AVAILABLE_CHUNKS > &) override;
-
-    void
-    staleGroup( Writable *, Parameter< Operation::STALE_GROUP > const & )
-        override;
 
     /**
      * @brief The ADIOS2 access type to chose for Engines opened
@@ -418,15 +413,6 @@ namespace detail
         operator()( Params &&... );
     };
 
-    struct RetrieveBlocksInfo
-    {
-        template < typename T, typename... Params >
-        void operator( )( Params &&... );
-
-        template < int n, typename... Params >
-        void operator( )( Params &&... );
-    };
-
     // Helper structs to help distinguish valid attribute/variable
     // datatypes from invalid ones
 
@@ -579,13 +565,6 @@ namespace detail
             bool const constantDims = false );
 
         void writeDataset( BufferedPut &, adios2::IO &, adios2::Engine & );
-
-        static void blocksInfo(
-            Parameter< Operation::AVAILABLE_CHUNKS > & params,
-            adios2::IO IO,
-            adios2::Engine engine,
-            std::string const & varName,
-            size_t step );
     };
 
     template < typename T >
@@ -605,8 +584,6 @@ namespace detail
         static void defineVariable( Params &&... );
 
         template < typename... Params > void writeDataset( Params &&... );
-
-        template < typename... Params > static void blocksInfo( Params &&... );
     };
 
     // Other datatypes used in the ADIOS2IOHandler implementation
@@ -685,7 +662,8 @@ namespace detail
 
         void flush( );
 
-        std::packaged_task< AdvanceStatus() > advance( AdvanceMode mode );
+        AdvanceStatus
+        advance( AdvanceMode mode );
 
         /*
          * Delete all buffered actions without running them.
@@ -717,21 +695,39 @@ namespace detail
         invalidateVariablesMap();
 
     private:
+        /*
+         * streamStatus is NoStream for file-based ADIOS engines.
+         * This is relevant for the method BufferedActions::requireActiveStep,
+         * where a step is only opened if the status is OutsideOfStep, but not
+         * if NoStream. The rationale behind this is that parsing a Series
+         * works differently for file-based and for stream-based engines:
+         * * stream-based: Iterations are parsed as they arrive. For parsing an
+         *   iteration, the iteration must be awaited.
+         *   BufferedActions::requireActiveStep takes care of this.
+         * * file-based: The Series is parsed up front. If no step has been
+         *   opened yet, ADIOS2 gives access to all variables and attributes
+         *   from all steps. Upon opening a step, only the variables from that
+         *   step are shown which hinders parsing. So, until a step is
+         *   explicitly opened via ADIOS2IOHandlerImpl::advance, do not open
+         *   one.
+         *
+         */
         enum class StreamStatus
         {
             NoStream,
             DuringStep,
             OutsideOfStep,
-            StreamOver,
-            TemporarilyInvalid
+            StreamOver
         };
         std::shared_ptr< StreamStatus > streamStatus =
             std::make_shared< StreamStatus >( StreamStatus::NoStream );
         int mpi_rank, mpi_size;
         std::shared_ptr< adios2::Engine > m_engine;
+        std::shared_ptr< adios2::StepStatus > m_lastStepStatus =
+            std::make_shared< adios2::StepStatus >( adios2::StepStatus::OK );
 
         /*
-         * ADIOS2 does not give direct access to its internal attribute and 
+         * ADIOS2 does not give direct access to its internal attribute and
          * variable maps, but will instead give access to copies of them.
          * In order to avoid unnecessary copies, we buffer the returned map.
          * The downside of this is that we need to pay attention to invalidate
@@ -741,7 +737,7 @@ namespace detail
          * been resolved
          * If false, the buffered map has been invalidated and needs to be
          * queried from ADIOS2 again. If true, the buffered map is equivalent to
-         * the map that would be returned by a call to 
+         * the map that would be returned by a call to
          * IO::Available(Attributes|Variables).
          */
         bool m_availableAttributesValid = false;
