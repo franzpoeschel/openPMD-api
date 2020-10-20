@@ -298,7 +298,12 @@ void ADIOS2IOHandlerImpl::createDataset(
         auto const file = refreshFileFromParent( writable );
         auto filePos = setAndGetFilePosition( writable, name );
         filePos->gd = ADIOS2FilePosition::GD::DATASET;
-        auto const varName = filePositionToString( filePos );
+        auto const varName = nameOfVariable( writable );
+        /*
+         * @brief std::optional would be more idiomatic, but it's not in
+         *        the C++11 standard
+         * @todo replace with std::optional upon switching to C++17
+         */
 
         auto operators = defaultOperators;
         if( !parameters.compression.empty() )
@@ -407,7 +412,7 @@ void ADIOS2IOHandlerImpl::openDataset(
     auto pos = setAndGetFilePosition( writable, name );
     pos->gd = ADIOS2FilePosition::GD::DATASET;
     auto file = refreshFileFromParent( writable );
-    auto varName = filePositionToString( pos );
+    auto varName = nameOfVariable( writable );
     *parameters.dtype = detail::fromADIOS2Type(
         getFileData( file ).m_IO.VariableType( varName ) );
     switchType( *parameters.dtype, detail::DatasetOpener( this ), file, varName,
@@ -756,7 +761,26 @@ ADIOS2IOHandlerImpl::getCompressionOperator( std::string const & compression )
 std::string
 ADIOS2IOHandlerImpl::nameOfVariable( Writable * writable )
 {
-    return filePositionToString( setAndGetFilePosition( writable ) );
+    auto filepos = setAndGetFilePosition( writable );
+    auto res = filePositionToString( filepos );
+    switch( filepos->gd )
+    {
+        case ADIOS2FilePosition::GD::GROUP:
+            return res;
+        case ADIOS2FilePosition::GD::DATASET:
+            if( auxiliary::ends_with( res, '/' ) )
+            {
+                return res + "__data__";
+            }
+            else
+            {
+                // By convention, this path should always be taken
+                // But let's be safe
+                return res + "/__data__";
+            }
+        default:
+            throw std::runtime_error( "[ADIOS2IOHandlerImpl] Unreachable!" );
+    }
 }
 
 std::string ADIOS2IOHandlerImpl::nameOfAttribute( Writable * writable,
