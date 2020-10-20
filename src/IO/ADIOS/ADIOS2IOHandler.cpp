@@ -533,36 +533,40 @@ void ADIOS2IOHandlerImpl::listPaths(
      * inspected.
      */
     std::vector< std::string > delete_me;
-    auto f = [myName, &subdirs, &delete_me](
-                 std::vector< std::string > & varsOrAttrs, bool variables ) {
-        for( auto var : varsOrAttrs )
-        {
-            auto firstSlash = var.find_first_of( '/' );
-            if( firstSlash != std::string::npos )
-            {
-                var = var.substr( 0, firstSlash );
-                subdirs.emplace( std::move( var ) );
-            }
-            else if( variables )
-            { // var is a dataset at the current level
-                delete_me.push_back( std::move( var ) );
-            }
-        }
-    };
-    std::vector< std::string > vars;
-    for( auto const & p : fileData.availableVariablesPrefixed( myName ) )
+
+    std::vector< std::string > vars =
+        fileData.availableVariablesPrefixed( myName );
+    for( auto var : vars )
     {
-        vars.emplace_back( std::move( p ) );
+        if( !auxiliary::ends_with( var, "/__data__" ) )
+        {
+            continue;
+        }
+        var = auxiliary::replace_last( var, "/__data__", "" );
+        auto firstSlash = var.find_first_of( '/' );
+        if( firstSlash != std::string::npos )
+        {
+            var = var.substr( 0, firstSlash );
+            subdirs.emplace( std::move( var ) );
+        }
+        else
+        { // var is a dataset at the current level
+            delete_me.push_back( std::move( var ) );
+        }
     }
 
-    std::vector< std::string > attrs;
-    for( auto const & p : fileData.availableAttributesPrefixed( myName ) )
+    std::vector< std::string > attrs =
+        fileData.availableAttributesPrefixed( myName );
+    for( auto attr : attrs )
     {
-        attrs.emplace_back( std::move( p ) );
+        auto firstSlash = attr.find_first_of( '/' );
+        if( firstSlash != std::string::npos )
+        {
+            attr = attr.substr( 0, firstSlash );
+            subdirs.emplace( std::move( attr ) );
+        }
     }
-    f( vars, true );
-    f( attrs, false );
-    for ( auto & d : delete_me )
+    for( auto & d : delete_me )
     {
         subdirs.erase( d );
     }
@@ -594,18 +598,25 @@ void ADIOS2IOHandlerImpl::listDatasets(
 
     auto & fileData = getFileData( file );
     fileData.requireActiveStep();
-    std::map< std::string, adios2::Params > vars =
-        fileData.availableVariables();
 
     std::unordered_set< std::string > subdirs;
-    for( auto & var : fileData.availableVariablesPrefixed( myName ) )
+    for( auto var : fileData.availableVariablesPrefixed( myName ) )
     {
+        if( !auxiliary::ends_with( var, "/__data__" ) )
+        {
+            continue;
+        }
+        // variable is now definitely a dataset, let's strip the suffix
+        var = auxiliary::replace_last( var, "/__data__", "" );
+        // if string still contains a slash, variable is a dataset below the
+        // current group
+        // we only want datasets contained directly within the current group
+        // let's ensure that
         auto firstSlash = var.find_first_of( '/' );
         if( firstSlash == std::string::npos )
         {
             subdirs.emplace( std::move( var ) );
-        } // else: var is a path or a dataset in a group below the current
-          // group
+        }
     }
     for( auto & dataset : subdirs )
     {
