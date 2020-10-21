@@ -75,35 +75,49 @@ namespace detail
      */
     Datatype fromADIOS2Type( std::string const & dt );
 
-    template < typename T > struct AttributeInfoHelper
+    enum class VariableOrAttribute : unsigned char
+    {
+        Variable,
+        Attribute
+    };
+
+    template< typename T >
+    struct AttributeInfoHelper
     {
         static typename std::vector< T >::size_type
-        getSize( adios2::IO &, std::string const & attributeName );
+        getSize(
+            adios2::IO &,
+            std::string const & attributeName,
+            VariableOrAttribute );
     };
 
     template < > struct AttributeInfoHelper< std::complex< long double > >
     {
         static typename std::vector< long double >::size_type
-        getSize( adios2::IO &, std::string const & )
+        getSize( adios2::IO &, std::string const &, VariableOrAttribute )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex attribute types" );
+            throw std::runtime_error( "[ADIOS2] Internal error: no support for "
+                                      "long double complex attribute types" );
         }
     };
 
     template < typename T > struct AttributeInfoHelper< std::vector< T > >
     {
         static typename std::vector< T >::size_type
-        getSize( adios2::IO &, std::string const & attributeName );
+        getSize(
+            adios2::IO &,
+            std::string const & attributeName,
+            VariableOrAttribute );
     };
 
     template < > struct AttributeInfoHelper< std::vector< std::complex< long double > > >
     {
         static typename std::vector< std::complex< long double > >::size_type
-        getSize( adios2::IO &, std::string const & )
+        getSize( adios2::IO &, std::string const &, VariableOrAttribute )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex vector attribute types" );
+                "[ADIOS2] Internal error: no support for long double complex "
+                "vector attribute types" );
         }
     };
 
@@ -111,26 +125,33 @@ namespace detail
     struct AttributeInfoHelper< std::array< T, n > >
     {
         static typename std::vector< T >::size_type
-        getSize( adios2::IO & IO, std::string const & attributeName )
+        getSize(
+            adios2::IO & IO,
+            std::string const & attributeName,
+            VariableOrAttribute voa )
         {
-            return AttributeInfoHelper< T >::getSize( IO, attributeName );
+            return AttributeInfoHelper< T >::getSize( IO, attributeName, voa );
         }
     };
 
     template <> struct AttributeInfoHelper< bool >
     {
         static typename std::vector< bool_representation >::size_type
-        getSize( adios2::IO &, std::string const & attributeName );
+        getSize(
+            adios2::IO &,
+            std::string const & attributeName,
+            VariableOrAttribute );
     };
 
     struct AttributeInfo
     {
-        template < typename T >
+        template< typename T, typename... Params >
         typename std::vector< T >::size_type
-        operator( )( adios2::IO &, std::string const & attributeName );
+        operator()( Params &&... );
 
-        template < int n, typename... Params >
-        size_t operator( )( Params &&... );
+        template< int n, typename... Params >
+        size_t
+        operator()( Params &&... );
     };
 
     /**
@@ -146,7 +167,8 @@ namespace detail
     attributeInfo(
         adios2::IO & IO,
         std::string const & attributeName,
-        bool verbose );
+        bool verbose,
+        VariableOrAttribute = VariableOrAttribute::Attribute );
 } // namespace detail
 
 } // namespace openPMD

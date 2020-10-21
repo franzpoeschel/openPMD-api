@@ -538,34 +538,35 @@ void ADIOS2IOHandlerImpl::listPaths(
         fileData.availableVariablesPrefixed( myName );
     for( auto var : vars )
     {
-        if( !auxiliary::ends_with( var, "/__data__" ) )
+        // since current Writable is a group and no dataset,
+        // var == "__data__" is not possible
+        if( auxiliary::ends_with( var, "/__data__" ) )
         {
-            continue;
-        }
-        var = auxiliary::replace_last( var, "/__data__", "" );
-        auto firstSlash = var.find_first_of( '/' );
-        if( firstSlash != std::string::npos )
-        {
-            var = var.substr( 0, firstSlash );
-            subdirs.emplace( std::move( var ) );
+            // here be datasets
+            var = auxiliary::replace_last( var, "/__data__", "" );
+            auto firstSlash = var.find_first_of( '/' );
+            if( firstSlash != std::string::npos )
+            {
+                var = var.substr( 0, firstSlash );
+                subdirs.emplace( std::move( var ) );
+            }
+            else
+            { // var is a dataset at the current level
+                delete_me.push_back( std::move( var ) );
+            }
         }
         else
-        { // var is a dataset at the current level
-            delete_me.push_back( std::move( var ) );
+        {
+            // here be attributes
+            auto firstSlash = var.find_first_of( '/' );
+            if( firstSlash != std::string::npos )
+            {
+                var = var.substr( 0, firstSlash );
+                subdirs.emplace( std::move( var ) );
+            }
         }
     }
 
-    std::vector< std::string > attrs =
-        fileData.availableAttributesPrefixed( myName );
-    for( auto attr : attrs )
-    {
-        auto firstSlash = attr.find_first_of( '/' );
-        if( firstSlash != std::string::npos )
-        {
-            attr = attr.substr( 0, firstSlash );
-            subdirs.emplace( std::move( attr ) );
-        }
-    }
     for( auto & d : delete_me )
     {
         subdirs.erase( d );
@@ -602,6 +603,8 @@ void ADIOS2IOHandlerImpl::listDatasets(
     std::unordered_set< std::string > subdirs;
     for( auto var : fileData.availableVariablesPrefixed( myName ) )
     {
+        // since current Writable is a group and no dataset,
+        // var == "__data__" is not possible
         if( !auxiliary::ends_with( var, "/__data__" ) )
         {
             continue;
@@ -640,9 +643,14 @@ void ADIOS2IOHandlerImpl::listAttributes(
     auto & ba = getFileData( file );
     ba.requireActiveStep(); // make sure that the attributes are present
 
-    auto const & attrs = ba.availableAttributesPrefixed( attributePrefix );
+    auto const & attrs = ba.availableVariablesPrefixed( attributePrefix );
     for( auto & rawAttr : attrs )
     {
+        if( auxiliary::ends_with( rawAttr, "/__data__" ) ||
+            rawAttr == "__data__" )
+        {
+            continue;
+        }
         auto attr = auxiliary::removeSlashes( rawAttr );
         if( attr.find_last_of( '/' ) == std::string::npos )
         {
@@ -1052,7 +1060,12 @@ namespace detail
         std::string name,
         const T value )
     {
-        auto attr = IO.DefineVariable< T >( name );
+        auto attr = IO.InquireVariable< T >( name );
+        // @todo check size
+        if( !attr )
+        {
+            attr = IO.DefineVariable< T >( name );
+        }
         engine.Put( attr, value );
         if( !attr )
         {
@@ -1071,14 +1084,15 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name );
+        auto attr = IO.InquireVariable< BasicType >( name );
         if( !attr )
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: Failed reading attribute '" + name +
                 "'." );
         }
-        *resource = attr.Data()[ 0 ];
+        *resource = T();
+        engine.Get( attr, &variantSrc::get< BasicType >( *resource ) );
     }
 
     template< typename T >
@@ -1090,7 +1104,13 @@ namespace detail
         const std::vector< T > & value )
     {
         auto size = value.size();
-        auto attr = IO.DefineVariable< T >( name, {size}, {0}, {size} );
+        auto attr = IO.InquireVariable< T >( name );
+        // @todo check size
+        if( !attr )
+        {
+            attr =
+                IO.DefineVariable< T >( name, { size }, { 0 }, { size } );
+        }
         engine.Put( attr, value.data() );
         if( !attr )
         {
@@ -1109,14 +1129,23 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name );
+        auto attr = IO.InquireVariable< BasicType >( name );
         if( !attr )
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: Failed reading attribute '" + name +
                 "'." );
         }
-        *resource = attr.Data();
+        auto extent = attr.Shape();
+        if( extent.size() != 1 )
+        {
+            throw std::runtime_error(
+                "[ADIOS2] Found multidimensional attribute, expecting vector." );
+        }
+        attr.SetSelection( { { 0 }, extent } );
+        *resource = std::vector< T >( extent[ 0 ] );
+        engine.Get(
+            attr, variantSrc::get< std::vector< T > >( *resource ).data() );
     }
 
     template< typename T, size_t n >
@@ -1127,7 +1156,12 @@ namespace detail
         std::string name,
         const std::array< T, n > & value )
     {
-        auto attr = IO.DefineVariable<T>( name, {n}, {0}, {n} );
+        auto attr = IO.InquireVariable< T >( name );
+        // @todo check size
+        if( !attr )
+        {
+            attr = IO.DefineVariable< T >( name, { n }, { 0 }, { n } );
+        }
         engine.Put( attr, value.data() );
         if( !attr )
         {
@@ -1146,20 +1180,23 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name );
+        auto attr = IO.InquireVariable< BasicType >( name );
         if( !attr )
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: Failed reading attribute '" + name +
                 "'." );
         }
-        auto data = attr.Data();
-        std::array< T, n > res;
-        for( size_t i = 0; i < n; i++ )
+        auto extent = attr.Shape();
+        if( extent != adios2::Dims{ n } )
         {
-            res[ i ] = data[ i ];
+            throw std::runtime_error(
+                "[ADIOS2] Attribute shape for '" + name + "' does not match." );
         }
-        *resource = res;
+        attr.SetSelection( { { 0 }, extent } );
+        *resource = std::array< T, n >();
+        engine.Get(
+            attr, variantSrc::get< std::array< T, n > >( *resource ).data() );
     }
 
     typename AttributeTypes< bool >::Attr
@@ -1181,13 +1218,15 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireAttribute< BasicType >( name );
-        if ( !attr )
+        auto attr = IO.InquireVariable< BasicType >( name );
+        if( !attr )
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: Failed reading attribute '" + name + "'." );
         }
-        *resource = fromRep( attr.Data( )[0] );
+        BasicType result;
+        engine.Get( attr, &result, adios2::Mode::Sync );
+        *resource = fromRep( result );
     }
 
     template < typename T >
@@ -1357,9 +1396,13 @@ namespace detail
     void
     BufferedAttributeRead::run( BufferedActions & ba )
     {
-        auto type = attributeInfo( ba.m_IO, name, /* verbose = */ true );
+        auto type = attributeInfo(
+            ba.m_IO,
+            name,
+            /* verbose = */ true,
+            VariableOrAttribute::Variable );
 
-        if ( type == Datatype::UNDEFINED )
+        if( type == Datatype::UNDEFINED )
         {
             throw std::runtime_error( "[ADIOS2] Requested attribute (" + name +
                                       ") not found in backend." );

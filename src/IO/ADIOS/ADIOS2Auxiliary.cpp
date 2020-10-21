@@ -122,42 +122,77 @@ namespace detail
     typename std::vector< T >::size_type
     AttributeInfoHelper< T >::getSize(
         adios2::IO & IO,
-        std::string const & attributeName )
+        std::string const & attributeName,
+        VariableOrAttribute voa )
     {
-        auto attribute = IO.InquireAttribute< T >( attributeName );
-        if( !attribute )
+        switch( voa )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: Attribute not present." );
+            case VariableOrAttribute::Attribute:
+            {
+                auto attribute = IO.InquireAttribute< T >( attributeName );
+                if( !attribute )
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Internal error: Attribute not present." );
+                }
+                return attribute.Data().size();
+            }
+            case VariableOrAttribute::Variable:
+            {
+                auto variable = IO.InquireVariable< T >( attributeName );
+                if( !variable )
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Internal error: Variable not present." );
+                }
+                auto shape = variable.Shape();
+                if( shape.size() == 0 )
+                {
+                    // single global value
+                    return 1;
+                }
+                else if( shape.size() == 1 )
+                {
+                    return shape[ 0 ];
+                }
+                else
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Found multidimensional attribute'" +
+                        attributeName + "'." );
+                }
+            }
+            default:
+                throw std::runtime_error( "[ADIOS2] Unreachable!" );
         }
-        return attribute.Data().size();
     }
 
     template< typename T >
     typename std::vector< T >::size_type
     AttributeInfoHelper< std::vector< T > >::getSize(
         adios2::IO & IO,
-        std::string const & attributeName )
+        std::string const & attributeName,
+        VariableOrAttribute voa )
     {
-        return AttributeInfoHelper< T >::getSize( IO, attributeName );
+        return AttributeInfoHelper< T >::getSize( IO, attributeName, voa );
     }
 
     typename std::vector< bool_representation >::size_type
     AttributeInfoHelper< bool >::getSize(
         adios2::IO & IO,
-        std::string const & attributeName )
+        std::string const & attributeName,
+        VariableOrAttribute voa )
     {
         return AttributeInfoHelper< bool_representation >::getSize(
-            IO, attributeName );
+            IO, attributeName, voa );
     }
 
-    template< typename T >
+    template< typename T, typename... Params >
     typename std::vector< T >::size_type
-    AttributeInfo::operator()(
-        adios2::IO & IO,
-        std::string const & attributeName )
+    AttributeInfo::operator()( Params &&... params )
     {
-        return AttributeInfoHelper< T >::getSize( IO, attributeName );
+        return AttributeInfoHelper< T >::getSize(
+            std::forward< Params >( params )... );
     }
 
     template< int n, typename... Params >
@@ -171,9 +206,19 @@ namespace detail
     attributeInfo(
         adios2::IO & IO,
         std::string const & attributeName,
-        bool verbose )
+        bool verbose,
+        VariableOrAttribute voa )
     {
-        std::string type = IO.AttributeType( attributeName );
+        std::string type;
+        switch( voa )
+        {
+            case VariableOrAttribute::Attribute:
+                type = IO.AttributeType( attributeName );
+                break;
+            case VariableOrAttribute::Variable:
+                type = IO.VariableType( attributeName );
+                break;
+        }
         if( type.empty() )
         {
             if( verbose )
@@ -189,7 +234,7 @@ namespace detail
             static AttributeInfo ai;
             Datatype basicType = fromADIOS2Type( type );
             auto size =
-                switchType< size_t >( basicType, ai, IO, attributeName );
+                switchType< size_t >( basicType, ai, IO, attributeName, voa );
             Datatype openPmdType = size == 1
                 ? basicType
                 : size == 7 && basicType == Datatype::DOUBLE

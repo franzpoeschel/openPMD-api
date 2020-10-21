@@ -608,6 +608,70 @@ namespace detail
         }
     };
 
+    template<>
+    struct AttributeTypes< std::vector< std::string > >
+    {
+        using Attr = adios2::Variable< std::string >;
+        using BasicType = std::string;
+
+        static Attr
+        createAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            const std::vector< std::string > & )
+        {
+            // @todo check size
+            auto attr = IO.InquireVariable< std::string >( name );
+            if( !attr )
+            {
+                attr = IO.DefineVariable< std::string >( name );
+            }
+            std::string notice =
+                "[ADIOS2] attribute type vector<string> unimplemented";
+            engine.Put( attr, notice );
+            return attr;
+        }
+
+        static void
+        readAttribute(
+            adios2::IO &,
+            adios2::Engine &,
+            std::string,
+            std::shared_ptr< Attribute::resource > resource )
+        {
+            *resource = std::vector< std::string >{
+                "[ADIOS2] attribute type vector<string> unimplemented"
+            };
+        }
+
+        static bool
+        attributeUnchanged(
+            adios2::IO & IO,
+            std::string name,
+            std::vector< std::string > val )
+        {
+            auto attr = IO.InquireAttribute< BasicType >( name );
+            if( !attr )
+            {
+                return false;
+            }
+            std::vector< BasicType > data = attr.Data();
+            if( data.size() != val.size() )
+            {
+                return false;
+            }
+            for( size_t i = 0; i < val.size(); ++i )
+            {
+                if( data[ i ] != val[ i ] )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    };
+
     template< typename T, size_t n >
     struct AttributeTypes< std::array< T, n > >
     {
