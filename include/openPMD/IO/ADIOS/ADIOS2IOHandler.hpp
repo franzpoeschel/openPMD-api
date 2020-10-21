@@ -365,12 +365,17 @@ namespace detail
 
     struct AttributeReader
     {
-        template < typename T >
-        Datatype operator( )( adios2::IO & IO, std::string name,
-                          std::shared_ptr< Attribute::resource > resource );
+        template< typename T >
+        Datatype
+        operator()(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            std::shared_ptr< Attribute::resource > resource );
 
-        template < int n, typename... Params >
-        Datatype operator( )( Params &&... );
+        template< int n, typename... Params >
+        Datatype
+        operator()( Params &&... );
     };
 
     struct AttributeWriter
@@ -434,17 +439,25 @@ namespace detail
      * for vector and array types, as well as the boolean
      * type (which is not natively supported by ADIOS).
      */
-    template < typename T > struct AttributeTypes
+    template< typename T >
+    struct AttributeTypes
     {
-        using Attr = adios2::Attribute< T >;
+        using Attr = adios2::Variable< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO, std::string name,
-                                     BasicType value );
+        static Attr
+        createAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            BasicType value );
 
         static void
-        readAttribute( adios2::IO & IO, std::string name,
-                       std::shared_ptr< Attribute::resource > resource );
+        readAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            std::shared_ptr< Attribute::resource > resource );
 
         /**
          * @brief Is the attribute given by parameters name and val already
@@ -467,53 +480,73 @@ namespace detail
         }
     };
 
-    template< > struct AttributeTypes< std::complex< long double > >
+    template<>
+    struct AttributeTypes< std::complex< long double > >
     {
         using Attr = adios2::Attribute< std::complex< double > >;
         using BasicType = double;
 
-        static Attr createAttribute( adios2::IO &, std::string,
-                                     std::complex< long double > )
+        static Attr
+        createAttribute(
+            adios2::IO &,
+            adios2::Engine &,
+            std::string,
+            std::complex< long double > )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex attribute types" );
+            throw std::runtime_error( "[ADIOS2] Internal error: no support for "
+                                      "long double complex attribute types" );
         }
 
         static void
-        readAttribute( adios2::IO &, std::string,
-                       std::shared_ptr< Attribute::resource > )
+        readAttribute(
+            adios2::IO &,
+            adios2::Engine &,
+            std::string,
+            std::shared_ptr< Attribute::resource > )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex attribute types" );
+            throw std::runtime_error( "[ADIOS2] Internal error: no support for "
+                                      "long double complex attribute types" );
         }
 
         static bool
         attributeUnchanged(
-            adios2::IO &, std::string, std::complex< long double > )
+            adios2::IO &,
+            std::string,
+            std::complex< long double > )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex attribute types" );
+            throw std::runtime_error( "[ADIOS2] Internal error: no support for "
+                                      "long double complex attribute types" );
         }
     };
 
-    template< > struct AttributeTypes< std::vector< std::complex< long double > > >
+    template<>
+    struct AttributeTypes< std::vector< std::complex< long double > > >
     {
         using Attr = adios2::Attribute< std::complex< double > >;
         using BasicType = double;
 
-        static Attr createAttribute( adios2::IO &, std::string,
-                                     const std::vector< std::complex< long double > > & )
+        static Attr
+        createAttribute(
+            adios2::IO &,
+            adios2::Engine &,
+            std::string,
+            const std::vector< std::complex< long double > > & )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex vector attribute types" );
+                "[ADIOS2] Internal error: no support for long double complex "
+                "vector attribute types" );
         }
 
         static void
-        readAttribute( adios2::IO &, std::string,
-                       std::shared_ptr< Attribute::resource > )
+        readAttribute(
+            adios2::IO &,
+            adios2::Engine &,
+            std::string,
+            std::shared_ptr< Attribute::resource > )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex vector attribute types" );
+                "[ADIOS2] Internal error: no support for long double complex "
+                "vector attribute types" );
         }
 
         static bool
@@ -523,21 +556,30 @@ namespace detail
             std::vector< std::complex< long double > > )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: no support for long double complex vector attribute types" );
+                "[ADIOS2] Internal error: no support for long double complex "
+                "vector attribute types" );
         }
     };
 
-    template < typename T > struct AttributeTypes< std::vector< T > >
+    template< typename T >
+    struct AttributeTypes< std::vector< T > >
     {
-        using Attr = adios2::Attribute< T >;
+        using Attr = adios2::Variable< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO, std::string name,
-                                     const std::vector< T > & value );
+        static Attr
+        createAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            const std::vector< T > & value );
 
         static void
-        readAttribute( adios2::IO & IO, std::string name,
-                       std::shared_ptr< Attribute::resource > resource );
+        readAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            std::shared_ptr< Attribute::resource > resource );
 
         static bool
         attributeUnchanged(
@@ -566,18 +608,25 @@ namespace detail
         }
     };
 
-    template < typename T, size_t n >
+    template< typename T, size_t n >
     struct AttributeTypes< std::array< T, n > >
     {
-        using Attr = adios2::Attribute< T >;
+        using Attr = adios2::Variable< T >;
         using BasicType = T;
 
-        static Attr createAttribute( adios2::IO & IO, std::string name,
-                                     const std::array< T, n > & value );
+        static Attr
+        createAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            const std::array< T, n > & value );
 
         static void
-        readAttribute( adios2::IO & IO, std::string name,
-                       std::shared_ptr< Attribute::resource > resource );
+        readAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            std::shared_ptr< Attribute::resource > resource );
 
         static bool
         attributeUnchanged(
@@ -606,18 +655,26 @@ namespace detail
         }
     };
 
-    template <> struct AttributeTypes< bool >
+    template<>
+    struct AttributeTypes< bool >
     {
         using rep = detail::bool_representation;
-        using Attr = adios2::Attribute< rep >;
+        using Attr = adios2::Variable< rep >;
         using BasicType = rep;
 
-        static Attr createAttribute( adios2::IO & IO, std::string name,
-                                     bool value );
+        static Attr
+        createAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            bool value );
 
         static void
-        readAttribute( adios2::IO & IO, std::string name,
-                       std::shared_ptr< Attribute::resource > resource );
+        readAttribute(
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
+            std::shared_ptr< Attribute::resource > resource );
 
 
         static constexpr rep toRep( bool b )
@@ -834,13 +891,6 @@ namespace detail
         detail::WriteDataset const m_writeDataset;
         detail::DatasetReader const m_readDataset;
         detail::AttributeReader const m_attributeReader;
-
-        /*
-         * We call an attribute committed if the step during which it was
-         * written has been closed.
-         * A committed attribute cannot be modified.
-         */
-        std::set< std::string > uncommittedAttributes;
 
         /*
          * The openPMD API will generally create new attributes for each

@@ -904,10 +904,13 @@ namespace detail
             "[ADIOS2] Internal error: Unknown datatype trying to read a dataset." );
     }
 
-    template < typename T >
-    Datatype AttributeReader::
-    operator( )( adios2::IO & IO, std::string name,
-                 std::shared_ptr< Attribute::resource > resource )
+    template< typename T >
+    Datatype
+    AttributeReader::operator()(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        std::shared_ptr< Attribute::resource > resource )
     {
         /*
          * If we store an attribute of boolean type, we store an additional
@@ -935,12 +938,13 @@ namespace detail
                 auto attr = IO.InquireAttribute< rep >( metaAttr );
                 if (attr.Data().size() == 1 && attr.Data()[0] == 1)
                 {
-                    AttributeTypes< bool >::readAttribute( IO, name, resource );
+                    AttributeTypes< bool >::readAttribute(
+                        IO, engine, name, resource );
                     return determineDatatype< bool >();
                 }
             }
         }
-        AttributeTypes< T >::readAttribute( IO, name, resource );
+        AttributeTypes< T >::readAttribute( IO, engine, name, resource );
         return determineDatatype< T >();
     }
 
@@ -970,43 +974,12 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace( std::move( file ) );
 
-        std::string t = IO.AttributeType( fullName );
-        if ( !t.empty( ) ) // an attribute is present <=> it has a type
-        {
-            // don't overwrite attributes if they are equivalent
-            // overwriting is only legal within the same step
-
-            auto attributeModifiable = [ &filedata, &fullName ]() {
-                auto it = filedata.uncommittedAttributes.find( fullName );
-                return it != filedata.uncommittedAttributes.end();
-            };
-            if( AttributeTypes< T >::attributeUnchanged(
-                    IO,
-                    fullName,
-                    variantSrc::get< T >( parameters.resource ) ) )
-            {
-                return;
-            }
-            else if( attributeModifiable() )
-            {
-                IO.RemoveAttribute( fullName );
-            }
-            else
-            {
-                std::cerr << "[Warning][ADIOS2] Cannot modify attribute from "
-                             "previous step: "
-                          << fullName << std::endl;
-                return;
-            }
-        }
-        else
-        {
-            filedata.uncommittedAttributes.emplace( fullName );
-        }
-
         typename AttributeTypes< T >::Attr attr =
             AttributeTypes< T >::createAttribute(
-                IO, fullName, variantSrc::get< T >( parameters.resource ) );
+                IO,
+                filedata.requireActiveStep(),
+                fullName,
+                variantSrc::get< T >( parameters.resource ) );
         VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
     }
 
@@ -1071,107 +1044,141 @@ namespace detail
             "[ADIOS2] Defining a variable with undefined type." );
     }
 
-    template < typename T >
+    template< typename T >
     typename AttributeTypes< T >::Attr
-    AttributeTypes< T >::createAttribute( adios2::IO & IO, std::string name,
-                                          const T value )
+    AttributeTypes< T >::createAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        const T value )
     {
-        auto attr = IO.DefineAttribute( name, value );
-        if ( !attr )
+        auto attr = IO.DefineVariable< T >( name );
+        engine.Put( attr, value );
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" + name +
+                "'." );
         }
         return attr;
     }
 
-    template < typename T >
-    void AttributeTypes< T >::readAttribute(
-        adios2::IO & IO, std::string name,
+    template< typename T >
+    void
+    AttributeTypes< T >::readAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
         auto attr = IO.InquireAttribute< BasicType >( name );
-        if ( !attr )
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed reading attribute '" + name +
+                "'." );
         }
-        *resource = attr.Data( )[0];
+        *resource = attr.Data()[ 0 ];
     }
 
-    template < typename T >
+    template< typename T >
     typename AttributeTypes< std::vector< T > >::Attr
     AttributeTypes< std::vector< T > >::createAttribute(
-        adios2::IO & IO, std::string name, const std::vector< T > & value )
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        const std::vector< T > & value )
     {
-        auto attr = IO.DefineAttribute( name, value.data( ), value.size( ) );
-        if ( !attr )
+        auto size = value.size();
+        auto attr = IO.DefineVariable< T >( name, {size}, {0}, {size} );
+        engine.Put( attr, value.data() );
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" + name +
+                "'." );
         }
         return attr;
     }
 
-    template < typename T >
-    void AttributeTypes< std::vector< T > >::readAttribute(
-        adios2::IO & IO, std::string name,
+    template< typename T >
+    void
+    AttributeTypes< std::vector< T > >::readAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
         auto attr = IO.InquireAttribute< BasicType >( name );
-        if ( !attr )
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed reading attribute '" + name +
+                "'." );
         }
-        *resource = attr.Data( );
+        *resource = attr.Data();
     }
 
-    template < typename T, size_t n >
+    template< typename T, size_t n >
     typename AttributeTypes< std::array< T, n > >::Attr
     AttributeTypes< std::array< T, n > >::createAttribute(
-        adios2::IO & IO, std::string name, const std::array< T, n > & value )
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        const std::array< T, n > & value )
     {
-        auto attr = IO.DefineAttribute( name, value.data( ), n );
-        if ( !attr )
+        auto attr = IO.DefineVariable<T>( name, {n}, {0}, {n} );
+        engine.Put( attr, value.data() );
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" + name +
+                "'." );
         }
         return attr;
     }
 
-    template < typename T, size_t n >
-    void AttributeTypes< std::array< T, n > >::readAttribute(
-        adios2::IO & IO, std::string name,
+    template< typename T, size_t n >
+    void
+    AttributeTypes< std::array< T, n > >::readAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
         auto attr = IO.InquireAttribute< BasicType >( name );
-        if ( !attr )
+        if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name + "'." );
+                "[ADIOS2] Internal error: Failed reading attribute '" + name +
+                "'." );
         }
-        auto data = attr.Data( );
+        auto data = attr.Data();
         std::array< T, n > res;
-        for ( size_t i = 0; i < n; i++ )
+        for( size_t i = 0; i < n; i++ )
         {
-            res[i] = data[i];
+            res[ i ] = data[ i ];
         }
         *resource = res;
     }
 
     typename AttributeTypes< bool >::Attr
-    AttributeTypes< bool >::createAttribute( adios2::IO & IO, std::string name,
-                                             const bool value )
+    AttributeTypes< bool >::createAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        const bool value )
     {
         IO.DefineAttribute< bool_representation >( "__is_boolean__" + name, 1 );
         return AttributeTypes< bool_representation >::createAttribute(
-            IO, name, toRep( value ) );
+            IO, engine, name, toRep( value ) );
     }
 
-    void AttributeTypes< bool >::readAttribute(
-        adios2::IO & IO, std::string name,
+    void
+    AttributeTypes< bool >::readAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
         auto attr = IO.InquireAttribute< BasicType >( name );
@@ -1358,13 +1365,13 @@ namespace detail
                                       ") not found in backend." );
         }
 
-        Datatype ret =
-            switchType< Datatype >(
-                type,
-                detail::AttributeReader{},
-                ba.m_IO,
-                name,
-                param.resource );
+        Datatype ret = switchType< Datatype >(
+            type,
+            detail::AttributeReader{},
+            ba.m_IO,
+            ba.requireActiveStep(),
+            name,
+            param.resource );
         *param.dtype = ret;
     }
 
@@ -1715,8 +1722,6 @@ namespace detail
                 }
                 flush( false );
                 getEngine().EndStep();
-                m_buffer.clear();
-                uncommittedAttributes.clear();
                 streamStatus = StreamStatus::OutsideOfStep;
                 return AdvanceStatus::OK;
             }
