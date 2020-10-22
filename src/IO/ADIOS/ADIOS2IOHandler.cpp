@@ -1066,7 +1066,7 @@ namespace detail
         {
             attr = IO.DefineVariable< T >( name );
         }
-        engine.Put( attr, value );
+        engine.Put( attr, value, adios2::Mode::Sync );
         if( !attr )
         {
             throw std::runtime_error(
@@ -1108,10 +1108,9 @@ namespace detail
         // @todo check size
         if( !attr )
         {
-            attr =
-                IO.DefineVariable< T >( name, { size }, { 0 }, { size } );
+            attr = IO.DefineVariable< T >( name, { size }, { 0 }, { size } );
         }
-        engine.Put( attr, value.data() );
+        engine.Put( attr, value.data(), adios2::Mode::Sync );
         if( !attr )
         {
             throw std::runtime_error(
@@ -1162,7 +1161,7 @@ namespace detail
         {
             attr = IO.DefineVariable< T >( name, { n }, { 0 }, { n } );
         }
-        engine.Put( attr, value.data() );
+        engine.Put( attr, value.data(), adios2::Mode::Sync );
         if( !attr )
         {
             throw std::runtime_error(
