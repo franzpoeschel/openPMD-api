@@ -1489,7 +1489,7 @@ namespace detail
             auto it = streamingEngines.find( m_engineType );
             if( it != streamingEngines.end() )
             {
-                optimizeAttributesStreaming = true;
+                optimizeAttributesStreaming = false;
                 useAdiosSteps = Steps::UseSteps;
                 streamStatus = StreamStatus::OutsideOfStep;
             }
@@ -1498,7 +1498,7 @@ namespace detail
                 it = fileEngines.find( m_engineType );
                 if( it != fileEngines.end() )
                 {
-                    streamStatus = StreamStatus::NoStream;
+                    streamStatus = StreamStatus::OutsideOfStep;
                     optimizeAttributesStreaming = false;
                     useAdiosSteps = Steps::DontUseSteps;
                 }
@@ -1622,30 +1622,25 @@ namespace detail
                 case adios2::Mode::Read:
                 {
                     m_engine = auxiliary::makeOption(
-                adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
+                        adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
+                    m_engine.get().BeginStep();
+                    streamStatus = StreamStatus::DuringStep;
                     if( useAdiosSteps != Steps::Undecided )
                     {
                         break;
                     }
-                    if( streamStatus == StreamStatus::NoStream )
+                    auto attr =
+                        m_IO.InquireAttribute< bool_representation >(
+                            ADIOS2Defaults::str_usesstepsAttribute );
+                    if( attr )
                     {
-                        auto attr =
-                            m_IO.InquireAttribute< bool_representation >(
-                                ADIOS2Defaults::str_usesstepsAttribute );
-                        if( attr )
-                        {
-                            useAdiosSteps = attr.Data()[ 0 ] == 1
-                                ? Steps::UseSteps
-                                : Steps::DontUseSteps;
-                        }
-                        else
-                        {
-                            useAdiosSteps = Steps::DontUseSteps;
-                        }
+                        useAdiosSteps = attr.Data()[ 0 ] == 1
+                            ? Steps::UseSteps
+                            : Steps::DontUseSteps;
                     }
                     else
                     {
-                        useAdiosSteps = Steps::UseSteps;
+                        useAdiosSteps = Steps::DontUseSteps;
                     }
                     break;
                 }

@@ -1074,12 +1074,11 @@ namespace detail
          */
         enum class StreamStatus
         {
-            NoStream,
             DuringStep,
             OutsideOfStep,
             StreamOver
         };
-        StreamStatus streamStatus = StreamStatus::NoStream;
+        StreamStatus streamStatus = StreamStatus::OutsideOfStep;
         adios2::StepStatus m_lastStepStatus = adios2::StepStatus::OK;
 
         /*
