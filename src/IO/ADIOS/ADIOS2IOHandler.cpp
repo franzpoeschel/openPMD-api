@@ -982,13 +982,36 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace( std::move( file ) );
 
-        typename AttributeTypes< T >::Attr attr =
-            AttributeTypes< T >::createAttribute(
-                IO,
-                filedata.requireActiveStep(),
-                fullName,
-                variantSrc::get< T >( parameters.resource ) );
-        VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
+        // Have we written this one already?
+        auto it = filedata.m_attributesInThisStep.find( fullName );
+        if( it != filedata.m_attributesInThisStep.end() )
+        {
+            if( it->second == parameters.resource )
+            {
+                // yep, nothing to do
+                return;
+            }
+            else
+            {
+                // yep we have, but we'll need to overwrite
+                std::cerr << "[ADIOS2] WARNING: Overwriting attributes not yet "
+                             "supported: "
+                          << fullName << std::endl;
+                return;
+            }
+        }
+        else
+        {
+            typename AttributeTypes< T >::Attr attr =
+                AttributeTypes< T >::createAttribute(
+                    IO,
+                    filedata.requireActiveStep(),
+                    fullName,
+                    variantSrc::get< T >( parameters.resource ) );
+            filedata.m_attributesInThisStep.emplace(
+                fullName, parameters.resource );
+            VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
+        }
     }
 
     template < int n, typename... Params >
@@ -1064,6 +1087,8 @@ namespace detail
         // @todo check size
         if( !attr )
         {
+            // std::cout << "DATATYPE OF " << name << ": "
+            //     << IO.VariableType( name ) << std::endl;
             attr = IO.DefineVariable< T >( name );
         }
         engine.Put( attr, value, adios2::Mode::Sync );
@@ -1759,6 +1784,7 @@ namespace detail
                 }
                 flush( false );
                 getEngine().EndStep();
+                m_attributesInThisStep.clear();
                 streamStatus = StreamStatus::OutsideOfStep;
                 return AdvanceStatus::OK;
             }
@@ -1776,6 +1802,7 @@ namespace detail
                     adiosStatus = getEngine().BeginStep();
                     m_buffer.clear();
                 }
+                m_attributesInThisStep.clear();
                 AdvanceStatus res = AdvanceStatus::OK;
                 switch( adiosStatus )
                 {

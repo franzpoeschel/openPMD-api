@@ -983,6 +983,8 @@ namespace detail
         /** @}
          */
 
+        std::map< std::string, Attribute::resource > m_attributesInThisStep;
+
         using AttributeMap_t = std::map< std::string, adios2::Params >;
 
         BufferedActions( ADIOS2IOHandlerImpl & impl, InvalidatableFile file );
