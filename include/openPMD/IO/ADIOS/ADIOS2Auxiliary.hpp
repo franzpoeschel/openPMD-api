@@ -23,12 +23,14 @@
 
 #include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
-#include "openPMD/Datatype.hpp"
-#include <adios2.h>
-#include <complex>
-#include <stdexcept>
-#include <utility>
-#include <vector>
+#    include <adios2.h>
+#    include <complex>
+#    include <stdexcept>
+#    include <utility>
+#    include <vector>
+
+#    include "openPMD/Dataset.hpp"
+#    include "openPMD/Datatype.hpp"
 
 namespace openPMD
 {
@@ -84,16 +86,17 @@ namespace detail
     template< typename T >
     struct AttributeInfoHelper
     {
-        static typename std::vector< T >::size_type
+        static Extent
         getSize(
             adios2::IO &,
             std::string const & attributeName,
             VariableOrAttribute );
     };
 
-    template < > struct AttributeInfoHelper< std::complex< long double > >
+    template<>
+    struct AttributeInfoHelper< std::complex< long double > >
     {
-        static typename std::vector< long double >::size_type
+        static Extent
         getSize( adios2::IO &, std::string const &, VariableOrAttribute )
         {
             throw std::runtime_error( "[ADIOS2] Internal error: no support for "
@@ -101,18 +104,20 @@ namespace detail
         }
     };
 
-    template < typename T > struct AttributeInfoHelper< std::vector< T > >
+    template< typename T >
+    struct AttributeInfoHelper< std::vector< T > >
     {
-        static typename std::vector< T >::size_type
+        static Extent
         getSize(
             adios2::IO &,
             std::string const & attributeName,
             VariableOrAttribute );
     };
 
-    template < > struct AttributeInfoHelper< std::vector< std::complex< long double > > >
+    template<>
+    struct AttributeInfoHelper< std::vector< std::complex< long double > > >
     {
-        static typename std::vector< std::complex< long double > >::size_type
+        static Extent
         getSize( adios2::IO &, std::string const &, VariableOrAttribute )
         {
             throw std::runtime_error(
@@ -121,10 +126,10 @@ namespace detail
         }
     };
 
-    template < typename T, std::size_t n >
+    template< typename T, std::size_t n >
     struct AttributeInfoHelper< std::array< T, n > >
     {
-        static typename std::vector< T >::size_type
+        static Extent
         getSize(
             adios2::IO & IO,
             std::string const & attributeName,
@@ -134,9 +139,10 @@ namespace detail
         }
     };
 
-    template <> struct AttributeInfoHelper< bool >
+    template<>
+    struct AttributeInfoHelper< bool >
     {
-        static typename std::vector< bool_representation >::size_type
+        static Extent
         getSize(
             adios2::IO &,
             std::string const & attributeName,
@@ -146,11 +152,11 @@ namespace detail
     struct AttributeInfo
     {
         template< typename T, typename... Params >
-        typename std::vector< T >::size_type
+        Extent
         operator()( Params &&... );
 
         template< int n, typename... Params >
-        size_t
+        Extent
         operator()( Params &&... );
     };
 

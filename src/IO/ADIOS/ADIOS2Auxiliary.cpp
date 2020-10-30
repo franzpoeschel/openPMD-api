@@ -119,7 +119,7 @@ namespace detail
     }
 
     template< typename T >
-    typename std::vector< T >::size_type
+    Extent
     AttributeInfoHelper< T >::getSize(
         adios2::IO & IO,
         std::string const & attributeName,
@@ -135,7 +135,7 @@ namespace detail
                     throw std::runtime_error(
                         "[ADIOS2] Internal error: Attribute not present." );
                 }
-                return attribute.Data().size();
+                return { attribute.Data().size() };
             }
             case VariableOrAttribute::Variable:
             {
@@ -146,21 +146,13 @@ namespace detail
                         "[ADIOS2] Internal error: Variable not present." );
                 }
                 auto shape = variable.Shape();
-                if( shape.size() == 0 )
+                Extent res;
+                res.reserve( shape.size() );
+                for( auto val : shape )
                 {
-                    // single global value
-                    return 1;
+                    res.push_back( val );
                 }
-                else if( shape.size() == 1 )
-                {
-                    return shape[ 0 ];
-                }
-                else
-                {
-                    throw std::runtime_error(
-                        "[ADIOS2] Found multidimensional attribute'" +
-                        attributeName + "'." );
-                }
+                return res;
             }
             default:
                 throw std::runtime_error( "[ADIOS2] Unreachable!" );
@@ -168,7 +160,7 @@ namespace detail
     }
 
     template< typename T >
-    typename std::vector< T >::size_type
+    Extent
     AttributeInfoHelper< std::vector< T > >::getSize(
         adios2::IO & IO,
         std::string const & attributeName,
@@ -177,7 +169,7 @@ namespace detail
         return AttributeInfoHelper< T >::getSize( IO, attributeName, voa );
     }
 
-    typename std::vector< bool_representation >::size_type
+    Extent
     AttributeInfoHelper< bool >::getSize(
         adios2::IO & IO,
         std::string const & attributeName,
@@ -188,7 +180,7 @@ namespace detail
     }
 
     template< typename T, typename... Params >
-    typename std::vector< T >::size_type
+    Extent
     AttributeInfo::operator()( Params &&... params )
     {
         return AttributeInfoHelper< T >::getSize(
@@ -196,10 +188,10 @@ namespace detail
     }
 
     template< int n, typename... Params >
-    size_t
+    Extent
     AttributeInfo::operator()( Params &&... )
     {
-        return 0;
+        return { 0 };
     }
 
     Datatype
@@ -233,14 +225,28 @@ namespace detail
         {
             static AttributeInfo ai;
             Datatype basicType = fromADIOS2Type( type );
-            auto size =
-                switchType< size_t >( basicType, ai, IO, attributeName, voa );
-            Datatype openPmdType = size == 1
-                ? basicType
-                : size == 7 && basicType == Datatype::DOUBLE
-                    ? Datatype::ARR_DBL_7
-                    : toVectorType( basicType );
-            return openPmdType;
+            Extent shape =
+                switchType< Extent >( basicType, ai, IO, attributeName, voa );
+            if( shape.size() <= 1 )
+            {
+                // size == 0 <=> global single value variable
+                auto size = shape.size() == 0 ? 1 : shape[ 0 ];
+                Datatype openPmdType = size == 1
+                    ? basicType
+                    : size == 7 && basicType == Datatype::DOUBLE
+                        ? Datatype::ARR_DBL_7
+                        : toVectorType( basicType );
+                return openPmdType;
+            }
+            else if( shape.size() == 2 && basicType == Datatype::CHAR )
+            {
+                return Datatype::VEC_STRING;
+            }
+            else
+            {
+                throw std::runtime_error(
+                    "[ADIOS2] Unexpected shape for " + attributeName );
+            }
         }
     }
 } // namespace detail

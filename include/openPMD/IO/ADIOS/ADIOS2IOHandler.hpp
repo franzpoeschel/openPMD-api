@@ -612,7 +612,6 @@ namespace detail
     struct AttributeTypes< std::vector< std::string > >
     {
         using Attr = adios2::Variable< char >;
-        using BasicType = std::string;
 
         static Attr
         createAttribute(
@@ -653,14 +652,47 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO &,
-            adios2::Engine &,
-            std::string,
+            adios2::IO & IO,
+            adios2::Engine & engine,
+            std::string name,
             std::shared_ptr< Attribute::resource > resource )
         {
-            *resource = std::vector< std::string >{
-                "[ADIOS2] attribute type vector<string> unimplemented"
-            };
+            auto attr = IO.InquireVariable< char >( name );
+            if( !attr )
+            {
+                throw std::runtime_error(
+                    "[ADIOS2] Internal error: Failed reading attribute '" +
+                    name + "'." );
+            }
+            auto extent = attr.Shape();
+            if( extent.size() != 2 )
+            {
+                throw std::runtime_error( "[ADIOS2] Expecting 2D variable for "
+                                          "VEC_STRING openPMD attribute." );
+            }
+
+            size_t width = extent[ 0 ];
+            size_t height = extent[ 1 ];
+
+            std::vector< char > rawData( width * height );
+            attr.SetSelection( { { 0, 0 }, { width, height } } );
+            engine.Get( attr, rawData.data() );
+
+            std::vector< std::string > res( height );
+            for( size_t i = 0; i < height; ++i )
+            {
+                size_t start = i * width;
+                char * start_ptr = rawData.data() + start;
+                size_t j = 0;
+                while( j < width && start_ptr[ j ] != 0 )
+                {
+                    ++j;
+                }
+                std::string & str = res[ i ];
+                str.append( start_ptr, start_ptr + j );
+            }
+
+            *resource = res;
         }
 
         static bool
@@ -669,12 +701,12 @@ namespace detail
             std::string name,
             std::vector< std::string > val )
         {
-            auto attr = IO.InquireAttribute< BasicType >( name );
+            auto attr = IO.InquireAttribute< std::string >( name );
             if( !attr )
             {
                 return false;
             }
-            std::vector< BasicType > data = attr.Data();
+            std::vector< std::string > data = attr.Data();
             if( data.size() != val.size() )
             {
                 return false;
