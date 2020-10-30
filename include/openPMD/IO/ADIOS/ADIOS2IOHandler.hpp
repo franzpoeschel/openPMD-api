@@ -380,10 +380,12 @@ namespace detail
 
     struct AttributeWriter
     {
-        template < typename T >
+        template< typename T >
         void
-        operator( )( ADIOS2IOHandlerImpl * impl, Writable * writable,
-                     const Parameter< Operation::WRITE_ATT > & parameters );
+        operator()(
+            Attribute::resource const & resource,
+            std::string const & fullName,
+            BufferedActions & fileData );
 
 
         template < int n, typename... Params > void operator( )( Params &&... );
@@ -960,7 +962,18 @@ namespace detail
         Parameter< Operation::READ_ATT > param;
         std::string name;
 
-        void run( BufferedActions & ) override;
+        void
+        run( BufferedActions & ) override;
+    };
+
+    struct BufferedAttributeWrite : BufferedAction
+    {
+        std::string name;
+        Datatype dtype;
+        Attribute::resource resource;
+
+        void
+        run( BufferedActions & ) override;
     };
 
     /*
@@ -1002,6 +1015,7 @@ namespace detail
         adios2::ADIOS & m_ADIOS;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
+        std::map< std::string, BufferedAttributeWrite > m_attributesBuffer;
         adios2::Mode m_mode;
         detail::WriteDataset const m_writeDataset;
         detail::DatasetReader const m_readDataset;
@@ -1033,8 +1047,6 @@ namespace detail
         Steps useAdiosSteps = Steps::Undecided;
         /** @}
          */
-
-        std::map< std::string, Attribute::resource > m_attributesInThisStep;
 
         using AttributeMap_t = std::map< std::string, adios2::Params >;
 

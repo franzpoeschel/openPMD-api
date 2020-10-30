@@ -468,8 +468,27 @@ void ADIOS2IOHandlerImpl::writeDataset(
 void ADIOS2IOHandlerImpl::writeAttribute(
     Writable * writable, const Parameter< Operation::WRITE_ATT > & parameters )
 {
-    switchType( parameters.dtype, detail::AttributeWriter( ), this, writable,
-                parameters );
+    VERIFY_ALWAYS(
+        m_handler->m_backendAccess != Access::READ_ONLY,
+        "[ADIOS2] Cannot write attribute in read-only mode." );
+    auto pos = setAndGetFilePosition( writable );
+    auto file = refreshFileFromParent( writable );
+    auto fullName = nameOfAttribute( writable, parameters.name );
+    auto prefix = filePositionToString( pos );
+
+    auto & filedata = getFileData( file );
+    filedata.invalidateAttributesMap();
+    m_dirty.emplace( std::move( file ) );
+
+    // detail::BufferedAttributeWrite bufferedWrite;
+    // bufferedWrite.param = *dynamic_cast< Parameter< Operation::WRITE_ATT > *
+    // >(
+    //     &*parameters.clone() );
+    // this intentionally overwrites previous writes
+    auto & bufferedWrite = filedata.m_attributesBuffer[ fullName ];
+    bufferedWrite.name = fullName;
+    bufferedWrite.dtype = parameters.dtype;
+    bufferedWrite.resource = parameters.resource;
 }
 
 void ADIOS2IOHandlerImpl::readDataset(
@@ -963,55 +982,20 @@ namespace detail
                                   "trying to read an attribute." );
     }
 
-    template < typename T >
-    void AttributeWriter::
-    operator( )( ADIOS2IOHandlerImpl * impl, Writable * writable,
-                 const Parameter< Operation::WRITE_ATT > & parameters )
+    template< typename T >
+    void
+    AttributeWriter::operator()(
+        Attribute::resource const & resource,
+        std::string const & fullName,
+        BufferedActions & fileData )
     {
-
-        VERIFY_ALWAYS( impl->m_handler->m_backendAccess !=
-                           Access::READ_ONLY,
-                       "[ADIOS2] Cannot write attribute in read-only mode." );
-        auto pos = impl->setAndGetFilePosition( writable );
-        auto file = impl->refreshFileFromParent( writable );
-        auto fullName = impl->nameOfAttribute( writable, parameters.name );
-        auto prefix = impl->filePositionToString( pos );
-
-        auto & filedata = impl->getFileData( file );
-        filedata.invalidateAttributesMap();
-        adios2::IO IO = filedata.m_IO;
-        impl->m_dirty.emplace( std::move( file ) );
-
-        // Have we written this one already?
-        auto it = filedata.m_attributesInThisStep.find( fullName );
-        if( it != filedata.m_attributesInThisStep.end() )
-        {
-            if( it->second == parameters.resource )
-            {
-                // yep, nothing to do
-                return;
-            }
-            else
-            {
-                // yep we have, but we'll need to overwrite
-                std::cerr << "[ADIOS2] WARNING: Overwriting attributes not yet "
-                             "supported: "
-                          << fullName << std::endl;
-                return;
-            }
-        }
-        else
-        {
-            typename AttributeTypes< T >::Attr attr =
-                AttributeTypes< T >::createAttribute(
-                    IO,
-                    filedata.requireActiveStep(),
-                    fullName,
-                    variantSrc::get< T >( parameters.resource ) );
-            filedata.m_attributesInThisStep.emplace(
-                fullName, parameters.resource );
-            VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
-        }
+        typename AttributeTypes< T >::Attr attr =
+            AttributeTypes< T >::createAttribute(
+                fileData.m_IO,
+                fileData.requireActiveStep(),
+                fullName,
+                variantSrc::get< T >( resource ) );
+        VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
     }
 
     template < int n, typename... Params >
@@ -1442,6 +1426,13 @@ namespace detail
         *param.dtype = ret;
     }
 
+    void
+    BufferedAttributeWrite::run( BufferedActions & fileData )
+    {
+        switchType(
+            dtype, detail::AttributeWriter(), resource, name, fileData );
+    }
+
     BufferedActions::BufferedActions(
         ADIOS2IOHandlerImpl & impl,
         InvalidatableFile file )
@@ -1720,7 +1711,7 @@ namespace detail
          */
         if( streamStatus == StreamStatus::OutsideOfStep )
         {
-            if( m_buffer.empty() )
+            if( m_buffer.empty() && m_attributesBuffer.empty() )
             {
                 return;
             }
@@ -1735,6 +1726,14 @@ namespace detail
         }
         if( performDatasetPutGets )
         {
+            for( auto & ba : m_buffer )
+            {
+                ba->run( *this );
+            }
+            for( auto & pair : m_attributesBuffer )
+            {
+                pair.second.run( *this );
+            }
             // Flush() does not necessarily perform
             // deferred actions....
             switch ( m_mode )
@@ -1755,6 +1754,8 @@ namespace detail
             }
             m_buffer.clear();
         }
+        m_buffer.clear();
+        m_attributesBuffer.clear();
     }
 
     AdvanceStatus
@@ -1784,7 +1785,6 @@ namespace detail
                 }
                 flush( false );
                 getEngine().EndStep();
-                m_attributesInThisStep.clear();
                 streamStatus = StreamStatus::OutsideOfStep;
                 return AdvanceStatus::OK;
             }
@@ -1802,7 +1802,6 @@ namespace detail
                     adiosStatus = getEngine().BeginStep();
                     m_buffer.clear();
                 }
-                m_attributesInThisStep.clear();
                 AdvanceStatus res = AdvanceStatus::OK;
                 switch( adiosStatus )
                 {
