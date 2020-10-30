@@ -611,7 +611,7 @@ namespace detail
     template<>
     struct AttributeTypes< std::vector< std::string > >
     {
-        using Attr = adios2::Variable< std::string >;
+        using Attr = adios2::Variable< char >;
         using BasicType = std::string;
 
         static Attr
@@ -619,17 +619,35 @@ namespace detail
             adios2::IO & IO,
             adios2::Engine & engine,
             std::string name,
-            const std::vector< std::string > & )
+            const std::vector< std::string > & vec )
         {
+            size_t width = 0;
+            for( auto const & str : vec )
+            {
+                width = std::max( width, str.size() );
+            }
+            ++width; // null delimiter
+            size_t const height = vec.size();
+
+            auto attr = IO.InquireVariable< char >( name );
             // @todo check size
-            auto attr = IO.InquireVariable< std::string >( name );
             if( !attr )
             {
-                attr = IO.DefineVariable< std::string >( name );
+                attr = IO.DefineVariable< char >(
+                    name, { width, height }, { 0, 0 }, { width, height } );
             }
+
+            std::vector< char > rawData( width * height, 0 );
+            for( size_t i = 0; i < height; ++i )
+            {
+                size_t start = i * width;
+                std::string const & str = vec[ i ];
+                std::copy( str.begin(), str.end(), rawData.begin() + start );
+            }
+
             std::string notice =
                 "[ADIOS2] attribute type vector<string> unimplemented";
-            engine.Put( attr, notice );
+            engine.Put( attr, rawData.data() );
             return attr;
         }
 
