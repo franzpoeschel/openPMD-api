@@ -633,7 +633,7 @@ namespace detail
             if( !attr )
             {
                 attr = IO.DefineVariable< char >(
-                    name, { width, height }, { 0, 0 }, { width, height } );
+                    name, { height, width }, { 0, 0 }, { height, width } );
             }
 
             std::vector< char > rawData( width * height, 0 );
@@ -646,7 +646,7 @@ namespace detail
 
             std::string notice =
                 "[ADIOS2] attribute type vector<string> unimplemented";
-            engine.Put( attr, rawData.data() );
+            engine.Put( attr, rawData.data(), adios2::Mode::Sync );
             return attr;
         }
 
@@ -671,12 +671,13 @@ namespace detail
                                           "VEC_STRING openPMD attribute." );
             }
 
-            size_t width = extent[ 0 ];
-            size_t height = extent[ 1 ];
+            size_t height = extent[ 0 ];
+            size_t width = extent[ 1 ];
 
             std::vector< char > rawData( width * height );
-            attr.SetSelection( { { 0, 0 }, { width, height } } );
-            engine.Get( attr, rawData.data() );
+            attr.SetSelection( { { 0, 0 }, { height, width } } );
+            // @todo no sync reading
+            engine.Get( attr, rawData.data(), adios2::Mode::Sync );
 
             std::vector< std::string > res( height );
             for( size_t i = 0; i < height; ++i )
