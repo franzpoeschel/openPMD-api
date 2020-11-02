@@ -985,16 +985,15 @@ namespace detail
     template< typename T >
     void
     AttributeWriter::operator()(
-        Attribute::resource const & resource,
-        std::string const & fullName,
+        detail::BufferedAttributeWrite & params,
         BufferedActions & fileData )
     {
         typename AttributeTypes< T >::Attr attr =
             AttributeTypes< T >::createAttribute(
                 fileData.m_IO,
                 fileData.requireActiveStep(),
-                fullName,
-                variantSrc::get< T >( resource ) );
+                params,
+                variantSrc::get< T >( params.resource ) );
         VERIFY_ALWAYS( attr, "[ADIOS2] Failed creating attribute." )
     }
 
@@ -1064,23 +1063,23 @@ namespace detail
     AttributeTypes< T >::createAttribute(
         adios2::IO & IO,
         adios2::Engine & engine,
-        std::string name,
+        detail::BufferedAttributeWrite & params,
         const T value )
     {
-        auto attr = IO.InquireVariable< T >( name );
+        auto attr = IO.InquireVariable< T >( params.name );
         // @todo check size
         if( !attr )
         {
             // std::cout << "DATATYPE OF " << name << ": "
             //     << IO.VariableType( name ) << std::endl;
-            attr = IO.DefineVariable< T >( name );
+            attr = IO.DefineVariable< T >( params.name );
         }
-        engine.Put( attr, value, adios2::Mode::Sync );
+        engine.Put( attr, value, adios2::Mode::Deferred );
         if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name +
-                "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" +
+                params.name + "'." );
         }
         return attr;
     }
@@ -1109,22 +1108,23 @@ namespace detail
     AttributeTypes< std::vector< T > >::createAttribute(
         adios2::IO & IO,
         adios2::Engine & engine,
-        std::string name,
+        detail::BufferedAttributeWrite & params,
         const std::vector< T > & value )
     {
         auto size = value.size();
-        auto attr = IO.InquireVariable< T >( name );
+        auto attr = IO.InquireVariable< T >( params.name );
         // @todo check size
         if( !attr )
         {
-            attr = IO.DefineVariable< T >( name, { size }, { 0 }, { size } );
+            attr = IO.DefineVariable< T >(
+                params.name, { size }, { 0 }, { size } );
         }
-        engine.Put( attr, value.data(), adios2::Mode::Sync );
+        engine.Put( attr, value.data(), adios2::Mode::Deferred );
         if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name +
-                "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" +
+                params.name + "'." );
         }
         return attr;
     }
@@ -1156,26 +1156,113 @@ namespace detail
             attr, variantSrc::get< std::vector< T > >( *resource ).data() );
     }
 
+    typename AttributeTypes< std::vector< std::string > >::Attr
+    AttributeTypes< std::vector< std::string > >::createAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        detail::BufferedAttributeWrite & params,
+        const std::vector< std::string > & vec )
+    {
+        size_t width = 0;
+        for( auto const & str : vec )
+        {
+            width = std::max( width, str.size() );
+        }
+        ++width; // null delimiter
+        size_t const height = vec.size();
+
+        auto attr = IO.InquireVariable< char >( params.name );
+        // @todo check size
+        if( !attr )
+        {
+            attr = IO.DefineVariable< char >(
+                params.name, { height, width }, { 0, 0 }, { height, width } );
+        }
+
+        // write this thing to the params, so we don't get a use after free
+        // due to deferred writing
+        params.bufferForVecString = std::vector< char >( width * height, 0 );
+        for( size_t i = 0; i < height; ++i )
+        {
+            size_t start = i * width;
+            std::string const & str = vec[ i ];
+            std::copy(
+                str.begin(),
+                str.end(),
+                params.bufferForVecString.begin() + start );
+        }
+
+        engine.Put(
+            attr, params.bufferForVecString.data(), adios2::Mode::Deferred );
+        return attr;
+    }
+
+    void
+    AttributeTypes< std::vector< std::string > >::readAttribute(
+        adios2::IO & IO,
+        adios2::Engine & engine,
+        std::string name,
+        std::shared_ptr< Attribute::resource > resource )
+    {
+        auto attr = IO.InquireVariable< char >( name );
+        if( !attr )
+        {
+            throw std::runtime_error(
+                "[ADIOS2] Internal error: Failed reading attribute '" + name +
+                "'." );
+        }
+        auto extent = attr.Shape();
+        if( extent.size() != 2 )
+        {
+            throw std::runtime_error( "[ADIOS2] Expecting 2D variable for "
+                                      "VEC_STRING openPMD attribute." );
+        }
+
+        size_t height = extent[ 0 ];
+        size_t width = extent[ 1 ];
+
+        std::vector< char > rawData( width * height );
+        attr.SetSelection( { { 0, 0 }, { height, width } } );
+        // @todo no sync reading
+        engine.Get( attr, rawData.data(), adios2::Mode::Sync );
+
+        std::vector< std::string > res( height );
+        for( size_t i = 0; i < height; ++i )
+        {
+            size_t start = i * width;
+            char * start_ptr = rawData.data() + start;
+            size_t j = 0;
+            while( j < width && start_ptr[ j ] != 0 )
+            {
+                ++j;
+            }
+            std::string & str = res[ i ];
+            str.append( start_ptr, start_ptr + j );
+        }
+
+        *resource = res;
+    }
+
     template< typename T, size_t n >
     typename AttributeTypes< std::array< T, n > >::Attr
     AttributeTypes< std::array< T, n > >::createAttribute(
         adios2::IO & IO,
         adios2::Engine & engine,
-        std::string name,
+        detail::BufferedAttributeWrite & params,
         const std::array< T, n > & value )
     {
-        auto attr = IO.InquireVariable< T >( name );
+        auto attr = IO.InquireVariable< T >( params.name );
         // @todo check size
         if( !attr )
         {
-            attr = IO.DefineVariable< T >( name, { n }, { 0 }, { n } );
+            attr = IO.DefineVariable< T >( params.name, { n }, { 0 }, { n } );
         }
-        engine.Put( attr, value.data(), adios2::Mode::Sync );
+        engine.Put( attr, value.data(), adios2::Mode::Deferred );
         if( !attr )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed defining attribute '" + name +
-                "'." );
+                "[ADIOS2] Internal error: Failed defining attribute '" +
+                params.name + "'." );
         }
         return attr;
     }
@@ -1211,12 +1298,13 @@ namespace detail
     AttributeTypes< bool >::createAttribute(
         adios2::IO & IO,
         adios2::Engine & engine,
-        std::string name,
+        detail::BufferedAttributeWrite & params,
         const bool value )
     {
-        IO.DefineAttribute< bool_representation >( "__is_boolean__" + name, 1 );
+        IO.DefineAttribute< bool_representation >(
+            "__is_boolean__" + params.name, 1 );
         return AttributeTypes< bool_representation >::createAttribute(
-            IO, engine, name, toRep( value ) );
+            IO, engine, params, toRep( value ) );
     }
 
     void
@@ -1429,8 +1517,7 @@ namespace detail
     void
     BufferedAttributeWrite::run( BufferedActions & fileData )
     {
-        switchType(
-            dtype, detail::AttributeWriter(), resource, name, fileData );
+        switchType( dtype, detail::AttributeWriter(), *this, fileData );
     }
 
     BufferedActions::BufferedActions(

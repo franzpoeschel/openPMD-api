@@ -74,6 +74,7 @@ namespace detail
     struct BufferedPut;
     struct BufferedGet;
     struct BufferedAttributeRead;
+    struct BufferedAttributeWrite;
 } // namespace detail
 
 
@@ -383,8 +384,7 @@ namespace detail
         template< typename T >
         void
         operator()(
-            Attribute::resource const & resource,
-            std::string const & fullName,
+            detail::BufferedAttributeWrite & params,
             BufferedActions & fileData );
 
 
@@ -451,7 +451,7 @@ namespace detail
         createAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
-            std::string name,
+            detail::BufferedAttributeWrite & params,
             BasicType value );
 
         static void
@@ -492,7 +492,7 @@ namespace detail
         createAttribute(
             adios2::IO &,
             adios2::Engine &,
-            std::string,
+            detail::BufferedAttributeWrite &,
             std::complex< long double > )
         {
             throw std::runtime_error( "[ADIOS2] Internal error: no support for "
@@ -531,7 +531,7 @@ namespace detail
         createAttribute(
             adios2::IO &,
             adios2::Engine &,
-            std::string,
+            detail::BufferedAttributeWrite &,
             const std::vector< std::complex< long double > > & )
         {
             throw std::runtime_error(
@@ -573,7 +573,7 @@ namespace detail
         createAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
-            std::string name,
+            detail::BufferedAttributeWrite & params,
             const std::vector< T > & value );
 
         static void
@@ -619,84 +619,15 @@ namespace detail
         createAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
-            std::string name,
-            const std::vector< std::string > & vec )
-        {
-            size_t width = 0;
-            for( auto const & str : vec )
-            {
-                width = std::max( width, str.size() );
-            }
-            ++width; // null delimiter
-            size_t const height = vec.size();
-
-            auto attr = IO.InquireVariable< char >( name );
-            // @todo check size
-            if( !attr )
-            {
-                attr = IO.DefineVariable< char >(
-                    name, { height, width }, { 0, 0 }, { height, width } );
-            }
-
-            std::vector< char > rawData( width * height, 0 );
-            for( size_t i = 0; i < height; ++i )
-            {
-                size_t start = i * width;
-                std::string const & str = vec[ i ];
-                std::copy( str.begin(), str.end(), rawData.begin() + start );
-            }
-
-            std::string notice =
-                "[ADIOS2] attribute type vector<string> unimplemented";
-            engine.Put( attr, rawData.data(), adios2::Mode::Sync );
-            return attr;
-        }
+            detail::BufferedAttributeWrite & params,
+            const std::vector< std::string > & vec );
 
         static void
         readAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
             std::string name,
-            std::shared_ptr< Attribute::resource > resource )
-        {
-            auto attr = IO.InquireVariable< char >( name );
-            if( !attr )
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Internal error: Failed reading attribute '" +
-                    name + "'." );
-            }
-            auto extent = attr.Shape();
-            if( extent.size() != 2 )
-            {
-                throw std::runtime_error( "[ADIOS2] Expecting 2D variable for "
-                                          "VEC_STRING openPMD attribute." );
-            }
-
-            size_t height = extent[ 0 ];
-            size_t width = extent[ 1 ];
-
-            std::vector< char > rawData( width * height );
-            attr.SetSelection( { { 0, 0 }, { height, width } } );
-            // @todo no sync reading
-            engine.Get( attr, rawData.data(), adios2::Mode::Sync );
-
-            std::vector< std::string > res( height );
-            for( size_t i = 0; i < height; ++i )
-            {
-                size_t start = i * width;
-                char * start_ptr = rawData.data() + start;
-                size_t j = 0;
-                while( j < width && start_ptr[ j ] != 0 )
-                {
-                    ++j;
-                }
-                std::string & str = res[ i ];
-                str.append( start_ptr, start_ptr + j );
-            }
-
-            *resource = res;
-        }
+            std::shared_ptr< Attribute::resource > resource );
 
         static bool
         attributeUnchanged(
@@ -735,7 +666,7 @@ namespace detail
         createAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
-            std::string name,
+            detail::BufferedAttributeWrite & params,
             const std::array< T, n > & value );
 
         static void
@@ -783,7 +714,7 @@ namespace detail
         createAttribute(
             adios2::IO & IO,
             adios2::Engine & engine,
-            std::string name,
+            detail::BufferedAttributeWrite & params,
             bool value );
 
         static void
@@ -971,6 +902,7 @@ namespace detail
         std::string name;
         Datatype dtype;
         Attribute::resource resource;
+        std::vector< char > bufferForVecString;
 
         void
         run( BufferedActions & ) override;
