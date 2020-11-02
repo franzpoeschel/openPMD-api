@@ -194,7 +194,9 @@ ADIOS2IOHandlerImpl::flush()
     {
         if ( m_dirty.find( p.first ) != m_dirty.end( ) )
         {
-            p.second->flush( true );
+            p.second->flush(
+                /* performDatasetPutGets = */ true,
+                /* writeAttributes = */ false );
         }
         else
         {
@@ -377,10 +379,9 @@ ADIOS2IOHandlerImpl::closeFile(
         auto it = m_fileData.find( fileIterator->second );
         if ( it != m_fileData.end( ) )
         {
-            auto & filedata = *it->second;
-            filedata.flush( false );
-            filedata.getEngine().Close();
-            filedata.m_buffer.clear();
+            it->second->flush(
+                /* performDatasetPutGets = */ false,
+                /* writeAttributes = */ true );
             m_fileData.erase( it );
         }
     }
@@ -1548,9 +1549,22 @@ namespace detail
     BufferedActions::~BufferedActions()
     {
         // if write accessing, ensure that the engine is opened
-        if( !m_engine && m_mode != adios2::Mode::Read )
+        // and that all attributes are written
+        // (attributes are written upon closing a step or a file
+        // which users might never do)
+        bool needToWriteAttributes = !m_attributesBuffer.empty();
+        if( ( needToWriteAttributes || !m_engine ) &&
+            m_mode != adios2::Mode::Read )
         {
-            getEngine();
+            auto & engine = getEngine();
+            if( needToWriteAttributes )
+            {
+                for( auto & pair : m_attributesBuffer )
+                {
+                    pair.second.run( *this );
+                }
+                engine.PerformPuts();
+            }
         }
         if( m_engine )
         {
@@ -1786,7 +1800,7 @@ namespace detail
     }
 
     void
-    BufferedActions::flush( bool performDatasetPutGets )
+    BufferedActions::flush( bool performDatasetPutGets, bool writeAttributes )
     {
         if( streamStatus == StreamStatus::StreamOver )
         {
@@ -1798,7 +1812,8 @@ namespace detail
          */
         if( streamStatus == StreamStatus::OutsideOfStep )
         {
-            if( m_buffer.empty() && m_attributesBuffer.empty() )
+            if( m_buffer.empty() &&
+                ( !writeAttributes || m_attributesBuffer.empty() ) )
             {
                 return;
             }
@@ -1817,9 +1832,12 @@ namespace detail
             {
                 ba->run( *this );
             }
-            for( auto & pair : m_attributesBuffer )
+            if( writeAttributes )
             {
-                pair.second.run( *this );
+                for( auto & pair : m_attributesBuffer )
+                {
+                    pair.second.run( *this );
+                }
             }
             // Flush() does not necessarily perform
             // deferred actions....
@@ -1842,7 +1860,10 @@ namespace detail
             m_buffer.clear();
         }
         m_buffer.clear();
-        m_attributesBuffer.clear();
+        if( writeAttributes )
+        {
+            m_attributesBuffer.clear();
+        }
     }
 
     AdvanceStatus
@@ -1850,7 +1871,9 @@ namespace detail
     {
         if( useAdiosSteps == Steps::DontUseSteps )
         {
-            flush( true );
+            flush(
+                /* performDatasetPutGets = */ true,
+                /* writeAttributes = */ false );
             return AdvanceStatus::OK;
         }
         switch( mode )
@@ -1870,7 +1893,9 @@ namespace detail
                 {
                     getEngine().BeginStep();
                 }
-                flush( false );
+                flush(
+                    /* performDatasetPutGets = */ false,
+                    /* writeAttributes = */ true );
                 getEngine().EndStep();
                 streamStatus = StreamStatus::OutsideOfStep;
                 return AdvanceStatus::OK;
@@ -1885,7 +1910,9 @@ namespace detail
                 // return status is stored in m_lastStepStatus
                 if( streamStatus != StreamStatus::DuringStep )
                 {
-                    flush( false );
+                    flush(
+                        /* performDatasetPutGets = */ false,
+                        /* writeAttributes = */ false );
                     adiosStatus = getEngine().BeginStep();
                     m_buffer.clear();
                 }

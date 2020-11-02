@@ -1002,7 +1002,7 @@ namespace detail
          *        e.g. ending a step.)
          */
         void
-        flush( bool performDatasetPutGets );
+        flush( bool performDatasetPutGets, bool writeAttributes = false );
 
         /**
          * @brief Begin or end an ADIOS step.
