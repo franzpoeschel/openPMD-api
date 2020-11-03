@@ -21,6 +21,7 @@
 #pragma once
 
 #include "ADIOS2FilePosition.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 #include "openPMD/IO/AbstractIOHandlerImplCommon.hpp"
@@ -1048,6 +1049,7 @@ namespace detail
          * The ADIOS2 engine type, to be passed to adios2::IO::SetEngine
          */
         std::string m_engineType;
+        PreloadAdiosAttributes preloadAttributes;
         /*
          * streamStatus is NoStream for file-based ADIOS engines.
          * This is relevant for the method BufferedActions::requireActiveStep,

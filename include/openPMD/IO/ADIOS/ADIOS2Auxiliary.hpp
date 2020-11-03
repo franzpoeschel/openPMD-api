@@ -175,6 +175,36 @@ namespace detail
         std::string const & attributeName,
         bool verbose,
         VariableOrAttribute = VariableOrAttribute::Attribute );
+
+    template< typename T >
+    struct IsTrivialType
+    {
+        constexpr static bool val = true;
+    };
+
+    template< typename T >
+    struct IsTrivialType< std::vector< T > >
+    {
+        constexpr static bool val = false;
+    };
+
+    template< typename T, size_t n >
+    struct IsTrivialType< std::array< T, n > >
+    {
+        constexpr static bool val = false;
+    };
+
+    template<>
+    struct IsTrivialType< bool >
+    {
+        constexpr static bool val = false;
+    };
+
+    template< typename T >
+    struct IsTrivialType< std::complex< T > >
+    {
+        constexpr static bool val = false;
+    };
 } // namespace detail
 
 } // namespace openPMD

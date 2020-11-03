@@ -1780,6 +1780,10 @@ namespace detail
         if( streamStatus == StreamStatus::OutsideOfStep )
         {
             m_lastStepStatus = eng.BeginStep();
+            if( m_mode == adios2::Mode::Read )
+            {
+                preloadAttributes.preloadAttributes( m_IO, m_engine.get() );
+            }
             streamStatus = StreamStatus::DuringStep;
         }
         return eng;
@@ -1915,6 +1919,12 @@ namespace detail
                         /* writeAttributes = */ false );
                     adiosStatus = getEngine().BeginStep();
                     m_buffer.clear();
+                    if( adiosStatus == adios2::StepStatus::OK &&
+                        m_mode == adios2::Mode::Read )
+                    {
+                        preloadAttributes.preloadAttributes(
+                            m_IO, m_engine.get() );
+                    }
                 }
                 AdvanceStatus res = AdvanceStatus::OK;
                 switch( adiosStatus )
