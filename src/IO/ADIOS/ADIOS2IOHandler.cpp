@@ -486,7 +486,7 @@ void ADIOS2IOHandlerImpl::writeAttribute(
     // >(
     //     &*parameters.clone() );
     // this intentionally overwrites previous writes
-    auto & bufferedWrite = filedata.m_attributesBuffer[ fullName ];
+    auto & bufferedWrite = filedata.m_attributeWrites[ fullName ];
     bufferedWrite.name = fullName;
     bufferedWrite.dtype = parameters.dtype;
     bufferedWrite.resource = parameters.resource;
@@ -514,7 +514,7 @@ void ADIOS2IOHandlerImpl::readAttribute(
     detail::BufferedAttributeRead bar;
     bar.name = nameOfAttribute( writable, parameters.name );
     bar.param = parameters;
-    ba.enqueue( std::move( bar ) );
+    ba.m_attributeReads.push_back( std::move( bar ) );
     m_dirty.emplace( std::move( file ) );
 }
 
@@ -936,7 +936,7 @@ namespace detail
     Datatype
     AttributeReader::operator()(
         adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
@@ -967,12 +967,13 @@ namespace detail
                 if (attr.Data().size() == 1 && attr.Data()[0] == 1)
                 {
                     AttributeTypes< bool >::readAttribute(
-                        IO, engine, name, resource );
+                        preloadedAttributes, name, resource );
                     return determineDatatype< bool >();
                 }
             }
         }
-        AttributeTypes< T >::readAttribute( IO, engine, name, resource );
+        AttributeTypes< T >::readAttribute(
+            preloadedAttributes, name, resource );
         return determineDatatype< T >();
     }
 
@@ -1088,20 +1089,20 @@ namespace detail
     template< typename T >
     void
     AttributeTypes< T >::readAttribute(
-        adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireVariable< BasicType >( name );
-        if( !attr )
+        detail::AttributeWithShape< T > attr =
+            preloadedAttributes.getAttribute< T >( name );
+        if( !( attr.shape.size() == 0 ||
+               ( attr.shape.size() == 1 && attr.shape[ 0 ] == 1 ) ) )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name +
-                "'." );
+                "[ADIOS2] Expecting scalar ADIOS variable, got " +
+                std::to_string( attr.shape.size() ) + "D: " + name );
         }
-        *resource = T();
-        engine.Get( attr, &variantSrc::get< BasicType >( *resource ) );
+        *resource = *attr.data;
     }
 
     template< typename T >
@@ -1133,28 +1134,20 @@ namespace detail
     template< typename T >
     void
     AttributeTypes< std::vector< T > >::readAttribute(
-        adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireVariable< BasicType >( name );
-        if( !attr )
+        detail::AttributeWithShape< T > attr =
+            preloadedAttributes.getAttribute< T >( name );
+        if( attr.shape.size() != 1 )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name +
-                "'." );
+            throw std::runtime_error( "[ADIOS2] Expecting 1D ADIOS variable" );
         }
-        auto extent = attr.Shape();
-        if( extent.size() != 1 )
-        {
-            throw std::runtime_error(
-                "[ADIOS2] Found multidimensional attribute, expecting vector." );
-        }
-        attr.SetSelection( { { 0 }, extent } );
-        *resource = std::vector< T >( extent[ 0 ] );
-        engine.Get(
-            attr, variantSrc::get< std::vector< T > >( *resource ).data() );
+
+        std::vector< T > res( attr.shape[ 0 ] );
+        std::copy_n( attr.data, attr.shape[ 0 ], res.data() );
+        *resource = std::move( res );
     }
 
     typename AttributeTypes< std::vector< std::string > >::Attr
@@ -1200,33 +1193,21 @@ namespace detail
 
     void
     AttributeTypes< std::vector< std::string > >::readAttribute(
-        adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireVariable< char >( name );
-        if( !attr )
+        detail::AttributeWithShape< char > attr =
+            preloadedAttributes.getAttribute< char >( name );
+        if( attr.shape.size() != 2 )
         {
-            throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name +
-                "'." );
+            throw std::runtime_error( "[ADIOS2] Expecting 2D ADIOS variable" );
         }
-        auto extent = attr.Shape();
-        if( extent.size() != 2 )
-        {
-            throw std::runtime_error( "[ADIOS2] Expecting 2D variable for "
-                                      "VEC_STRING openPMD attribute." );
-        }
-
-        size_t height = extent[ 0 ];
-        size_t width = extent[ 1 ];
+        size_t height = attr.shape[ 0 ];
+        size_t width = attr.shape[ 1 ];
 
         std::vector< char > rawData( width * height );
-        attr.SetSelection( { { 0, 0 }, { height, width } } );
-        // @todo no sync reading
-        engine.Get( attr, rawData.data(), adios2::Mode::Sync );
-
+        std::copy_n( attr.data, width * height, rawData.data() );
         std::vector< std::string > res( height );
         for( size_t i = 0; i < height; ++i )
         {
@@ -1271,28 +1252,22 @@ namespace detail
     template< typename T, size_t n >
     void
     AttributeTypes< std::array< T, n > >::readAttribute(
-        adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireVariable< BasicType >( name );
-        if( !attr )
+        detail::AttributeWithShape< T > attr =
+            preloadedAttributes.getAttribute< T >( name );
+        if( attr.shape.size() != 1 || attr.shape[ 0 ] != n )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name +
-                "'." );
+                "[ADIOS2] Expecting 1D ADIOS variable of extent " +
+                std::to_string( n ) );
         }
-        auto extent = attr.Shape();
-        if( extent != adios2::Dims{ n } )
-        {
-            throw std::runtime_error(
-                "[ADIOS2] Attribute shape for '" + name + "' does not match." );
-        }
-        attr.SetSelection( { { 0 }, extent } );
-        *resource = std::array< T, n >();
-        engine.Get(
-            attr, variantSrc::get< std::array< T, n > >( *resource ).data() );
+
+        std::array< T, n > res;
+        std::copy_n( attr.data, n, res.data() );
+        *resource = std::move( res );
     }
 
     typename AttributeTypes< bool >::Attr
@@ -1310,20 +1285,21 @@ namespace detail
 
     void
     AttributeTypes< bool >::readAttribute(
-        adios2::IO & IO,
-        adios2::Engine & engine,
+        detail::PreloadAdiosAttributes const & preloadedAttributes,
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        auto attr = IO.InquireVariable< BasicType >( name );
-        if( !attr )
+        detail::AttributeWithShape< BasicType > attr =
+            preloadedAttributes.getAttribute< BasicType >( name );
+        if( !( attr.shape.size() == 0 ||
+               ( attr.shape.size() == 1 && attr.shape[ 0 ] == 1 ) ) )
         {
             throw std::runtime_error(
-                "[ADIOS2] Internal error: Failed reading attribute '" + name + "'." );
+                "[ADIOS2] Expecting scalar ADIOS variable, got " +
+                std::to_string( attr.shape.size() ) + "D: " + name );
         }
-        BasicType result;
-        engine.Get( attr, &result, adios2::Mode::Sync );
-        *resource = fromRep( result );
+
+        *resource = fromRep( *attr.data );
     }
 
     template < typename T >
@@ -1501,15 +1477,16 @@ namespace detail
 
         if( type == Datatype::UNDEFINED )
         {
-            throw std::runtime_error( "[ADIOS2] Requested attribute (" + name +
-                                      ") not found in backend." );
+            throw std::runtime_error(
+                "[ADIOS2] Requested attribute (" + name +
+                ") not found in backend." );
         }
 
         Datatype ret = switchType< Datatype >(
             type,
             detail::AttributeReader{},
             ba.m_IO,
-            ba.requireActiveStep(),
+            ba.preloadAttributes,
             name,
             param.resource );
         *param.dtype = ret;
@@ -1542,7 +1519,7 @@ namespace detail
         }
         else
         {
-            configure_IO(impl);
+            configure_IO( impl );
         }
     }
 
@@ -1552,14 +1529,14 @@ namespace detail
         // and that all attributes are written
         // (attributes are written upon closing a step or a file
         // which users might never do)
-        bool needToWriteAttributes = !m_attributesBuffer.empty();
+        bool needToWriteAttributes = !m_attributeWrites.empty();
         if( ( needToWriteAttributes || !m_engine ) &&
             m_mode != adios2::Mode::Read )
         {
             auto & engine = getEngine();
             if( needToWriteAttributes )
             {
-                for( auto & pair : m_attributesBuffer )
+                for( auto & pair : m_attributeWrites )
                 {
                     pair.second.run( *this );
                 }
@@ -1741,6 +1718,7 @@ namespace detail
                     m_engine = auxiliary::makeOption(
                         adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
                     m_engine.get().BeginStep();
+                    preloadAttributes.preloadAttributes( m_IO, m_engine.get() );
                     streamStatus = StreamStatus::DuringStep;
                     if( useAdiosSteps != Steps::Undecided )
                     {
@@ -1810,14 +1788,14 @@ namespace detail
         {
             return;
         }
-        auto & eng = getEngine( );
+        auto & eng = getEngine();
         /*
          * Only open a new step if it is necessary.
          */
         if( streamStatus == StreamStatus::OutsideOfStep )
         {
             if( m_buffer.empty() &&
-                ( !writeAttributes || m_attributesBuffer.empty() ) )
+                ( !writeAttributes || m_attributeWrites.empty() ) )
             {
                 return;
             }
@@ -1838,7 +1816,7 @@ namespace detail
             }
             if( writeAttributes )
             {
-                for( auto & pair : m_attributesBuffer )
+                for( auto & pair : m_attributeWrites )
                 {
                     pair.second.run( *this );
                 }
@@ -1855,8 +1833,8 @@ namespace detail
                 break;
             case adios2::Mode::Append:
                 // TODO order?
-                eng.PerformGets( );
-                eng.PerformPuts( );
+                eng.PerformGets();
+                eng.PerformPuts();
                 break;
             default:
                 break;
@@ -1864,9 +1842,14 @@ namespace detail
             m_buffer.clear();
         }
         m_buffer.clear();
+        for( BufferedAttributeRead & task : m_attributeReads )
+        {
+            task.run( *this );
+        }
+        m_attributeReads.clear();
         if( writeAttributes )
         {
-            m_attributesBuffer.clear();
+            m_attributeWrites.clear();
         }
     }
 

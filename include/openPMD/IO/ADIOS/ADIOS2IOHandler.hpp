@@ -371,7 +371,7 @@ namespace detail
         Datatype
         operator()(
             adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const & preloadedAttributes,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -457,8 +457,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const &,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -502,8 +501,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO &,
-            adios2::Engine &,
+            detail::PreloadAdiosAttributes const &,
             std::string,
             std::shared_ptr< Attribute::resource > )
         {
@@ -542,8 +540,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO &,
-            adios2::Engine &,
+            detail::PreloadAdiosAttributes const &,
             std::string,
             std::shared_ptr< Attribute::resource > )
         {
@@ -579,8 +576,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const &,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -625,8 +621,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const &,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -672,8 +667,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const &,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -720,8 +714,7 @@ namespace detail
 
         static void
         readAttribute(
-            adios2::IO & IO,
-            adios2::Engine & engine,
+            detail::PreloadAdiosAttributes const &,
             std::string name,
             std::shared_ptr< Attribute::resource > resource );
 
@@ -889,16 +882,16 @@ namespace detail
         void run( BufferedActions & ) override;
     };
 
-    struct BufferedAttributeRead : BufferedAction
+    struct BufferedAttributeRead
     {
         Parameter< Operation::READ_ATT > param;
         std::string name;
 
         void
-        run( BufferedActions & ) override;
+        run( BufferedActions & );
     };
 
-    struct BufferedAttributeWrite : BufferedAction
+    struct BufferedAttributeWrite
     {
         std::string name;
         Datatype dtype;
@@ -906,7 +899,7 @@ namespace detail
         std::vector< char > bufferForVecString;
 
         void
-        run( BufferedActions & ) override;
+        run( BufferedActions & );
     };
 
     /*
@@ -948,11 +941,13 @@ namespace detail
         adios2::ADIOS & m_ADIOS;
         adios2::IO m_IO;
         std::vector< std::unique_ptr< BufferedAction > > m_buffer;
-        std::map< std::string, BufferedAttributeWrite > m_attributesBuffer;
+        std::map< std::string, BufferedAttributeWrite > m_attributeWrites;
+        std::vector< BufferedAttributeRead > m_attributeReads;
         adios2::Mode m_mode;
         detail::WriteDataset const m_writeDataset;
         detail::DatasetReader const m_readDataset;
         detail::AttributeReader const m_attributeReader;
+        PreloadAdiosAttributes preloadAttributes;
 
         /*
          * The openPMD API will generally create new attributes for each
@@ -1049,7 +1044,6 @@ namespace detail
          * The ADIOS2 engine type, to be passed to adios2::IO::SetEngine
          */
         std::string m_engineType;
-        PreloadAdiosAttributes preloadAttributes;
         /*
          * streamStatus is NoStream for file-based ADIOS engines.
          * This is relevant for the method BufferedActions::requireActiveStep,

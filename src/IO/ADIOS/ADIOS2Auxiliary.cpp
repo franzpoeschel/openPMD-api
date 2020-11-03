@@ -227,6 +227,47 @@ namespace detail
             Datatype basicType = fromADIOS2Type( type );
             Extent shape =
                 switchType< Extent >( basicType, ai, IO, attributeName, voa );
+
+            switch( voa )
+            {
+                case VariableOrAttribute::Attribute:
+                {
+                    auto size = shape[ 0 ];
+                    Datatype openPmdType = size == 1
+                        ? basicType
+                        : size == 7 && basicType == Datatype::DOUBLE
+                            ? Datatype::ARR_DBL_7
+                            : toVectorType( basicType );
+                    return openPmdType;
+                }
+                case VariableOrAttribute::Variable:
+                {
+                    if( shape.size() == 0 ||
+                        ( shape.size() == 1 && shape[ 0 ] == 1 ) )
+                    {
+                        // global single value variable
+                        return basicType;
+                    }
+                    else if( shape.size() == 1 )
+                    {
+                        auto size = shape[ 0 ];
+                        Datatype openPmdType =
+                            size == 7 && basicType == Datatype::DOUBLE
+                            ? Datatype::ARR_DBL_7
+                            : toVectorType( basicType );
+                        return openPmdType;
+                    }
+                    else if( shape.size() == 2 && basicType == Datatype::CHAR )
+                    {
+                        return Datatype::VEC_STRING;
+                    }
+                    else
+                    {
+                        throw std::runtime_error(
+                            "[ADIOS2] Unexpected shape for " + attributeName );
+                    }
+                }
+            }
             if( shape.size() <= 1 )
             {
                 // size == 0 <=> global single value variable
