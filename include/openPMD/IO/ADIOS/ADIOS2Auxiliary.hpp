@@ -200,8 +200,14 @@ namespace detail
         constexpr static bool val = false;
     };
 
-    template< typename T >
-    struct IsTrivialType< std::complex< T > >
+    template<>
+    struct IsTrivialType< std::complex< long double > >
+    {
+        constexpr static bool val = false;
+    };
+
+    template<>
+    struct IsTrivialType< std::vector< std::complex< long double > > >
     {
         constexpr static bool val = false;
     };

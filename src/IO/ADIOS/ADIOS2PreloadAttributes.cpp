@@ -28,7 +28,7 @@ namespace detail
             adios2::Engine & engine,
             adios2::Variable< std::string > & var )
         {
-            engine.Get( var, ptr, adios2::Mode::Deferred );
+            engine.Get( var, *ptr, adios2::Mode::Sync );
         }
 
         template< typename T, typename = void >
@@ -99,10 +99,7 @@ namespace detail
                 }
                 else
                 {
-                    engine.Get(
-                        var,
-                        reinterpret_cast< T * >( buffer ),
-                        adios2::Mode::Deferred );
+                    engine.Get( var, dest, adios2::Mode::Deferred );
                 }
             }
         };
@@ -162,7 +159,7 @@ namespace detail
             constexpr size_t
             operator()()
             {
-                return AttributeTypes< T >::alignment();
+                return AttributeTypes< T >::size();
             }
 
             template< unsigned long, typename... Args >

@@ -34,6 +34,10 @@ namespace detail
 
     public:
         explicit PreloadAdiosAttributes() = default;
+        PreloadAdiosAttributes( PreloadAdiosAttributes const & other ) = delete;
+        PreloadAdiosAttributes &
+        operator=( PreloadAdiosAttributes const & other ) = delete;
+
         void
         preloadAttributes( adios2::IO & IO, adios2::Engine & engine );
         template< typename T >
