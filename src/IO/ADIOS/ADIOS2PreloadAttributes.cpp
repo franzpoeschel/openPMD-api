@@ -185,20 +185,6 @@ namespace detail
                 return {};
             }
         };
-
-        size_t
-        getMaxAlignment()
-        {
-            size_t res = 0;
-            GetAlignment ga;
-            for( auto dt : openPMD_Datatypes )
-            {
-                res = std::max( res, switchType< size_t >( dt, ga ) );
-            }
-            return res;
-        }
-
-        size_t maxAlignment = getMaxAlignment();
     } // namespace
 
     PreloadAdiosAttributes::AttributeLocation::AttributeLocation(
