@@ -15,22 +15,6 @@ namespace detail
 {
     namespace
     {
-        template< typename T >
-        void
-        loadString( T *, adios2::Engine &, adios2::Variable< T > & )
-        {
-        }
-
-        template<>
-        void
-        loadString< std::string >(
-            std::string * ptr,
-            adios2::Engine & engine,
-            adios2::Variable< std::string > & var )
-        {
-            engine.Get( var, *ptr, adios2::Mode::Sync );
-        }
-
         template< typename T, typename = void >
         struct AttributeTypes;
 
@@ -84,36 +68,19 @@ namespace detail
                     var.SetSelection( { offset, shape } );
                 }
                 T * dest = reinterpret_cast< T * >( buffer );
-                if
-#if __cplusplus > 201402L
-                    constexpr
-#endif
-                    ( std::is_same< T, std::string >::value )
+                size_t numItems = 1;
+                for( auto extent : shape )
                 {
-                    if( shape.size() > 0 )
-                    {
-                        throw std::runtime_error(
-                            "[ADIOS2] ADIOS does not support global string "
-                            "arrays." );
-                    }
-                    loadString< T >( dest, engine, var );
+                    numItems *= extent;
                 }
-                else
-                {
-                    size_t numItems = 1;
-                    for( auto extent : shape )
+                new( dest ) T[ numItems ];
+                location.destroy = [ dest, numItems ]() {
+                    for( size_t i = 0; i < numItems; ++i )
                     {
-                        numItems *= extent;
+                        dest[ i ].~T();
                     }
-                    new( dest ) T[ numItems ];
-                    location.destroy = [ dest, numItems ]() {
-                        for( size_t i = 0; i < numItems; ++i )
-                        {
-                            dest[ i ].~T();
-                        }
-                    };
-                    engine.Get( var, dest, adios2::Mode::Deferred );
-                }
+                };
+                engine.Get( var, dest, adios2::Mode::Deferred );
             }
         };
 
@@ -290,33 +257,11 @@ namespace detail
         // PHASE 2: get offsets for attributes in buffer
         std::map< Datatype, size_t > offsets;
         size_t currentOffset = 0;
-        size_t stringOffset = 0;
         GetAlignment __alignment;
         GetSize __size;
         VariableShape __shape;
         for( auto & pair : attributesByType )
         {
-            if( pair.first == Datatype::STRING )
-            {
-                for( std::string & name : pair.second )
-                {
-                    adios2::Dims shape =
-                        __shape.operator()< std::string >( IO, name );
-                    if( shape.size() > 0 )
-                    {
-                        throw std::runtime_error(
-                            "[ADIOS2] ADIOS does not support global string "
-                            "arrays." );
-                    };
-                    m_offsets.emplace(
-                        std::piecewise_construct,
-                        std::forward_as_tuple( std::move( name ) ),
-                        std::forward_as_tuple(
-                            adios2::Dims{}, stringOffset, Datatype::STRING ) );
-                    ++stringOffset;
-                }
-                continue;
-            }
             size_t alignment = switchType< size_t >( pair.first, __alignment );
             size_t size = switchType< size_t >( pair.first, __size );
             // go to next offset with valid alignment
@@ -345,55 +290,18 @@ namespace detail
         // now, currentOffset is the number of bytes that we need to allocate
         // PHASE 3: allocate new buffer and schedule loads
         m_rawBuffer.resize( currentOffset );
-        m_stringBuffer.resize( stringOffset );
         ScheduleLoad __schedule;
         for( auto & pair : m_offsets )
         {
-            if( pair.second.dt == Datatype::STRING )
-            {
-                __schedule.operator()< std::string >(
-                    IO,
-                    engine,
-                    pair.first,
-                    reinterpret_cast< char * >(
-                        &m_stringBuffer[ pair.second.offset ] ),
-                    pair.second );
-            }
-            else
-            {
-                switchType(
-                    pair.second.dt,
-                    __schedule,
-                    IO,
-                    engine,
-                    pair.first,
-                    &m_rawBuffer[ pair.second.offset ],
-                    pair.second );
-            }
+            switchType(
+                pair.second.dt,
+                __schedule,
+                IO,
+                engine,
+                pair.first,
+                &m_rawBuffer[ pair.second.offset ],
+                pair.second );
         }
-    }
-
-    template<>
-    AttributeWithShape< std::string >
-    PreloadAdiosAttributes::getAttribute< std::string >(
-        std::string const & name ) const
-    {
-        auto it = m_offsets.find( name );
-        if( it == m_offsets.end() )
-        {
-            throw std::runtime_error(
-                "[ADIOS2] Requested attribute not found: " + name );
-        }
-        AttributeLocation const & location = it->second;
-        if( location.dt != Datatype::STRING )
-        {
-            throw std::runtime_error(
-                "[ADIOS2] Wrong datatype for attribute: " + name );
-        }
-        AttributeWithShape< std::string > res;
-        res.shape = location.shape;
-        res.data = &m_stringBuffer[ location.offset ];
-        return res;
     }
 } // namespace detail
 } // namespace openPMD

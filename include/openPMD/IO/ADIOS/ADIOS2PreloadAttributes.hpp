@@ -42,9 +42,7 @@ namespace detail
         };
         // allocate one large buffer instead of hundreds of single heap
         // allocations
-        // std::unique_ptr< char, std::function< void( char * ) > > m_rawBuffer;
         std::vector< char > m_rawBuffer;
-        std::vector< std::string > m_stringBuffer;
         std::map< std::string, AttributeLocation > m_offsets;
 
     public:
@@ -82,10 +80,5 @@ namespace detail
             reinterpret_cast< T const * >( &m_rawBuffer[ location.offset ] );
         return res;
     }
-
-    template<>
-    AttributeWithShape< std::string >
-    PreloadAdiosAttributes::getAttribute< std::string >(
-        std::string const & name ) const;
 } // namespace detail
 } // namespace openPMD
