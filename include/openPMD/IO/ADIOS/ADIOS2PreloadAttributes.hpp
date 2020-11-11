@@ -20,6 +20,7 @@ namespace detail
 
     class PreloadAdiosAttributes
     {
+    public:
         struct AttributeLocation
         {
             adios2::Dims shape;
@@ -40,6 +41,8 @@ namespace detail
 
             ~AttributeLocation();
         };
+
+    private:
         // allocate one large buffer instead of hundreds of single heap
         // allocations
         std::vector< char > m_rawBuffer;
