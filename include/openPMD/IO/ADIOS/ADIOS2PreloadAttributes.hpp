@@ -3,6 +3,7 @@
 #include <adios2.h>
 #include <functional>
 #include <map>
+#include <stddef.h>
 
 #include "openPMD/Datatype.hpp"
 
@@ -24,6 +25,20 @@ namespace detail
             adios2::Dims shape;
             size_t offset;
             Datatype dt;
+            std::function< void() > destroy;
+
+            AttributeLocation() = delete;
+            AttributeLocation( adios2::Dims shape, size_t offset, Datatype dt );
+
+            AttributeLocation( AttributeLocation const & other ) = delete;
+            AttributeLocation &
+            operator=( AttributeLocation const & other ) = delete;
+
+            AttributeLocation( AttributeLocation && other ) = default;
+            AttributeLocation &
+            operator=( AttributeLocation && other ) = default;
+
+            ~AttributeLocation();
         };
         // allocate one large buffer instead of hundreds of single heap
         // allocations

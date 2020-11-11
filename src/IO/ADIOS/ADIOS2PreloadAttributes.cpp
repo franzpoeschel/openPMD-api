@@ -68,7 +68,8 @@ namespace detail
                 adios2::IO & IO,
                 adios2::Engine & engine,
                 std::string const & name,
-                char * buffer )
+                char * buffer,
+                PreloadAdiosAttributes::AttributeLocation & location )
             {
                 adios2::Variable< T > var = IO.InquireVariable< T >( name );
                 if( !var )
@@ -76,7 +77,7 @@ namespace detail
                     throw std::runtime_error(
                         "[ADIOS2] Variable not found: " + name );
                 }
-                adios2::Dims shape = var.Shape();
+                adios2::Dims const & shape = location.shape;
                 adios2::Dims offset( shape.size(), 0 );
                 if( shape.size() > 0 )
                 {
@@ -99,6 +100,18 @@ namespace detail
                 }
                 else
                 {
+                    size_t numItems = 1;
+                    for( auto extent : shape )
+                    {
+                        numItems *= extent;
+                    }
+                    new( dest ) T[ numItems ];
+                    location.destroy = [ dest, numItems ]() {
+                        for( size_t i = 0; i < numItems; ++i )
+                        {
+                            dest[ i ].~T();
+                        }
+                    };
                     engine.Get( var, dest, adios2::Mode::Deferred );
                 }
             }
@@ -221,6 +234,28 @@ namespace detail
         size_t maxAlignment = getMaxAlignment();
     } // namespace
 
+    PreloadAdiosAttributes::AttributeLocation::AttributeLocation(
+        adios2::Dims shape_in,
+        size_t offset_in,
+        Datatype dt_in )
+        : shape( std::move( shape_in ) )
+        , offset( offset_in )
+        , dt( dt_in )
+    {
+    }
+
+    PreloadAdiosAttributes::AttributeLocation::~AttributeLocation()
+    {
+        /*
+         * If the object has been moved from, this may be empty.
+         * Or else, if no custom destructor has been emplaced.
+         */
+        if( destroy )
+        {
+            destroy();
+        }
+    }
+
     void
     PreloadAdiosAttributes::preloadAttributes(
         adios2::IO & IO,
@@ -272,12 +307,12 @@ namespace detail
                         throw std::runtime_error(
                             "[ADIOS2] ADIOS does not support global string "
                             "arrays." );
-                    }
-                    AttributeLocation location;
-                    location.offset = stringOffset;
-                    location.dt = Datatype::STRING;
-                    location.shape = {};
-                    m_offsets[ std::move( name ) ] = std::move( location );
+                    };
+                    m_offsets.emplace(
+                        std::piecewise_construct,
+                        std::forward_as_tuple( std::move( name ) ),
+                        std::forward_as_tuple(
+                            adios2::Dims{}, stringOffset, Datatype::STRING ) );
                     ++stringOffset;
                 }
                 continue;
@@ -299,11 +334,11 @@ namespace detail
                 {
                     elements *= extent;
                 }
-                AttributeLocation location;
-                location.offset = currentOffset;
-                location.dt = pair.first;
-                location.shape = std::move( shape );
-                m_offsets[ std::move( name ) ] = std::move( location );
+                m_offsets.emplace(
+                    std::piecewise_construct,
+                    std::forward_as_tuple( std::move( name ) ),
+                    std::forward_as_tuple(
+                        std::move( shape ), currentOffset, pair.first ) );
                 currentOffset += elements * size;
             }
         }
@@ -312,7 +347,7 @@ namespace detail
         m_rawBuffer.resize( currentOffset );
         m_stringBuffer.resize( stringOffset );
         ScheduleLoad __schedule;
-        for( auto const & pair : m_offsets )
+        for( auto & pair : m_offsets )
         {
             if( pair.second.dt == Datatype::STRING )
             {
@@ -321,7 +356,8 @@ namespace detail
                     engine,
                     pair.first,
                     reinterpret_cast< char * >(
-                        &m_stringBuffer[ pair.second.offset ] ) );
+                        &m_stringBuffer[ pair.second.offset ] ),
+                    pair.second );
             }
             else
             {
@@ -331,7 +367,8 @@ namespace detail
                     IO,
                     engine,
                     pair.first,
-                    &m_rawBuffer[ pair.second.offset ] );
+                    &m_rawBuffer[ pair.second.offset ],
+                    pair.second );
             }
         }
     }
