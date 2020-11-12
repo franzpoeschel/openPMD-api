@@ -1,12 +1,36 @@
-#include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
+/* Copyright 2020 Franz Poeschel
+ *
+ * This file is part of openPMD-api.
+ *
+ * openPMD-api is free software: you can redistribute it and/or modify
+ * it under the terms of of either the GNU General Public License or
+ * the GNU Lesser General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * openPMD-api is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License and the GNU Lesser General Public License
+ * for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * and the GNU Lesser General Public License along with openPMD-api.
+ * If not, see <http://www.gnu.org/licenses/>.
+ */
 
-#include <cstdlib>
-#include <iostream>
-#include <numeric>
+#include "openPMD/config.hpp"
+#if openPMD_HAVE_ADIOS2
+
+#include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
+
+#include <cstdlib>
+#include <iostream>
+#include <numeric>
 #include <type_traits>
 
 namespace openPMD
@@ -120,14 +144,14 @@ namespace detail
         {
             template< typename T >
             constexpr size_t
-            operator()()
+            operator()() const
             {
                 return AttributeTypes< T >::alignment();
             }
 
             template< unsigned long, typename... Args >
             constexpr size_t
-            operator()( Args &&... )
+            operator()( Args &&... ) const
             {
                 return 0;
             }
@@ -137,14 +161,14 @@ namespace detail
         {
             template< typename T >
             constexpr size_t
-            operator()()
+            operator()() const
             {
                 return AttributeTypes< T >::size();
             }
 
             template< unsigned long, typename... Args >
             constexpr size_t
-            operator()( Args &&... )
+            operator()( Args &&... ) const
             {
                 return 0;
             }
@@ -291,3 +315,5 @@ namespace detail
     }
 } // namespace detail
 } // namespace openPMD
+
+#endif // openPMD_HAVE_ADIOS2
