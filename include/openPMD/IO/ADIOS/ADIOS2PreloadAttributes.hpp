@@ -77,6 +77,10 @@ namespace detail
         PreloadAdiosAttributes &
         operator=( PreloadAdiosAttributes const & other ) = delete;
 
+        PreloadAdiosAttributes( PreloadAdiosAttributes && other ) = default;
+        PreloadAdiosAttributes &
+        operator=( PreloadAdiosAttributes && other ) = default;
+
         void
         preloadAttributes( adios2::IO & IO, adios2::Engine & engine );
         template< typename T >
