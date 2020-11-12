@@ -1206,13 +1206,11 @@ namespace detail
         size_t height = attr.shape[ 0 ];
         size_t width = attr.shape[ 1 ];
 
-        std::vector< char > rawData( width * height );
-        std::copy_n( attr.data, width * height, rawData.data() );
         std::vector< std::string > res( height );
         for( size_t i = 0; i < height; ++i )
         {
             size_t start = i * width;
-            char * start_ptr = rawData.data() + start;
+            char const * start_ptr = attr.data + start;
             size_t j = 0;
             while( j < width && start_ptr[ j ] != 0 )
             {
