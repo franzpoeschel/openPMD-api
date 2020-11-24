@@ -982,8 +982,13 @@ namespace detail
 
         ~BufferedActions( );
 
-        adios2::Engine & getEngine( );
-        adios2::Engine & requireActiveStep( );
+        void
+        finalize();
+
+        adios2::Engine &
+        getEngine();
+        adios2::Engine &
+        requireActiveStep();
 
         template < typename BA > void enqueue( BA && ba );
 
@@ -998,7 +1003,14 @@ namespace detail
          *        e.g. ending a step.)
          */
         void
-        flush( bool performDatasetPutGets, bool writeAttributes = false );
+        flush( bool writeAttributes = false );
+
+        template< typename F >
+        void
+        flush(
+            F && performPutsGets,
+            bool writeAttributes,
+            bool flushUnconditionally );
 
         /**
          * @brief Begin or end an ADIOS step.
@@ -1088,6 +1100,11 @@ namespace detail
          */
         auxiliary::Option< AttributeMap_t > m_availableAttributes;
         auxiliary::Option< AttributeMap_t > m_availableVariables;
+
+        /*
+         * finalize() will set this true to avoid running twice.
+         */
+        bool finalized = false;
 
         void
         configure_IO( ADIOS2IOHandlerImpl & impl );
