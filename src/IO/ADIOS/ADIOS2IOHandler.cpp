@@ -379,6 +379,10 @@ ADIOS2IOHandlerImpl::closeFile(
         auto it = m_fileData.find( fileIterator->second );
         if ( it != m_fileData.end( ) )
         {
+            /*
+             * Do not perform Puts and Gets manually, engine will do that
+             * upon being closed.
+             */
             it->second->flush(
                 /* performDatasetPutGets = */ false,
                 /* writeAttributes = */ true );
@@ -1806,18 +1810,18 @@ namespace detail
         {
             ba->run( *this );
         }
+        if( writeAttributes )
+        {
+            for( auto & pair : m_attributeWrites )
+            {
+                pair.second.run( *this );
+            }
+        }
         if( performDatasetPutGets )
         {
             for( auto & ba : m_buffer )
             {
                 ba->run( *this );
-            }
-            if( writeAttributes )
-            {
-                for( auto & pair : m_attributeWrites )
-                {
-                    pair.second.run( *this );
-                }
             }
             // Flush() does not necessarily perform
             // deferred actions....
@@ -1838,16 +1842,16 @@ namespace detail
                 break;
             }
             m_buffer.clear();
-        }
-        m_buffer.clear();
-        for( BufferedAttributeRead & task : m_attributeReads )
-        {
-            task.run( *this );
-        }
-        m_attributeReads.clear();
-        if( writeAttributes )
-        {
-            m_attributeWrites.clear();
+
+            for( BufferedAttributeRead & task : m_attributeReads )
+            {
+                task.run( *this );
+            }
+            m_attributeReads.clear();
+            if( writeAttributes )
+            {
+                m_attributeWrites.clear();
+            }
         }
     }
 
@@ -1878,10 +1882,22 @@ namespace detail
                 {
                     getEngine().BeginStep();
                 }
+                /*
+                 * Do not perform Puts and Gets manually,
+                 * engine will do that upon EndStep.
+                 */
                 flush(
                     /* performDatasetPutGets = */ false,
                     /* writeAttributes = */ true );
                 getEngine().EndStep();
+                m_buffer.clear();
+                /*
+                 * Flush a second time to read attributes, now that they've been
+                 * preloaded.
+                 */
+                flush(
+                    /* performDatasetPutGets = */ true,
+                    /* writeAttributes = */ false );
                 streamStatus = StreamStatus::OutsideOfStep;
                 return AdvanceStatus::OK;
             }
@@ -1895,6 +1911,10 @@ namespace detail
                 // return status is stored in m_lastStepStatus
                 if( streamStatus != StreamStatus::DuringStep )
                 {
+                    /*
+                     * Do not perform Puts and Gets,
+                     * Engine is outside of a step anyway.
+                     */
                     flush(
                         /* performDatasetPutGets = */ false,
                         /* writeAttributes = */ false );
