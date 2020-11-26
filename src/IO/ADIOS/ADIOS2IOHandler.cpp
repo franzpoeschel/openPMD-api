@@ -2005,7 +2005,6 @@ namespace detail
             {
                 optimizeAttributesStreaming =
                     m_attributeLayout == AttributeLayout::ByAdiosAttributes;
-                useAdiosSteps = Steps::UseSteps;
                 streamStatus = StreamStatus::OutsideOfStep;
             }
             else
@@ -2013,9 +2012,21 @@ namespace detail
                 it = fileEngines.find( m_engineType );
                 if( it != fileEngines.end() )
                 {
-                    streamStatus = StreamStatus::OutsideOfStep;
+                    switch( m_mode )
+                    {
+                        case adios2::Mode::Read:
+                            streamStatus = StreamStatus::Undecided;
+                            delayOpeningTheFirstStep = m_attributeLayout ==
+                                AttributeLayout::ByAdiosAttributes;
+                            break;
+                        case adios2::Mode::Write:
+                            streamStatus = StreamStatus::NoStream;
+                            break;
+
+                        default:
+                            throw std::runtime_error( "Unreachable!" );
+                    }
                     optimizeAttributesStreaming = false;
-                    useAdiosSteps = Steps::DontUseSteps;
                 }
                 else
                 {
@@ -2046,24 +2057,20 @@ namespace detail
             }
             auto _useAdiosSteps =
                 impl.config( ADIOS2Defaults::str_usesteps, engineConfig );
-            if( !_useAdiosSteps.json().is_null() )
+            if( !_useAdiosSteps.json().is_null() &&
+                m_mode != adios2::Mode::Read )
             {
                 bool tmp = _useAdiosSteps.json();
-                if( useAdiosSteps == Steps::UseSteps && !bool(tmp) )
+                if( streamStatus != StreamStatus::NoStream && !bool( tmp ) )
                 {
                     throw std::runtime_error(
                         "Cannot switch off steps for streaming engines." );
                 }
-                useAdiosSteps = bool( tmp ) ? Steps::UseSteps
-                                            : Steps::DontUseSteps;
+                streamStatus = bool( tmp ) ? StreamStatus::OutsideOfStep
+                                           : StreamStatus::NoStream;
             }
         }
 
-        if( m_mode == adios2::Mode::Read )
-        {
-            // decide upon opening engine
-            useAdiosSteps = Steps::Undecided;
-        }
         auto shadow = impl.m_config.invertShadow();
         if( shadow.size() > 0 )
         {
@@ -2127,7 +2134,7 @@ namespace detail
                 case adios2::Mode::Write:
                 {
                     bool_representation usesSteps =
-                        useAdiosSteps == Steps::UseSteps ? 1 : 0;
+                        streamStatus == StreamStatus::NoStream ? 0 : 1;
                     m_IO.DefineAttribute< bool_representation >(
                         ADIOS2Defaults::str_usesstepsAttribute, usesSteps );
                     m_engine =auxiliary::makeOption(
@@ -2138,29 +2145,42 @@ namespace detail
                 {
                     m_engine = auxiliary::makeOption(
                         adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
-                    m_engine.get().BeginStep();
+                    switch( streamStatus )
+                    {
+                        case StreamStatus::Undecided:
+                        {
+                            auto attr =
+                                m_IO.InquireAttribute< bool_representation >(
+                                    ADIOS2Defaults::str_usesstepsAttribute );
+                            if( attr && attr.Data()[ 0 ] == 1 )
+                            {
+                                if( delayOpeningTheFirstStep )
+                                {
+                                    streamStatus = StreamStatus::Parsing;
+                                }
+                                else
+                                {
+                                    m_engine.get().BeginStep();
+                                    streamStatus = StreamStatus::DuringStep;
+                                }
+                            }
+                            else
+                            {
+                                streamStatus = StreamStatus::NoStream;
+                            }
+                            break;
+                        }
+                        case StreamStatus::OutsideOfStep:
+                            m_engine.get().BeginStep();
+                            streamStatus = StreamStatus::DuringStep;
+                            break;
+                        default:
+                            throw std::runtime_error( "Unreachable!" );
+                    }
                     if( m_attributeLayout == AttributeLayout::ByAdiosVariables )
                     {
                         preloadAttributes.preloadAttributes(
                             m_IO, m_engine.get() );
-                    }
-                    streamStatus = StreamStatus::DuringStep;
-                    if( useAdiosSteps != Steps::Undecided )
-                    {
-                        break;
-                    }
-                    auto attr =
-                        m_IO.InquireAttribute< bool_representation >(
-                            ADIOS2Defaults::str_usesstepsAttribute );
-                    if( attr )
-                    {
-                        useAdiosSteps = attr.Data()[ 0 ] == 1
-                            ? Steps::UseSteps
-                            : Steps::DontUseSteps;
-                    }
-                    else
-                    {
-                        useAdiosSteps = Steps::DontUseSteps;
                     }
                     break;
                 }
@@ -2305,7 +2325,7 @@ namespace detail
     AdvanceStatus
     BufferedActions::advance( AdvanceMode mode )
     {
-        if( useAdiosSteps == Steps::DontUseSteps )
+        if( streamStatus == StreamStatus::NoStream )
         {
             flush( /* writeAttributes = */ false );
             return AdvanceStatus::OK;

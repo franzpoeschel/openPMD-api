@@ -1135,21 +1135,6 @@ namespace detail
          * on chosen ADIOS2 engine and can not be explicitly overridden by user.
          */
         bool optimizeAttributesStreaming = false;
-        /** @defgroup workaroundSteps Workaround for ADIOS steps in file mode
-         *  @{
-         * Workaround for the fact that ADIOS steps (currently) break random-
-         * access: Make ADIOS steps opt-in for persistent backends.
-         *
-         */
-        enum class Steps
-        {
-            UseSteps,     //!< In Streaming mode, actually do use ADIOS steps
-            DontUseSteps, //!< Don't use ADIOS steps, even in streaming mode
-            Undecided     //!< Not yet determined whether or not to use steps
-        };
-        Steps useAdiosSteps = Steps::Undecided;
-        /** @}
-         */
 
         using AttributeMap_t = std::map< std::string, adios2::Params >;
 
@@ -1256,10 +1241,15 @@ namespace detail
         {
             DuringStep,
             OutsideOfStep,
-            StreamOver
+            StreamOver,
+            NoStream,
+            Parsing,
+            Undecided
         };
         StreamStatus streamStatus = StreamStatus::OutsideOfStep;
         adios2::StepStatus m_lastStepStatus = adios2::StepStatus::OK;
+
+        bool delayOpeningTheFirstStep = false;
 
         /*
          * ADIOS2 does not give direct access to its internal attribute and
