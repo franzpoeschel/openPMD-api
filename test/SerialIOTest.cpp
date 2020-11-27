@@ -2844,7 +2844,42 @@ TEST_CASE( "bp4_steps", "[serial][adios2]" )
     bp4_steps( "../samples/bp4steps_no_yes.bp", dontUseSteps, useSteps );
     bp4_steps( "../samples/bp4steps_yes_no.bp", useSteps, dontUseSteps );
     bp4_steps( "../samples/bp4steps_no_no.bp", dontUseSteps, dontUseSteps );
-    bp4_steps("../samples/bp4steps_default.bp", "{}", "{}");
+    bp4_steps( "../samples/bp4steps_default.bp", "{}", "{}" );
+
+    /*
+     * Do this whole thing once more, but this time use the new attribute
+     * layout.
+     */
+    useSteps = R"(
+    {
+        "adios2": {
+            "new_attribute_layout": true,
+            "engine": {
+                "type": "bp4",
+                "usesteps": true
+            }
+        }
+    }
+    )";
+    dontUseSteps = R"(
+    {
+        "adios2": {
+            "new_attribute_layout": true,
+            "engine": {
+                "type": "bp4",
+                "usesteps": false
+            }
+        }
+    }
+    )";
+    // sing the yes no song
+    bp4_steps( "../samples/newlayout_bp4steps_yes_yes.bp", useSteps, useSteps );
+    bp4_steps(
+        "../samples/newlayout_bp4steps_no_yes.bp", dontUseSteps, useSteps );
+    bp4_steps(
+        "../samples/newlayout_bp4steps_yes_no.bp", useSteps, dontUseSteps );
+    bp4_steps(
+        "../samples/newlayout_bp4steps_no_no.bp", dontUseSteps, dontUseSteps );
 }
 #endif
 

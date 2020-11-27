@@ -98,10 +98,10 @@ ADIOS2IOHandlerImpl::init( nlohmann::json cfg )
     m_config = std::move( cfg[ "adios2" ] );
     defaultOperators = getOperators().first;
 
-    if( m_config.json().contains( "newAttributeLayout" ) )
+    if( m_config.json().contains( "new_attribute_layout" ) )
     {
         m_attributeLayout =
-            static_cast< bool >( m_config[ "newAttributeLayout" ].json() )
+            static_cast< bool >( m_config[ "new_attribute_layout" ].json() )
             ? AttributeLayout::ByAdiosVariables
             : AttributeLayout::ByAdiosAttributes;
     }
