@@ -1239,11 +1239,50 @@ namespace detail
          */
         enum class StreamStatus
         {
+            /**
+             * A step is currently active.
+             */
             DuringStep,
+            /**
+             * A stream is active, but no step.
+             */
             OutsideOfStep,
+            /**
+             * Stream has ended.
+             */
             StreamOver,
+            /**
+             * File is not written is streaming fashion.
+             * Begin/EndStep will be replaced by simple flushes.
+             * Used for:
+             * 1) Writing BP4 files without steps despite using the Streaming
+             *    API. This is due to the fact that ADIOS2.6.0 requires using
+             *    steps to read BP4 files written with steps, so using steps
+             *    is opt-in for now.
+             * 2) Reading with the Streaming API any file that has been written
+             *    without steps.
+             */
             NoStream,
+            /**
+             * Necessary workaround under the following circumstances:
+             * 1) Using ADIOS2.6.0
+             * 2) Using attribute-based layout
+             * 3) Reading from a file-based engine a Series written with steps
+             * Up until ADIOS2.6.0, attributes are not associated with ADIOS
+             * steps in file-based engines. As a consequence, parsing one
+             * ADIOS step will show only the variables of that step, but the
+             * attributes of all steps which breaks our parsing logic.
+             * Workaround: If parsing before opening any step, all variables
+             * and attributes in the file will be shown.
+             * Hence, streamStatus == Parsing means that the first step has yet
+             * to be opened.
+             */
             Parsing,
+            /**
+             * The stream status of a file-based engine will be decided upon
+             * opening the engine if in read mode. Up until then, this right
+             * here is the status.
+             */
             Undecided
         };
         StreamStatus streamStatus = StreamStatus::OutsideOfStep;

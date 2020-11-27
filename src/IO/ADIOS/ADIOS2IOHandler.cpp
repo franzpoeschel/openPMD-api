@@ -2175,7 +2175,7 @@ namespace detail
                             streamStatus = StreamStatus::DuringStep;
                             break;
                         default:
-                            throw std::runtime_error( "Unreachable!" );
+                            throw std::runtime_error( "[ADIOS2] Control flow error!" );
                     }
                     if( m_attributeLayout == AttributeLayout::ByAdiosVariables )
                     {
