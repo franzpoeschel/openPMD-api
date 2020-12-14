@@ -24,7 +24,7 @@
 
 namespace openPMD
 {
-Writable::Writable(Attributable* a)
+Writable::Writable(internal::AttributableData* a)
         : abstractFilePosition{nullptr},
           IOHandler{nullptr},
           attributable{a},

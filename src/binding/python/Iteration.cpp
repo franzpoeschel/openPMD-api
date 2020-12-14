@@ -21,6 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "openPMD/binding/python/Attributable.tpp"
 #include "openPMD/Iteration.hpp"
 
 #include <string>
@@ -30,7 +31,7 @@ using namespace openPMD;
 
 
 void init_Iteration(py::module &m) {
-    py::class_<Iteration, Attributable>(m, "Iteration")
+    auto pyclass = py::class_<Iteration>(m, "Iteration")
         .def(py::init<Iteration const &>())
 
         .def("__repr__",
@@ -64,4 +65,5 @@ void init_Iteration(py::module &m) {
             // garbage collection: return value must be freed before Iteration
             py::keep_alive<1, 0>())
     ;
+    addAttributableInterface< Iteration >( pyclass );
 }

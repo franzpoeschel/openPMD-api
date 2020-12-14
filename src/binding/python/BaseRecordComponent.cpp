@@ -24,6 +24,7 @@
 
 #include "openPMD/backend/BaseRecordComponent.hpp"
 #include "openPMD/Datatype.hpp"
+#include "openPMD/binding/python/Attributable.tpp"
 #include "openPMD/binding/python/Numpy.hpp"
 
 #include <sstream>
@@ -33,7 +34,7 @@ using namespace openPMD;
 
 
 void init_BaseRecordComponent(py::module &m) {
-    py::class_<BaseRecordComponent, Attributable>(m, "Base_Record_Component")
+    auto pyclass = py::class_<BaseRecordComponent>(m, "Base_Record_Component")
         .def("__repr__",
             [](BaseRecordComponent const & brc) {
                 std::stringstream ss;
@@ -52,4 +53,5 @@ void init_BaseRecordComponent(py::module &m) {
             return dtype_to_numpy( brc.getDatatype() );
         })
     ;
+    addAttributableInterface< BaseRecordComponent >( pyclass );
 }

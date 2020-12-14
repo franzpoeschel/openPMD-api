@@ -3,27 +3,27 @@
 #   define OPENPMD_private public
 #   define OPENPMD_protected public
 #endif
-#include "openPMD/config.hpp"
-#include "openPMD/backend/Writable.hpp"
-#include "openPMD/backend/Attributable.hpp"
-#include "openPMD/backend/Container.hpp"
-#include "openPMD/auxiliary/DerefDynamicCast.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/Option.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-#include "openPMD/IO/AbstractIOHandler.hpp"
-#include "openPMD/IO/AbstractIOHandlerHelper.hpp"
-#include "openPMD/Dataset.hpp"
-
-#include <catch2/catch.hpp>
-
 #include <array>
 #include <exception>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/AbstractIOHandlerHelper.hpp"
+#include "openPMD/auxiliary/DerefDynamicCast.hpp"
+#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Option.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/Attributable.tpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/Writable.hpp"
+#include "openPMD/config.hpp"
+#include <catch2/catch.hpp>
 
 using namespace openPMD;
 
@@ -32,12 +32,24 @@ namespace openPMD
 {
 namespace test
 {
-struct TestHelper : public Attributable
+struct TestHelper
+    : public internal::AttributableData
+    , public AttributableImpl< TestHelper >
 {
     TestHelper()
     {
         m_writable->IOHandler = createIOHandler(".", Access::CREATE, Format::JSON);
         IOHandler = m_writable->IOHandler.get();
+    }
+
+    internal::AttributableData & getAttributable()
+    {
+        return *this;
+    }
+
+    internal::AttributableData const & getAttributable() const
+    {
+        return *this;
     }
 };
 } // test
@@ -306,7 +318,7 @@ TEST_CASE( "container_access_test", "[auxiliary]" )
 
 TEST_CASE( "attributable_default_test", "[auxiliary]" )
 {
-    Attributable a;
+    test::TestHelper a;
 
     REQUIRE(a.numAttributes() == 0);
 }

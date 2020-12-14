@@ -44,7 +44,11 @@ namespace traits
 {
     template< typename T >
     struct GenerationPolicy;
-} // traits
+} // namespace traits
+template< typename >
+class SeriesImpl;
+template< typename >
+class AttributableImpl;
 class AbstractFilePosition;
 
 class no_such_attribute_error : public std::runtime_error
@@ -56,37 +60,70 @@ public:
     virtual ~no_such_attribute_error() { }
 };
 
-
-/** @brief Layer to manage storage of attributes associated with file objects.
- *
- * Mandatory and user-defined Attributes and their data for every object in the
- * openPMD hierarchy are stored and managed through this class.
- */
-class Attributable
+namespace internal
 {
+/*
+ * @todo
+ * Once all classes have been fully split into internal and
+ * external, delete all copy/move constructors/asssignment operators.
+ */
+class AttributableData
+{
+template< typename >
+friend class openPMD::AttributableImpl;
+
+public:
+    AttributableData();
+    AttributableData(AttributableData const&);
+    AttributableData(AttributableData&&) = delete;
+    virtual ~AttributableData() = default;
+
+    AttributableData& operator=(AttributableData const&);
+    AttributableData& operator=(AttributableData&&) = delete;
+
     using A_MAP = std::map< std::string, Attribute >;
-    friend Writable* getWritable(Attributable*);
-    template< typename T_elem >
-    friend class BaseRecord;
-    template<
-        typename T,
-        typename T_key,
-        typename T_container
-    >
+    std::shared_ptr< Writable > m_writable;
+    /* views into the resources held by m_writable
+    * purely for convenience so code that uses these does not have to go through m_writable-> */
+    AbstractFilePosition* abstractFilePosition;
+    AbstractIOHandler* IOHandler;
+    Writable* parent;
+private:
+    std::shared_ptr< A_MAP > m_attributes;
+};
+}
+
+template< typename AttributableWrapper >
+class AttributableImpl
+{
+    friend class Iteration;
+    template< typename T, typename T_key, typename T_container >
     friend class Container;
     template< typename T >
     friend struct traits::GenerationPolicy;
-    friend class Iteration;
     friend class Series;
+    template< typename >
+    friend class SeriesImpl;
+    template< typename T_elem >
+    friend class BaseRecord;
+
+protected:
+
+    inline
+    internal::AttributableData & get()
+    {
+        return static_cast< AttributableWrapper * >( this )->getAttributable();
+    }
+
+    inline
+    internal::AttributableData const & get() const
+    {
+        return static_cast< AttributableWrapper const * >( this )
+            ->getAttributable();
+    }
 
 public:
-    Attributable();
-    Attributable(Attributable const&);
-    Attributable(Attributable&&) = delete;
-    virtual ~Attributable() = default;
-
-    Attributable& operator=(Attributable const&);
-    Attributable& operator=(Attributable&&) = delete;
+    ~AttributableImpl() = default;
 
     /** Populate Attribute of provided name with provided value.
      *
@@ -149,7 +186,8 @@ public:
      * @param   comment String value to be stored as a comment.
      * @return  Reference to modified Attributable.
      */
-    Attributable& setComment(std::string const& comment);
+    AttributableImpl< AttributableWrapper > &
+    setComment(std::string const& comment);
 
 OPENPMD_protected:
     void flushAttributes();
@@ -187,28 +225,23 @@ OPENPMD_protected:
      */
     template< typename T >
     std::vector< T > readVectorFloatingpoint(std::string const& key) const;
-
-    std::shared_ptr< Writable > m_writable;
-    /* views into the resources held by m_writable
-     * purely for convenience so code that uses these does not have to go through m_writable-> */
-    AbstractFilePosition* abstractFilePosition;
-    AbstractIOHandler* IOHandler;
-    Writable* parent;
-    bool& dirty() const { return m_writable->dirty; }
-    bool& written() const { return m_writable->written; }
+    bool& dirty() const { return get().m_writable->dirty; }
+    bool& written() const { return get().m_writable->written; }
 
 private:
-    virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
 
-    std::shared_ptr< A_MAP > m_attributes;
-}; // Attributable
+    virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
+};
 
 //TODO explicitly instantiate Attributable::setAttribute for all T in Datatype
+template< typename AttributableWrapper >
 template< typename T >
 inline bool
-Attributable::setAttribute(std::string const& key, T const& value)
+AttributableImpl< AttributableWrapper >::setAttribute(
+    std::string const& key, T const& value)
 {
-    if(IOHandler && Access::READ_ONLY == IOHandler->m_frontendAccess )
+    if( get().IOHandler && Access::READ_ONLY
+        == get().IOHandler->m_frontendAccess )
     {
         auxiliary::OutOfRangeMsg const out_of_range_msg(
             "Attribute",
@@ -218,8 +251,9 @@ Attributable::setAttribute(std::string const& key, T const& value)
     }
 
     dirty() = true;
-    auto it = m_attributes->lower_bound(key);
-    if( it != m_attributes->end() && !m_attributes->key_comp()(key, it->first) )
+    auto it = get().m_attributes->lower_bound(key);
+    if( it != get().m_attributes->end()
+        && !get().m_attributes->key_comp()(key, it->first) )
     {
         // key already exists in map, just replace the value
         it->second = Attribute(value);
@@ -227,32 +261,39 @@ Attributable::setAttribute(std::string const& key, T const& value)
     } else
     {
         // emplace a new map element for an unknown key
-        m_attributes->emplace_hint(it,
-                                   std::make_pair(key, Attribute(value)));
+        get().m_attributes->emplace_hint(
+            it, std::make_pair(key, Attribute(value)));
         return false;
     }
 }
+
+template< typename AttributableWrapper >
 inline bool
-Attributable::setAttribute(std::string const& key, char const value[])
+AttributableImpl< AttributableWrapper >::setAttribute(
+    std::string const& key, char const value[])
 {
     return this->setAttribute(key, std::string(value));
 }
 
+template< typename AttributableWrapper >
 template< typename T >
 inline T
-Attributable::readFloatingpoint(std::string const& key) const
+AttributableImpl< AttributableWrapper >::readFloatingpoint(
+    std::string const& key) const
 {
     static_assert(std::is_floating_point< T >::value, "Type of attribute must be floating point");
 
-    return getAttribute(key).get< T >();
+    return getAttribute(key).template get< T >();
 }
 
+template< typename AttributableWrapper >
 template< typename T >
 inline std::vector< T >
-Attributable::readVectorFloatingpoint(std::string const& key) const
+AttributableImpl< AttributableWrapper >::readVectorFloatingpoint(
+    std::string const& key) const
 {
     static_assert(std::is_floating_point< T >::value, "Type of attribute must be floating point");
 
-    return getAttribute(key).get< std::vector< T > >();
+    return getAttribute(key).template get< std::vector< T > >();
 }
 } // namespace openPMD

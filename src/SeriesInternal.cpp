@@ -1,4 +1,4 @@
-/* Copyright 2018-2020 Fabian Koller
+/* Copyright 2017-2020 Fabian Koller, Axel Huebl
  *
  * This file is part of openPMD-api.
  *
@@ -18,13 +18,27 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include "openPMD/IO/IOTask.hpp"
-#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/auxiliary/Date.hpp"
+#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/AbstractIOHandlerHelper.hpp"
+#include "openPMD/IO/Format.hpp"
+#include "openPMD/SeriesInternal.hpp"
+#include "openPMD/version.hpp"
+
+#include <exception>
+#include <iomanip>
+#include <iostream>
+#include <regex>
+#include <set>
+#include <string>
+#include <tuple>
 
 
 namespace openPMD
 {
-Writable*
-getWritable(internal::AttributableData* a)
-{ return a->m_writable.get(); }
-} // openPMD
+namespace internal
+{
+} // namespace internal
+} // namespace openPMD

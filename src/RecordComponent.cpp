@@ -311,7 +311,7 @@ RecordComponent::readBase()
 bool
 RecordComponent::dirtyRecursive() const
 {
-    if( Attributable::dirty() )
+    if( this->dirty() )
     {
         return true;
     }

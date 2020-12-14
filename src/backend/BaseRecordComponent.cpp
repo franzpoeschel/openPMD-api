@@ -20,9 +20,12 @@
  */
 #include "openPMD/backend/BaseRecordComponent.hpp"
 
+#include "openPMD/backend/Attributable.tpp"
 
 namespace openPMD
 {
+template class AttributableImpl< BaseRecordComponent >;
+
 double
 BaseRecordComponent::unitSI() const
 {

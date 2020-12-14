@@ -24,25 +24,27 @@
  * BSD-style license, see pybind11 LICENSE file.
  */
 
-#include <pybind11/pybind11.h>
-#include <pybind11/stl_bind.h>
-#include <pybind11/stl.h>
-
 #include "openPMD/backend/Container.hpp"
-#include "openPMD/backend/BaseRecord.hpp"
-#include "openPMD/backend/MeshRecordComponent.hpp"
-#include "openPMD/backend/PatchRecordComponent.hpp"
-#include "openPMD/backend/BaseRecordComponent.hpp"
-#include "openPMD/backend/PatchRecord.hpp"
+
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Mesh.hpp"
-#include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/ParticlePatches.hpp"
+#include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/Record.hpp"
-
-#include <string>
-#include <memory>
-#include <utility>
+#include "openPMD/backend/Attributable.tpp"
+#include "openPMD/backend/BaseRecord.hpp"
+#include "openPMD/backend/BaseRecordComponent.hpp"
+#include "openPMD/backend/MeshRecordComponent.hpp"
+#include "openPMD/backend/PatchRecord.hpp"
+#include "openPMD/backend/PatchRecordComponent.hpp"
+#include "openPMD/binding/python/Attributable.tpp"
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/stl_bind.h>
 
 namespace py = pybind11;
 using namespace openPMD;
@@ -61,11 +63,7 @@ namespace detail
         typename holder_type = std::unique_ptr< Map >,
         typename... Args
     >
-    py::class_<
-        Map,
-        holder_type,
-        Attributable
-    > bind_container(
+    py::class_< Map, holder_type > bind_container(
         py::handle scope,
         std::string const & name,
         Args && ... args
@@ -73,11 +71,7 @@ namespace detail
     {
         using KeyType = typename Map::key_type;
         using MappedType = typename Map::mapped_type;
-        using Class_ = py::class_<
-            Map,
-            holder_type,
-            Attributable
-        >;
+        using Class_ = py::class_< Map, holder_type >;
 
         // If either type is a non-module-local bound type then make the map
         // binding non-local as well; otherwise (e.g. both types are either
@@ -195,6 +189,8 @@ namespace detail
                 return l;
             }
         );
+
+        addAttributableInterface< Map >( cl );
 
         return cl;
     }

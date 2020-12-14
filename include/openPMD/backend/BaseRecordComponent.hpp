@@ -31,7 +31,9 @@
 
 namespace openPMD
 {
-class BaseRecordComponent : public Attributable
+class BaseRecordComponent
+    : public internal::AttributableData
+    , public AttributableImpl < BaseRecordComponent >
 {
     template<
         typename T,
@@ -78,6 +80,18 @@ public:
      */
     ChunkTable
     availableChunks();
+
+    inline internal::AttributableData &
+    getAttributable()
+    {
+        return *this;
+    }
+
+    inline internal::AttributableData const &
+    getAttributable() const
+    {
+        return *this;
+    }
 
     OPENPMD_protected : BaseRecordComponent();
 

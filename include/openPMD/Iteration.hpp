@@ -35,7 +35,9 @@ namespace openPMD
  *
  * @see https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
  */
-class Iteration : public Attributable
+class Iteration
+    : public internal::AttributableData
+    , public AttributableImpl< Iteration >
 {
     template<
             typename T,
@@ -46,6 +48,8 @@ class Iteration : public Attributable
     friend class Series;
     friend class WriteIterations;
     friend class SeriesIterator;
+    template< typename >
+    friend class SeriesImpl;
 
 public:
     Iteration(Iteration const&);
@@ -136,8 +140,20 @@ public:
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
 
+    internal::AttributableData & getAttributable()
+    {
+        return *this;
+    }
+
+    internal::AttributableData const & getAttributable() const
+    {
+        return *this;
+    }
+
     virtual ~Iteration() = default;
 private:
+    using attributable_t = AttributableImpl< Iteration >;
+
     Iteration();
 
     void flushFileBased(std::string const&, uint64_t);
@@ -251,7 +267,7 @@ Iteration::time< long double >() const;
 template< typename T >
 inline T
 Iteration::time() const
-{ return Attributable::readFloatingpoint< T >("time"); }
+{ return attributable_t::readFloatingpoint< T >("time"); }
 
 
 extern template
@@ -269,5 +285,5 @@ Iteration::dt< long double >() const;
 template< typename T >
 inline T
 Iteration::dt() const
-{ return Attributable::readFloatingpoint< T >("dt"); }
+{ return attributable_t::readFloatingpoint< T >("dt"); }
 } // openPMD

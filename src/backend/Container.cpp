@@ -1,4 +1,4 @@
-/* Copyright 2018-2020 Fabian Koller
+/* Copyright 2021 Franz Poeschel
  *
  * This file is part of openPMD-api.
  *
@@ -18,13 +18,24 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include "openPMD/IO/IOTask.hpp"
-#include "openPMD/backend/Attributable.hpp"
 
+#include "openPMD/backend/Container.hpp"
+
+#include "openPMD/Mesh.hpp"
+#include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/Record.hpp"
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/backend/Attributable.tpp"
+#include "openPMD/backend/PatchRecord.hpp"
+#include "openPMD/backend/PatchRecordComponent.hpp"
 
 namespace openPMD
 {
-Writable*
-getWritable(internal::AttributableData* a)
-{ return a->m_writable.get(); }
-} // openPMD
+template class AttributableImpl< Container< Mesh > >;
+template class AttributableImpl< Container< ParticleSpecies > >;
+template class AttributableImpl< Container< Record > >;
+template class AttributableImpl< Container< RecordComponent > >;
+template class AttributableImpl< Container< MeshRecordComponent > >;
+template class AttributableImpl< Container< PatchRecord > >;
+template class AttributableImpl< Container< PatchRecordComponent > >;
+} // namespace openPMD

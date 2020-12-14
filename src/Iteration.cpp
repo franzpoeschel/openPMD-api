@@ -19,22 +19,24 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
+
+#include <exception>
+#include <tuple>
+
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/backend/Attributable.tpp"
 #include "openPMD/backend/Writable.hpp"
-
-#include <exception>
-#include <tuple>
 
 
 namespace openPMD
 {
-Iteration::Iteration()
-        : meshes{Container< Mesh >()},
-          particles{Container< ParticleSpecies >()}
+template class AttributableImpl< Iteration >;
+
+Iteration::Iteration() : meshes{}, particles{}
 {
     setTime(static_cast< double >(0));
     setDt(static_cast< double >(1));
@@ -42,7 +44,7 @@ Iteration::Iteration()
 }
 
 Iteration::Iteration( Iteration const & i )
-    : Attributable{ i },
+    : internal::AttributableData{ i },
       meshes{ i.meshes },
       particles{ i.particles },
       m_closed{ i.m_closed },
@@ -59,7 +61,7 @@ Iteration::Iteration( Iteration const & i )
 Iteration& Iteration::operator=(Iteration const& i)
 {
     // warning (clang-tidy-10): bugprone-unhandled-self-assignment
-    Attributable::operator=( i );
+    internal::AttributableData::operator=( i );
     meshes = i.meshes;
     particles = i.particles;
     IOHandler = i.IOHandler;
@@ -153,8 +155,9 @@ Iteration::close( bool _flush )
         else
         {
             // flush things manually
-            Series * s = &auxiliary::deref_dynamic_cast< Series >(
-                parent->attributable->parent->attributable );
+            internal::SeriesInternal * s = 
+                &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+                    parent->attributable->parent->attributable );
             // figure out my iteration number
             auto begin = s->indexOf( *this );
             auto end = begin;
@@ -199,8 +202,9 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
 {
     /* Find the root point [Series] of this file,
      * meshesPath and particlesPath are stored there */
-    Series * s = &auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+    internal::SeriesInternal * s =
+        &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
     if( s == nullptr )
         throw std::runtime_error("[Iteration::flushFileBased] Series* is a nullptr");
 
@@ -268,8 +272,9 @@ Iteration::flush()
     {
         /* Find the root point [Series] of this file,
          * meshesPath and particlesPath are stored there */
-        Series * s = &auxiliary::deref_dynamic_cast< Series >(
-            parent->attributable->parent->attributable );
+        internal::SeriesInternal * s =
+            &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+                parent->attributable->parent->attributable );
 
         if( !meshes.empty() || s->containsAttribute("meshesPath") )
         {
@@ -331,8 +336,9 @@ Iteration::read()
 
     /* Find the root point [Series] of this file,
      * meshesPath and particlesPath are stored there */
-    Series * s = &auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+    internal::SeriesInternal * s =
+        &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
 
     Parameter< Operation::LIST_PATHS > pList;
     std::string version = s->openPMD();
@@ -449,12 +455,13 @@ AdvanceStatus
 Iteration::beginStep()
 {
     using IE = IterationEncoding;
-    auto & series = auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+    internal::SeriesInternal & series =
+        auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
     // Initialize file with this to quiet warnings
     // The following switch is comprehensive
-    Attributable * file = this;
-    switch( *series.m_iterationEncoding )
+    internal::AttributableData * file = this;
+    switch( *series.get().m_iterationEncoding )
     {
         case IE::fileBased:
             file = this;
@@ -493,11 +500,12 @@ void
 Iteration::endStep()
 {
     using IE = IterationEncoding;
-    auto & series = auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+    internal::SeriesInternal & series =
+        auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
     // Initialize file with this to quiet warnings
     // The following switch is comprehensive
-    Attributable * file = this;
+    internal::AttributableData * file = this;
     switch( *series.m_iterationEncoding )
     {
         case IE::fileBased:
@@ -515,8 +523,9 @@ Iteration::endStep()
 StepStatus
 Iteration::getStepStatus()
 {
-    Series * s = &auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+     internal::SeriesInternal * s =
+        &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
     switch( *s->m_iterationEncoding )
     {
         using IE = IterationEncoding;
@@ -532,8 +541,9 @@ Iteration::getStepStatus()
 void
 Iteration::setStepStatus( StepStatus status )
 {
-    Series * s = &auxiliary::deref_dynamic_cast< Series >(
-        parent->attributable->parent->attributable );
+     internal::SeriesInternal * s =
+        &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
+            parent->attributable->parent->attributable );
     switch( *s->m_iterationEncoding )
     {
         using IE = IterationEncoding;
@@ -575,7 +585,7 @@ Iteration::dirtyRecursive() const
 void
 Iteration::linkHierarchy(std::shared_ptr< Writable > const& w)
 {
-    Attributable::linkHierarchy(w);
+    attributable_t::linkHierarchy(w);
     meshes.linkHierarchy(m_writable);
     particles.linkHierarchy(m_writable);
 }
@@ -607,4 +617,4 @@ template
 Iteration& Iteration::setDt< double >(double dt);
 template
 Iteration& Iteration::setDt< long double >(long double dt);
-} // openPMD
+} // namespace openPMD

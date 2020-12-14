@@ -37,10 +37,18 @@ struct TestHelper;
 } // namespace test
 class AbstractFilePosition;
 class AbstractIOHandler;
-class Attributable;
 struct ADIOS2FilePosition;
 template <typename FilePositionType>
 class AbstractIOHandlerImplCommon;
+namespace internal
+{
+    class AttributableData;
+    class SeriesData;
+}
+template< typename >
+class AttributableImpl;
+template< typename >
+class SeriesImpl;
 
 
 /** @brief Layer to mirror structure of logical data and persistent data in file.
@@ -54,7 +62,6 @@ class AbstractIOHandlerImplCommon;
  */
 class Writable final
 {
-    friend class Attributable;
     template< typename T_elem >
     friend class BaseRecord;
     template<
@@ -67,6 +74,12 @@ class Writable final
     friend class Mesh;
     friend class ParticleSpecies;
     friend class Series;
+    friend class internal::AttributableData;
+    friend class internal::SeriesData;
+    template< typename >
+    friend class SeriesImpl;
+    template< typename >
+    friend class AttributableImpl;
     friend class Record;
     friend class ADIOS1IOHandlerImpl;
     friend class ParallelADIOS1IOHandlerImpl;
@@ -80,13 +93,13 @@ class Writable final
     friend std::string concrete_bp1_file_position(Writable*);
 
 public:
-    Writable(Attributable* = nullptr);
+    Writable(internal::AttributableData* = nullptr);
     ~Writable() = default;
 
 OPENPMD_private:
     std::shared_ptr< AbstractFilePosition > abstractFilePosition;
     std::shared_ptr< AbstractIOHandler > IOHandler;
-    Attributable* attributable;
+    internal::AttributableData* attributable;
     Writable* parent;
     bool dirty;
     bool written;

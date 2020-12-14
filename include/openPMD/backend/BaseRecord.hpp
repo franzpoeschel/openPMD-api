@@ -248,7 +248,7 @@ template< typename T_elem >
 inline std::array< double, 7 >
 BaseRecord< T_elem >::unitDimension() const
 {
-    return Attributable::getAttribute("unitDimension").template get< std::array< double, 7 > >();
+    return this->getAttribute("unitDimension").template get< std::array< double, 7 > >();
 }
 
 template< typename T_elem >
@@ -311,7 +311,7 @@ template< typename T_elem >
 inline bool
 BaseRecord< T_elem >::dirtyRecursive() const
 {
-    if( Attributable::dirty() )
+    if( this->dirty() )
     {
         return true;
     }

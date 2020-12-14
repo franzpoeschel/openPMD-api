@@ -54,6 +54,10 @@ namespace traits
     };
 } // traits
 
+namespace internal {
+    class SeriesData;
+}
+
 /** @brief Map-like container that enforces openPMD requirements and handles IO.
  *
  * @see http://en.cppreference.com/w/cpp/container/map
@@ -63,18 +67,24 @@ namespace traits
  * @tparam T_container  Type of container used for internal storage (must supply the same type traits and interface as std::map)
  */
 template<
-        typename T,
-        typename T_key = std::string,
-        typename T_container = std::map< T_key, T >
->
-class Container : public Attributable
+    typename T,
+    typename T_key = std::string,
+    typename T_container = std::map< T_key, T > >
+class Container
+    : public internal::AttributableData
+    , public AttributableImpl< Container< T, T_key, T_container > >
 {
-    static_assert(std::is_base_of< Attributable, T >::value, "Type of container element must be derived from Writable");
+    // @todo
+    // static_assert(std::is_base_of< Attributable, T >::value, "Type of
+    // container element must be derived from Writable");
     using InternalContainer = T_container;
 
     friend class Iteration;
     friend class ParticleSpecies;
     friend class Series;
+    friend class internal::SeriesData;
+    template< typename >
+    friend class SeriesImpl;
 
 public:
     using key_type = typename InternalContainer::key_type;
@@ -250,32 +260,46 @@ public:
     auto emplace(Args&&... args)
     -> decltype(InternalContainer().emplace(std::forward<Args>(args)...))
     {
-        return m_container->emplace(std::forward<Args>(args)...);
+        return m_container->emplace( std::forward< Args >( args )... );
     }
 
-OPENPMD_protected:
-    Container()
-        : m_container{std::make_shared< InternalContainer >()}
+    internal::AttributableData &
+    getAttributable()
+    {
+        return *this;
+    }
+
+    internal::AttributableData const &
+    getAttributable() const
+    {
+        return *this;
+    }
+
+    OPENPMD_protected : using Attributable_t = AttributableImpl< Container >;
+
+    Container() : m_container{ std::make_shared< InternalContainer >() }
     { }
 
     void clear_unchecked()
     {
-        if( written() )
-            throw std::runtime_error("Clearing a written container not (yet) implemented.");
+        if( this->written() )
+            throw std::runtime_error(
+                "Clearing a written container not (yet) implemented." );
 
         m_container->clear();
     }
 
-    virtual void flush(std::string const& path)
+    virtual void
+    flush( std::string const & path )
     {
-        if( !written() )
+        if( !this->written() )
         {
             Parameter< Operation::CREATE_PATH > pCreate;
             pCreate.path = path;
-            IOHandler->enqueue(IOTask(this, pCreate));
+            IOHandler->enqueue( IOTask( this, pCreate ) );
         }
 
-        flushAttributes();
+        this->flushAttributes();
     }
 
     std::shared_ptr< InternalContainer > m_container;
