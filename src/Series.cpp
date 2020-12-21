@@ -526,13 +526,13 @@ Series::flushFileBased( IterationsContainer && iterationsToFlush )
                 continue;
             }
             /*
-             * Opening a file is expensive, so let's do it only if necessary.
-             * Necessary if:
-             * 1. The iteration itself has been changed somewhere.
-             * 2. Or the Series has been changed globally in a manner that
-             *    requires adapting all iterations.
+             * Open the file and write to it.
+             * Do this unconditionally: Even if the iteration is not
+             * dirty on the current process, there might be other ranks
+             * where it is.
+             * Since opening a file is a collective operation in some backends,
+             * do this everywhere.
              */
-            if( dirtyRecursive || this->dirty() )
             {
                 // openIteration() will update the close status
                 openIteration( i.first, i.second );
@@ -574,13 +574,13 @@ Series::flushFileBased( IterationsContainer && iterationsToFlush )
             }
 
             /*
-             * Opening a file is expensive, so let's do it only if necessary.
-             * Necessary if:
-             * 1. The iteration itself has been changed somewhere.
-             * 2. Or the Series has been changed globally in a manner that
-             *    requires adapting all iterations.
+             * Open the file and write to it.
+             * Do this unconditionally: Even if the iteration is not
+             * dirty on the current process, there might be other ranks
+             * where it is.
+             * Since opening a file is a collective operation in some backends,
+             * do this everywhere.
              */
-            if( dirtyRecursive || this->dirty() )
             {
                 /* as there is only one series,
                 * emulate the file belonging to each iteration as not yet written
