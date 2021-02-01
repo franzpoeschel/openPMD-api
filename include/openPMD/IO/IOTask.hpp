@@ -41,10 +41,11 @@ namespace internal
 {
     class AttributableData;
 }
+class AttributableImpl;
 class Writable;
 
 Writable*
-getWritable(internal::AttributableData*);
+getWritable(AttributableImpl*);
 
 /** Type of IO operation between logical and persistent data.
  */
@@ -568,7 +569,7 @@ public:
     { }
 
     template< Operation op >
-    explicit IOTask(internal::AttributableData* a,
+    explicit IOTask(AttributableImpl* a,
            Parameter< op > const & p)
             : writable{getWritable(a)},
               operation{op},

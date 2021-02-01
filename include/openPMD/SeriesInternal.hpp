@@ -53,7 +53,6 @@ namespace openPMD
 {
 class WriteIterations;
 class Series;
-template< typename >
 class SeriesImpl;
 
 namespace internal
@@ -67,7 +66,6 @@ namespace internal
  */
 class SeriesData : public AttributableData
 {
-template< typename >
 friend class openPMD::SeriesImpl;
 friend class openPMD::Iteration;
 friend class openPMD::Series;

@@ -19,7 +19,6 @@
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
-#include "openPMD/backend/Attributable.tpp"
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
@@ -32,24 +31,16 @@ namespace openPMD
 {
 namespace test
 {
-struct TestHelper
-    : public internal::AttributableData
-    , public AttributableImpl< TestHelper >
+struct TestHelper : public AttributableImpl
 {
-    TestHelper()
-    {
-        m_writable->IOHandler = createIOHandler(".", Access::CREATE, Format::JSON);
-        IOHandler = m_writable->IOHandler.get();
-    }
+    std::shared_ptr< internal::AttributableData > m_attributable =
+        std::make_shared< internal::AttributableData >();
 
-    internal::AttributableData & getAttributable()
+    TestHelper() : AttributableImpl{ nullptr }
     {
-        return *this;
-    }
-
-    internal::AttributableData const & getAttributable() const
-    {
-        return *this;
+        m_attri = m_attributable.get();
+        writable()->IOHandler =
+            createIOHandler( ".", Access::CREATE, Format::JSON );
     }
 };
 } // test

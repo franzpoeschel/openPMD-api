@@ -31,9 +31,7 @@
 
 namespace openPMD
 {
-class BaseRecordComponent
-    : public internal::AttributableData
-    , public AttributableImpl < BaseRecordComponent >
+class BaseRecordComponent : public AttributableImpl
 {
     template<
         typename T,
@@ -44,7 +42,7 @@ class BaseRecordComponent
     class Container;
 
 public:
-    ~BaseRecordComponent() override = default;
+    ~BaseRecordComponent() = default;
 
     double unitSI() const;
 
@@ -81,22 +79,14 @@ public:
     ChunkTable
     availableChunks();
 
-    inline internal::AttributableData &
-    getAttributable()
-    {
-        return *this;
-    }
+OPENPMD_protected:
 
-    inline internal::AttributableData const &
-    getAttributable() const
-    {
-        return *this;
-    }
-
-    OPENPMD_protected : BaseRecordComponent();
+    BaseRecordComponent();
 
     std::shared_ptr< Dataset > m_dataset;
     std::shared_ptr< bool > m_isConstant;
+    std::shared_ptr< internal::AttributableData > m_attributable =
+        std::make_shared< internal::AttributableData >();
 }; // BaseRecordComponent
 
 namespace detail

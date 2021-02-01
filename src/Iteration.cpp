@@ -28,51 +28,18 @@
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/backend/Attributable.tpp"
 #include "openPMD/backend/Writable.hpp"
 
 
 namespace openPMD
 {
-template class AttributableImpl< Iteration >;
-
-Iteration::Iteration() : meshes{}, particles{}
+Iteration::Iteration()
+    : AttributableImpl{ nullptr }, meshes{}, particles{}
 {
-    setTime(static_cast< double >(0));
+    m_attri = m_attributable.get();
+    setTime( static_cast< double >( 0 ) );
     setDt(static_cast< double >(1));
     setTimeUnitSI(1);
-}
-
-Iteration::Iteration( Iteration const & i )
-    : internal::AttributableData{ i },
-      meshes{ i.meshes },
-      particles{ i.particles },
-      m_closed{ i.m_closed },
-      m_stepStatus{ i.m_stepStatus }
-{
-    IOHandler = i.IOHandler;
-    parent = i.parent;
-    meshes.IOHandler = IOHandler;
-    meshes.parent = this->m_writable.get();
-    particles.IOHandler = IOHandler;
-    particles.parent = this->m_writable.get();
-}
-
-Iteration& Iteration::operator=(Iteration const& i)
-{
-    // warning (clang-tidy-10): bugprone-unhandled-self-assignment
-    internal::AttributableData::operator=( i );
-    meshes = i.meshes;
-    particles = i.particles;
-    IOHandler = i.IOHandler;
-    parent = i.parent;
-    m_closed = i.m_closed;
-    m_stepStatus = i.m_stepStatus;
-    meshes.IOHandler = IOHandler;
-    meshes.parent = this->m_writable.get();
-    particles.IOHandler = IOHandler;
-    particles.parent = this->m_writable.get();
-    return *this;
 }
 
 template< typename T >
@@ -114,7 +81,7 @@ Iteration &
 Iteration::close( bool _flush )
 {
     using bool_type = unsigned char;
-    if( this->IOHandler->m_frontendAccess != Access::READ_ONLY )
+    if( this->IOHandler()->m_frontendAccess != Access::READ_ONLY )
     {
         setAttribute< bool_type >( "closed", 1u );
     }
@@ -157,7 +124,7 @@ Iteration::close( bool _flush )
             // flush things manually
             internal::SeriesInternal * s = 
                 &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-                    parent->attributable->parent->attributable );
+                    parent()->attributable->parent()->attributable );
             // figure out my iteration number
             auto begin = s->indexOf( *this );
             auto end = begin;
@@ -204,7 +171,7 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
      * meshesPath and particlesPath are stored there */
     internal::SeriesInternal * s =
         &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
     if( s == nullptr )
         throw std::runtime_error("[Iteration::flushFileBased] Series* is a nullptr");
 
@@ -213,25 +180,25 @@ Iteration::flushFileBased(std::string const& filename, uint64_t i)
         /* create file */
         Parameter< Operation::CREATE_FILE > fCreate;
         fCreate.name = filename;
-        IOHandler->enqueue(IOTask(s, fCreate));
+        IOHandler()->enqueue(IOTask(s, fCreate));
 
         /* create basePath */
         Parameter< Operation::CREATE_PATH > pCreate;
         pCreate.path = auxiliary::replace_first(s->basePath(), "%T/", "");
-        IOHandler->enqueue(IOTask(&s->iterations, pCreate));
+        IOHandler()->enqueue(IOTask(&s->iterations, pCreate));
 
         /* create iteration path */
         pCreate.path = std::to_string(i);
-        IOHandler->enqueue(IOTask(this, pCreate));
+        IOHandler()->enqueue(IOTask(this, pCreate));
     } else
     {
         // operations for create mode
-        if((IOHandler->m_frontendAccess == Access::CREATE ) &&
-           ( (IOHandler->backendName() == "MPI_ADIOS1") || (IOHandler->backendName() == "ADIOS1") ) )
+        if((IOHandler()->m_frontendAccess == Access::CREATE ) &&
+           ( (IOHandler()->backendName() == "MPI_ADIOS1") || (IOHandler()->backendName() == "ADIOS1") ) )
         {
             Parameter< Operation::OPEN_FILE > fOpen;
             fOpen.name = filename;
-            IOHandler->enqueue(IOTask(s, fOpen));
+            IOHandler()->enqueue(IOTask(s, fOpen));
             flush();
 
             return;
@@ -253,7 +220,7 @@ Iteration::flushGroupBased(uint64_t i)
         /* create iteration path */
         Parameter< Operation::CREATE_PATH > pCreate;
         pCreate.path = std::to_string(i);
-        IOHandler->enqueue(IOTask(this, pCreate));
+        IOHandler()->enqueue(IOTask(this, pCreate));
     }
 
     flush();
@@ -262,7 +229,7 @@ Iteration::flushGroupBased(uint64_t i)
 void
 Iteration::flush()
 {
-    if(IOHandler->m_frontendAccess == Access::READ_ONLY )
+    if(IOHandler()->m_frontendAccess == Access::READ_ONLY )
     {
         for( auto& m : meshes )
             m.second.flush(m.first);
@@ -274,7 +241,7 @@ Iteration::flush()
          * meshesPath and particlesPath are stored there */
         internal::SeriesInternal * s =
             &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-                parent->attributable->parent->attributable );
+                parent()->attributable->parent()->attributable );
 
         if( !meshes.empty() || s->containsAttribute("meshesPath") )
         {
@@ -307,8 +274,8 @@ Iteration::read()
     Parameter< Operation::READ_ATT > aRead;
 
     aRead.name = "dt";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::FLOAT )
         setDt(Attribute(*aRead.resource).get< float >());
     else if( *aRead.dtype == DT::DOUBLE )
@@ -317,8 +284,8 @@ Iteration::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'dt'");
 
     aRead.name = "time";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::FLOAT )
         setTime(Attribute(*aRead.resource).get< float >());
     else if( *aRead.dtype == DT::DOUBLE )
@@ -327,8 +294,8 @@ Iteration::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'time'");
 
     aRead.name = "timeUnitSI";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::DOUBLE )
         setTimeUnitSI(Attribute(*aRead.resource).get< double >());
     else
@@ -338,7 +305,7 @@ Iteration::read()
      * meshesPath and particlesPath are stored there */
     internal::SeriesInternal * s =
         &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
 
     Parameter< Operation::LIST_PATHS > pList;
     std::string version = s->openPMD();
@@ -346,8 +313,8 @@ Iteration::read()
     bool hasParticles = false;
     if( version == "1.0.0" || version == "1.0.1" )
     {
-        IOHandler->enqueue(IOTask(this, pList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(this, pList));
+        IOHandler()->flush();
         hasMeshes = std::count(
             pList.paths->begin(),
             pList.paths->end(),
@@ -369,13 +336,13 @@ Iteration::read()
     {
         Parameter< Operation::OPEN_PATH > pOpen;
         pOpen.path = s->meshesPath();
-        IOHandler->enqueue(IOTask(&meshes, pOpen));
+        IOHandler()->enqueue(IOTask(&meshes, pOpen));
 
         meshes.readAttributes();
 
         /* obtain all non-scalar meshes */
-        IOHandler->enqueue(IOTask(&meshes, pList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(&meshes, pList));
+        IOHandler()->flush();
 
         Parameter< Operation::LIST_ATTS > aList;
         for( auto const& mesh_name : *pList.paths )
@@ -383,9 +350,9 @@ Iteration::read()
             Mesh& m = meshes[mesh_name];
             pOpen.path = mesh_name;
             aList.attributes->clear();
-            IOHandler->enqueue(IOTask(&m, pOpen));
-            IOHandler->enqueue(IOTask(&m, aList));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&m, pOpen));
+            IOHandler()->enqueue(IOTask(&m, aList));
+            IOHandler()->flush();
 
             auto att_begin = aList.attributes->begin();
             auto att_end = aList.attributes->end();
@@ -394,9 +361,9 @@ Iteration::read()
             if( value != att_end && shape != att_end )
             {
                 MeshRecordComponent& mrc = m[MeshRecordComponent::SCALAR];
-                mrc.parent = m.parent;
-                IOHandler->enqueue(IOTask(&mrc, pOpen));
-                IOHandler->flush();
+                mrc.parent() = m.parent();
+                IOHandler()->enqueue(IOTask(&mrc, pOpen));
+                IOHandler()->flush();
                 *mrc.m_isConstant = true;
             }
             m.read();
@@ -404,20 +371,20 @@ Iteration::read()
 
         /* obtain all scalar meshes */
         Parameter< Operation::LIST_DATASETS > dList;
-        IOHandler->enqueue(IOTask(&meshes, dList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(&meshes, dList));
+        IOHandler()->flush();
 
         Parameter< Operation::OPEN_DATASET > dOpen;
         for( auto const& mesh_name : *dList.datasets )
         {
             Mesh& m = meshes[mesh_name];
             dOpen.name = mesh_name;
-            IOHandler->enqueue(IOTask(&m, dOpen));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&m, dOpen));
+            IOHandler()->flush();
             MeshRecordComponent& mrc = m[MeshRecordComponent::SCALAR];
-            mrc.parent = m.parent;
-            IOHandler->enqueue(IOTask(&mrc, dOpen));
-            IOHandler->flush();
+            mrc.parent() = m.parent();
+            IOHandler()->enqueue(IOTask(&mrc, dOpen));
+            IOHandler()->flush();
             mrc.written() = false;
             mrc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
             mrc.written() = true;
@@ -429,21 +396,21 @@ Iteration::read()
     {
         Parameter< Operation::OPEN_PATH > pOpen;
         pOpen.path = s->particlesPath();
-        IOHandler->enqueue(IOTask(&particles, pOpen));
+        IOHandler()->enqueue(IOTask(&particles, pOpen));
 
         particles.readAttributes();
 
         /* obtain all particle species */
         pList.paths->clear();
-        IOHandler->enqueue(IOTask(&particles, pList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(&particles, pList));
+        IOHandler()->flush();
 
         for( auto const& species_name : *pList.paths )
         {
             ParticleSpecies& p = particles[species_name];
             pOpen.path = species_name;
-            IOHandler->enqueue(IOTask(&p, pOpen));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&p, pOpen));
+            IOHandler()->flush();
             p.read();
         }
     }
@@ -457,14 +424,14 @@ Iteration::beginStep()
     using IE = IterationEncoding;
     internal::SeriesInternal & series =
         auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
     // Initialize file with this to quiet warnings
     // The following switch is comprehensive
-    internal::AttributableData * file = this;
+    internal::AttributableData * file = nullptr;
     switch( *series.get().m_iterationEncoding )
     {
         case IE::fileBased:
-            file = this;
+            file = m_attributable.get();
             break;
         case IE::groupBased:
             file = &series;
@@ -479,14 +446,14 @@ Iteration::beginStep()
 
     // re-read -> new datasets might be available
     if( *series.m_iterationEncoding == IE::groupBased &&
-        ( this->IOHandler->m_frontendAccess == Access::READ_ONLY ||
-          this->IOHandler->m_frontendAccess == Access::READ_WRITE ) )
+        ( this->IOHandler()->m_frontendAccess == Access::READ_ONLY ||
+          this->IOHandler()->m_frontendAccess == Access::READ_WRITE ) )
     {
         bool previous = series.iterations.written();
         series.iterations.written() = false;
-        auto oldType = this->IOHandler->m_frontendAccess;
+        auto oldType = this->IOHandler()->m_frontendAccess;
         auto newType =
-            const_cast< Access * >( &this->IOHandler->m_frontendAccess );
+            const_cast< Access * >( &this->IOHandler()->m_frontendAccess );
         *newType = Access::READ_WRITE;
         series.readGroupBased( false );
         *newType = oldType;
@@ -502,14 +469,14 @@ Iteration::endStep()
     using IE = IterationEncoding;
     internal::SeriesInternal & series =
         auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
     // Initialize file with this to quiet warnings
     // The following switch is comprehensive
-    internal::AttributableData * file = this;
+    internal::AttributableData * file = nullptr;
     switch( *series.m_iterationEncoding )
     {
         case IE::fileBased:
-            file = this;
+            file = m_attributable.get();
             break;
         case IE::groupBased:
             file = &series;
@@ -525,7 +492,7 @@ Iteration::getStepStatus()
 {
      internal::SeriesInternal * s =
         &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
     switch( *s->m_iterationEncoding )
     {
         using IE = IterationEncoding;
@@ -543,7 +510,7 @@ Iteration::setStepStatus( StepStatus status )
 {
      internal::SeriesInternal * s =
         &auxiliary::deref_dynamic_cast< internal::SeriesInternal >(
-            parent->attributable->parent->attributable );
+            parent()->attributable->parent()->attributable );
     switch( *s->m_iterationEncoding )
     {
         using IE = IterationEncoding;
@@ -585,13 +552,12 @@ Iteration::dirtyRecursive() const
 void
 Iteration::linkHierarchy(std::shared_ptr< Writable > const& w)
 {
-    attributable_t::linkHierarchy(w);
-    meshes.linkHierarchy(m_writable);
-    particles.linkHierarchy(m_writable);
+    AttributableImpl::linkHierarchy(w);
+    meshes.linkHierarchy(m_attributable->m_writable);
+    particles.linkHierarchy(m_attributable->m_writable);
 }
 
-template float
-Iteration::time< float >() const;
+template float Iteration::time< float >() const;
 template double
 Iteration::time< double >() const;
 template long double

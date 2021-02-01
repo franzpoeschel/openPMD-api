@@ -70,9 +70,7 @@ template<
     typename T,
     typename T_key = std::string,
     typename T_container = std::map< T_key, T > >
-class Container
-    : public internal::AttributableData
-    , public AttributableImpl< Container< T, T_key, T_container > >
+class Container : public AttributableImpl
 {
     // @todo
     // static_assert(std::is_base_of< Attributable, T >::value, "Type of
@@ -83,7 +81,6 @@ class Container
     friend class ParticleSpecies;
     friend class Series;
     friend class internal::SeriesData;
-    template< typename >
     friend class SeriesImpl;
 
 public:
@@ -122,7 +119,7 @@ public:
      */
     void clear()
     {
-        if(Access::READ_ONLY == IOHandler->m_frontendAccess )
+        if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
             throw std::runtime_error("Can not clear a container in a read-only Series.");
 
         clear_unchecked();
@@ -156,14 +153,14 @@ public:
             return it->second;
         else
         {
-            if(Access::READ_ONLY == IOHandler->m_frontendAccess )
+            if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
             {
                 auxiliary::OutOfRangeMsg const out_of_range_msg;
                 throw std::out_of_range(out_of_range_msg(key));
             }
 
             T t = T();
-            t.linkHierarchy(m_writable);
+            t.linkHierarchy(m_attributable->m_writable);
             auto& ret = m_container->insert({key, std::move(t)}).first->second;
             traits::GenerationPolicy< T > gen;
             gen(ret);
@@ -183,14 +180,14 @@ public:
             return it->second;
         else
         {
-            if(Access::READ_ONLY == IOHandler->m_frontendAccess )
+            if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
             {
                 auxiliary::OutOfRangeMsg out_of_range_msg;
                 throw std::out_of_range(out_of_range_msg(key));
             }
 
             T t = T();
-            t.linkHierarchy(m_writable);
+            t.linkHierarchy(m_attributable->m_writable);
             auto& ret = m_container->insert({std::move(key), std::move(t)}).first->second;
             traits::GenerationPolicy< T > gen;
             gen(ret);
@@ -224,7 +221,7 @@ public:
      */
     virtual size_type erase(key_type const& key)
     {
-        if(Access::READ_ONLY == IOHandler->m_frontendAccess )
+        if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
             throw std::runtime_error("Can not erase from a container in a read-only Series.");
 
         auto res = m_container->find(key);
@@ -232,8 +229,8 @@ public:
         {
             Parameter< Operation::DELETE_PATH > pDelete;
             pDelete.path = ".";
-            IOHandler->enqueue(IOTask(&res->second, pDelete));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&res->second, pDelete));
+            IOHandler()->flush();
         }
         return m_container->erase(key);
     }
@@ -241,15 +238,15 @@ public:
     //! @todo why does const_iterator not work compile with pybind11?
     virtual iterator erase(iterator res)
     {
-        if(Access::READ_ONLY == IOHandler->m_frontendAccess )
+        if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
             throw std::runtime_error("Can not erase from a container in a read-only Series.");
 
         if( res != m_container->end() && res->second.written() )
         {
             Parameter< Operation::DELETE_PATH > pDelete;
             pDelete.path = ".";
-            IOHandler->enqueue(IOTask(&res->second, pDelete));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&res->second, pDelete));
+            IOHandler()->flush();
         }
         return m_container->erase(res);
     }
@@ -275,10 +272,12 @@ public:
         return *this;
     }
 
-    OPENPMD_protected : using Attributable_t = AttributableImpl< Container >;
-
-    Container() : m_container{ std::make_shared< InternalContainer >() }
-    { }
+    Container()
+        : AttributableImpl{ nullptr }
+        , m_container{ std::make_shared< InternalContainer >() }
+    {
+        AttributableImpl::m_attri = m_attributable.get();
+    }
 
     void clear_unchecked()
     {
@@ -296,13 +295,17 @@ public:
         {
             Parameter< Operation::CREATE_PATH > pCreate;
             pCreate.path = path;
-            IOHandler->enqueue( IOTask( this, pCreate ) );
+            IOHandler()->enqueue( IOTask( this, pCreate ) );
         }
 
         this->flushAttributes();
     }
 
     std::shared_ptr< InternalContainer > m_container;
+
+private:
+    std::shared_ptr< internal::AttributableData > m_attributable =
+        std::make_shared< internal::AttributableData >();
 };
 
 } // openPMD

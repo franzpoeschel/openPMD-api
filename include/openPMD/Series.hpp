@@ -12,13 +12,12 @@
 
 namespace openPMD
 {
-template< typename SeriesWrapper >
-class SeriesImpl : public AttributableImpl< SeriesWrapper >
+class SeriesImpl : public AttributableImpl
 {
 friend class Iteration;
 
 public:
-    explicit SeriesImpl() = default;
+    SeriesImpl( internal::SeriesData *, internal::AttributableData * );
 
     std::string
     openPMD() const;
@@ -277,20 +276,21 @@ public:
 protected:
     using iterations_t = decltype(internal::SeriesData::iterations);
     using iterations_iterator = iterations_t::iterator;
-    using attributable_t = AttributableImpl< SeriesWrapper >;
 
     struct ParsedInput;
+
+    internal::SeriesData * m_series;
 
     inline internal::SeriesData &
     get()
     {
-        return static_cast< SeriesWrapper * >( this )->getSeries();
+        return *m_series;
     }
 
     inline internal::SeriesData const &
     get() const
     {
-        return static_cast< SeriesWrapper const * >( this )->getSeries();
+        return *m_series;
     }
 
     std::unique_ptr< ParsedInput > parseInput(std::string);
@@ -351,7 +351,7 @@ namespace internal
 {
     class SeriesInternal
         : public SeriesData
-        , public SeriesImpl< SeriesInternal >
+        , public SeriesImpl
     {
         friend struct SeriesShared;
 
@@ -400,7 +400,7 @@ namespace internal
 class ReadIterations;
 class WriteIterations;
 
-class Series : public SeriesImpl< Series >
+class Series : public SeriesImpl
 {
 private:
     std::shared_ptr< internal::SeriesInternal > m_series;

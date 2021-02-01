@@ -196,7 +196,7 @@ Mesh::setTimeOffset( float );
 void
 Mesh::flush_impl(std::string const& name)
 {
-    if(IOHandler->m_frontendAccess == Access::READ_ONLY )
+    if(IOHandler()->m_frontendAccess == Access::READ_ONLY )
     {
         for( auto& comp : *this )
             comp.second.flush(comp.first);
@@ -207,21 +207,19 @@ Mesh::flush_impl(std::string const& name)
             if( scalar() )
             {
                 MeshRecordComponent& mrc = at(RecordComponent::SCALAR);
-                mrc.m_writable->parent = parent;
-                mrc.parent = parent;
+                mrc.parent() = parent();
+                mrc.parent() = parent();
                 mrc.flush(name);
-                IOHandler->flush();
-                m_writable->abstractFilePosition = mrc.m_writable->abstractFilePosition;
-                mrc.abstractFilePosition = m_writable->abstractFilePosition.get();
-                abstractFilePosition = mrc.abstractFilePosition;
+                IOHandler()->flush();
+                writable()->abstractFilePosition = mrc.writable()->abstractFilePosition;
                 written() = true;
             } else
             {
                 Parameter< Operation::CREATE_PATH > pCreate;
                 pCreate.path = name;
-                IOHandler->enqueue(IOTask(this, pCreate));
+                IOHandler()->enqueue(IOTask(this, pCreate));
                 for( auto& comp : *this )
-                    comp.second.parent = this->m_writable.get();
+                    comp.second.parent() = this->writable();
             }
         }
 
@@ -239,8 +237,8 @@ Mesh::read()
     Parameter< Operation::READ_ATT > aRead;
 
     aRead.name = "geometry";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::STRING )
     {
         std::string tmpGeometry = Attribute(*aRead.resource).get< std::string >();
@@ -259,8 +257,8 @@ Mesh::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'geometry'");
 
     aRead.name = "dataOrder";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::CHAR )
         setDataOrder(static_cast<DataOrder>(Attribute(*aRead.resource).get< char >()));
     else if( *aRead.dtype == DT::STRING )
@@ -275,8 +273,8 @@ Mesh::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'dataOrder'");
 
     aRead.name = "axisLabels";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::VEC_STRING )
         setAxisLabels(Attribute(*aRead.resource).get< std::vector< std::string > >());
     else if( *aRead.dtype == DT::STRING )
@@ -285,8 +283,8 @@ Mesh::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'axisLabels'");
 
     aRead.name = "gridSpacing";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     Attribute a = Attribute(*aRead.resource);
     if( *aRead.dtype == DT::VEC_FLOAT )
         setGridSpacing(a.get< std::vector< float > >());
@@ -300,8 +298,8 @@ Mesh::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'gridSpacing'");
 
     aRead.name = "gridGlobalOffset";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::VEC_DOUBLE )
         setGridGlobalOffset(Attribute(*aRead.resource).get< std::vector< double > >());
     else if( *aRead.dtype == DT::DOUBLE )
@@ -310,8 +308,8 @@ Mesh::read()
         throw std::runtime_error("Unexpected Attribute datatype for 'gridGlobalOffset'");
 
     aRead.name = "gridUnitSI";
-    IOHandler->enqueue(IOTask(this, aRead));
-    IOHandler->flush();
+    IOHandler()->enqueue(IOTask(this, aRead));
+    IOHandler()->flush();
     if( *aRead.dtype == DT::DOUBLE )
         setGridUnitSI(Attribute(*aRead.resource).get< double >());
     else
@@ -324,8 +322,8 @@ Mesh::read()
     } else
     {
         Parameter< Operation::LIST_PATHS > pList;
-        IOHandler->enqueue(IOTask(this, pList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(this, pList));
+        IOHandler()->flush();
 
         Parameter< Operation::OPEN_PATH > pOpen;
         for( auto const& component : *pList.paths )
@@ -336,14 +334,14 @@ Mesh::read()
                 continue;
             }
             pOpen.path = component;
-            IOHandler->enqueue(IOTask(&rc, pOpen));
+            IOHandler()->enqueue(IOTask(&rc, pOpen));
             *rc.m_isConstant = true;
             rc.read();
         }
 
         Parameter< Operation::LIST_DATASETS > dList;
-        IOHandler->enqueue(IOTask(this, dList));
-        IOHandler->flush();
+        IOHandler()->enqueue(IOTask(this, dList));
+        IOHandler()->flush();
 
         Parameter< Operation::OPEN_DATASET > dOpen;
         for( auto const& component : *dList.datasets )
@@ -354,8 +352,8 @@ Mesh::read()
                 continue;
             }
             dOpen.name = component;
-            IOHandler->enqueue(IOTask(&rc, dOpen));
-            IOHandler->flush();
+            IOHandler()->enqueue(IOTask(&rc, dOpen));
+            IOHandler()->flush();
             rc.written() = false;
             rc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
             rc.written() = true;

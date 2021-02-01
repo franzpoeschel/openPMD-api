@@ -20,12 +20,8 @@
  */
 #include "openPMD/backend/BaseRecordComponent.hpp"
 
-#include "openPMD/backend/Attributable.tpp"
-
 namespace openPMD
 {
-template class AttributableImpl< BaseRecordComponent >;
-
 double
 BaseRecordComponent::unitSI() const
 {
@@ -43,9 +39,12 @@ BaseRecordComponent::resetDatatype(Datatype d)
 }
 
 BaseRecordComponent::BaseRecordComponent()
-        : m_dataset{std::make_shared< Dataset >(Dataset(Datatype::UNDEFINED, {}))},
+        : AttributableImpl{ nullptr }
+        , m_dataset{std::make_shared< Dataset >(Dataset(Datatype::UNDEFINED, {}))},
           m_isConstant{std::make_shared< bool >(false)}
-{ }
+{
+    m_attri = m_attributable.get();
+}
 
 Datatype
 BaseRecordComponent::getDatatype() const
@@ -64,8 +63,8 @@ BaseRecordComponent::availableChunks()
 {
     Parameter< Operation::AVAILABLE_CHUNKS > param;
     IOTask task( this, param );
-    IOHandler->enqueue( task );
-    IOHandler->flush();
+    IOHandler()->enqueue( task );
+    IOHandler()->flush();
     return std::move( *param.chunks );
 }
 } // namespace openPMD

@@ -45,10 +45,12 @@ namespace internal
     class AttributableData;
     class SeriesData;
 }
-template< typename >
 class AttributableImpl;
-template< typename >
 class SeriesImpl;
+namespace traits
+{
+    template< typename > struct GenerationPolicy;
+}
 
 
 /** @brief Layer to mirror structure of logical data and persistent data in file.
@@ -76,9 +78,7 @@ class Writable final
     friend class Series;
     friend class internal::AttributableData;
     friend class internal::SeriesData;
-    template< typename >
     friend class SeriesImpl;
-    template< typename >
     friend class AttributableImpl;
     friend class Record;
     friend class ADIOS1IOHandlerImpl;
@@ -89,6 +89,8 @@ class Writable final
     friend class AbstractIOHandlerImplCommon<ADIOS2FilePosition>;
     friend class JSONIOHandlerImpl;
     friend struct test::TestHelper;
+    template< typename >
+    friend struct traits::GenerationPolicy;
     friend std::string concrete_h5_file_position(Writable*);
     friend std::string concrete_bp1_file_position(Writable*);
 

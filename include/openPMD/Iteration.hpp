@@ -31,29 +31,24 @@
 
 namespace openPMD
 {
-/** @brief  Logical compilation of data from one snapshot (e.g. a single simulation cycle).
+/** @brief  Logical compilation of data from one snapshot (e.g. a single
+ * simulation cycle).
  *
- * @see https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
+ * @see
+ * https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
  */
-class Iteration
-    : public internal::AttributableData
-    , public AttributableImpl< Iteration >
+class Iteration : public AttributableImpl
 {
-    template<
-            typename T,
-            typename T_key,
-            typename T_container
-    >
+    template< typename T, typename T_key, typename T_container >
     friend class Container;
     friend class Series;
     friend class WriteIterations;
     friend class SeriesIterator;
-    template< typename >
     friend class SeriesImpl;
 
 public:
-    Iteration(Iteration const&);
-    Iteration& operator=(Iteration const&);
+    Iteration(Iteration const&) = default;
+    Iteration& operator=(Iteration const&) = default;
 
     /**
      * @tparam  T   Floating point type of user-selected precision (e.g. float, double).
@@ -140,19 +135,8 @@ public:
     Container< Mesh > meshes;
     Container< ParticleSpecies > particles; //particleSpecies?
 
-    internal::AttributableData & getAttributable()
-    {
-        return *this;
-    }
-
-    internal::AttributableData const & getAttributable() const
-    {
-        return *this;
-    }
-
     virtual ~Iteration() = default;
 private:
-    using attributable_t = AttributableImpl< Iteration >;
 
     Iteration();
 
@@ -250,11 +234,12 @@ private:
     dirtyRecursive() const;
 
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
-};  // Iteration
 
-extern template
-float
-Iteration::time< float >() const;
+    std::shared_ptr< internal::AttributableData > m_attributable =
+        std::make_shared< internal::AttributableData >();
+}; // Iteration
+
+extern template float Iteration::time< float >() const;
 
 extern template
 double
@@ -267,7 +252,7 @@ Iteration::time< long double >() const;
 template< typename T >
 inline T
 Iteration::time() const
-{ return attributable_t::readFloatingpoint< T >("time"); }
+{ return readFloatingpoint< T >("time"); }
 
 
 extern template
@@ -285,5 +270,5 @@ Iteration::dt< long double >() const;
 template< typename T >
 inline T
 Iteration::dt() const
-{ return attributable_t::readFloatingpoint< T >("dt"); }
+{ return readFloatingpoint< T >("dt"); }
 } // openPMD

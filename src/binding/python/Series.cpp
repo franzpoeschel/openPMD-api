@@ -22,7 +22,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "openPMD/binding/python/Attributable.tpp"
 #include "openPMD/config.hpp"
 #include "openPMD/Series.hpp"
 
@@ -79,7 +78,7 @@ void init_Series(py::module &m) {
         py::keep_alive<0, 1>())
     ;
 
-    auto pyseries = py::class_<Series>(m, "Series")
+    py::class_<Series, AttributableImpl>(m, "Series")
 
         .def(py::init<std::string const&, Access, std::string const &>(),
             py::arg("filepath"), py::arg("access"), py::arg("options") = "{}")
@@ -189,5 +188,4 @@ void init_Series(py::module &m) {
         .def("write_iterations",
             &Series::writeIterations, py::keep_alive<0, 1>())
     ;
-    addAttributableInterface< Series >( pyseries );
 }
