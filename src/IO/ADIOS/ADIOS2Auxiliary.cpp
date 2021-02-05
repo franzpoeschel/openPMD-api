@@ -257,7 +257,10 @@ namespace detail
                             : toVectorType( basicType );
                         return openPmdType;
                     }
-                    else if( shape.size() == 2 && basicType == Datatype::CHAR )
+                    else if(
+                        shape.size() == 2 &&
+                        ( basicType == Datatype::CHAR ||
+                          basicType == Datatype::UCHAR ) )
                     {
                         return Datatype::VEC_STRING;
                     }
@@ -275,7 +278,8 @@ namespace detail
                         throw std::runtime_error( errorMsg.str() );
                     }
                 }
-                }
+            }
+            throw std::runtime_error( "Unreachable!" );
         }
     }
 } // namespace detail
