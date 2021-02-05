@@ -1603,20 +1603,51 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        detail::AttributeWithShape< char > attr =
-            preloadedAttributes.getAttribute< char >( name );
-        if( attr.shape.size() != 2 )
+        char const * loadedData{ nullptr };
+        size_t height{ 0 }, width{ 0 };
+        /*
+         * ADIOS2 might be feeling funny and report as unsigned char what we
+         * wrote as signed char. Guard against that.
+         */
+        switch( preloadedAttributes.attributeType( name ) )
         {
-            throw std::runtime_error( "[ADIOS2] Expecting 2D ADIOS variable" );
+        case Datatype::CHAR: {
+            detail::AttributeWithShape< char > attr =
+                preloadedAttributes.getAttribute< char >( name );
+            if( attr.shape.size() != 2 )
+            {
+                throw std::runtime_error(
+                    "[ADIOS2] Expecting 2D ADIOS variable" );
+            }
+            loadedData = attr.data;
+            height = attr.shape[ 0 ];
+            width = attr.shape[ 1 ];
+            break;
         }
-        size_t height = attr.shape[ 0 ];
-        size_t width = attr.shape[ 1 ];
+        case Datatype::UCHAR: {
+            detail::AttributeWithShape< unsigned char > attr =
+                preloadedAttributes.getAttribute< unsigned char >( name );
+            if( attr.shape.size() != 2 )
+            {
+                throw std::runtime_error(
+                    "[ADIOS2] Expecting 2D ADIOS variable" );
+            }
+            loadedData = reinterpret_cast< char const * >( attr.data );
+            height = attr.shape[ 0 ];
+            width = attr.shape[ 1 ];
+            break;
+        }
+        default: {
+            throw std::runtime_error( "[ADIOS2] Expecting 2D ADIOS variable of "
+                                      "type signed or unsigned char." );
+        }
+        }
 
         std::vector< std::string > res( height );
         for( size_t i = 0; i < height; ++i )
         {
             size_t start = i * width;
-            char const * start_ptr = attr.data + start;
+            char const * start_ptr = loadedData + start;
             size_t j = 0;
             while( j < width && start_ptr[ j ] != 0 )
             {
