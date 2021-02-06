@@ -1603,8 +1603,37 @@ namespace detail
         std::string name,
         std::shared_ptr< Attribute::resource > resource )
     {
-        char const * loadedData{ nullptr };
-        size_t height{ 0 }, width{ 0 };
+        auto loadFromDatatype =
+            [ &preloadedAttributes, &name, &resource ]( auto char_type ) {
+                using char_t = decltype( char_type );
+                detail::AttributeWithShape< char_t > attr =
+                    preloadedAttributes.getAttribute< char_t >( name );
+                if( attr.shape.size() != 2 )
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Expecting 2D ADIOS variable" );
+                }
+                char_t const * loadedData = attr.data;
+                size_t height = attr.shape[ 0 ];
+                size_t width = attr.shape[ 1 ];
+
+                std::vector< std::string > res( height );
+                for( size_t i = 0; i < height; ++i )
+                {
+                    size_t start = i * width;
+                    char const * start_ptr =
+                        reinterpret_cast< char const * >( loadedData + start );
+                    size_t j = 0;
+                    while( j < width && start_ptr[ j ] != 0 )
+                    {
+                        ++j;
+                    }
+                    std::string & str = res[ i ];
+                    str.append( start_ptr, start_ptr + j );
+                }
+
+                *resource = res;
+            };
         /*
          * ADIOS2 might be feeling funny and report as unsigned char what we
          * wrote as signed char. Guard against that.
@@ -1612,52 +1641,20 @@ namespace detail
         switch( preloadedAttributes.attributeType( name ) )
         {
         case Datatype::CHAR: {
-            detail::AttributeWithShape< char > attr =
-                preloadedAttributes.getAttribute< char >( name );
-            if( attr.shape.size() != 2 )
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Expecting 2D ADIOS variable" );
-            }
-            loadedData = attr.data;
-            height = attr.shape[ 0 ];
-            width = attr.shape[ 1 ];
+            loadFromDatatype( char{} );
             break;
         }
         case Datatype::UCHAR: {
-            detail::AttributeWithShape< unsigned char > attr =
-                preloadedAttributes.getAttribute< unsigned char >( name );
-            if( attr.shape.size() != 2 )
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Expecting 2D ADIOS variable" );
-            }
-            loadedData = reinterpret_cast< char const * >( attr.data );
-            height = attr.shape[ 0 ];
-            width = attr.shape[ 1 ];
+            using uchar_t = unsigned char;
+            loadFromDatatype( uchar_t{} );
             break;
         }
         default: {
-            throw std::runtime_error( "[ADIOS2] Expecting 2D ADIOS variable of "
-                                      "type signed or unsigned char." );
+            throw std::runtime_error(
+                "[ADIOS2] Expecting 2D ADIOS variable of "
+                "type signed or unsigned char." );
         }
         }
-
-        std::vector< std::string > res( height );
-        for( size_t i = 0; i < height; ++i )
-        {
-            size_t start = i * width;
-            char const * start_ptr = loadedData + start;
-            size_t j = 0;
-            while( j < width && start_ptr[ j ] != 0 )
-            {
-                ++j;
-            }
-            std::string & str = res[ i ];
-            str.append( start_ptr, start_ptr + j );
-        }
-
-        *resource = res;
     }
 
     template< typename T, size_t n >
