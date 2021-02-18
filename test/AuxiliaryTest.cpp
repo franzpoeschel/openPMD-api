@@ -37,7 +37,6 @@ struct TestHelper : public Attributable
     TestHelper()
     {
         m_writable->IOHandler = createIOHandler(".", Access::CREATE, Format::JSON);
-        IOHandler = m_writable->IOHandler.get();
     }
 };
 } // test
