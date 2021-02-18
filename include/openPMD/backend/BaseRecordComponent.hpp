@@ -42,7 +42,7 @@ class BaseRecordComponent : public Attributable
     class Container;
 
 public:
-    ~BaseRecordComponent() override = default;
+    ~BaseRecordComponent() = default;
 
     double unitSI() const;
 

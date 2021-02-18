@@ -567,8 +567,8 @@ void
 Iteration::linkHierarchy(std::shared_ptr< Writable > const& w)
 {
     Attributable::linkHierarchy(w);
-    meshes.linkHierarchy(m_writable);
-    particles.linkHierarchy(m_writable);
+    meshes.linkHierarchy(writableShared());
+    particles.linkHierarchy(writableShared());
 }
 
 template float
