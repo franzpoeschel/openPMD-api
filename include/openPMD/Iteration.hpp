@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include "openPMD/auxiliary/Option.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
@@ -31,6 +32,11 @@
 
 namespace openPMD
 {
+namespace traits
+{
+struct AccessIteration;
+}
+
 /** @brief  Logical compilation of data from one snapshot (e.g. a single simulation cycle).
  *
  * @see https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#required-attributes-for-the-basepath
@@ -40,12 +46,14 @@ class Iteration : public LegacyAttributable
     template<
             typename T,
             typename T_key,
-            typename T_container
+            typename T_container,
+            typename T_access_policy
     >
     friend class Container;
     friend class SeriesImpl;
     friend class WriteIterations;
     friend class SeriesIterator;
+    friend struct traits::AccessIteration;
 
 public:
     Iteration( Iteration const & ) = default;
@@ -156,6 +164,7 @@ private:
     void flushFileBased(std::string const&, uint64_t);
     void flushGroupBased(uint64_t);
     void flush();
+    void deferRead( std::string path );
     void read();
 
     /**
@@ -193,6 +202,10 @@ private:
      */
     std::shared_ptr< StepStatus > m_stepStatus =
         std::make_shared< StepStatus >( StepStatus::NoStep );
+
+    std::shared_ptr< auxiliary::Option< std::string > > m_deferredRead =
+        std::make_shared< auxiliary::Option< std::string > >(
+            auxiliary::Option< std::string >() );
 
     /**
      * @brief Begin an IO step on the IO file (or file-like object)
@@ -249,9 +262,41 @@ private:
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
 };  // Iteration
 
-extern template
-float
-Iteration::time< float >() const;
+namespace traits
+{
+struct AccessIteration
+{
+    static void policy( Iteration & iteration )
+    {
+        if( iteration.IOHandler()->m_frontendAccess == Access::CREATE )
+        {
+            return;
+        }
+        auto oldAccess = iteration.IOHandler()->m_frontendAccess;
+        auto newAccess =
+            const_cast< Access * >( &iteration.IOHandler()->m_frontendAccess );
+        *newAccess = Access::READ_WRITE;
+        try
+        {
+            iteration.read();
+        }
+        catch( ... )
+        {
+            *newAccess = oldAccess;
+            throw;
+        }
+        *newAccess = oldAccess;
+    }
+};
+}
+
+using Iterations_t = Container<
+    Iteration,
+    uint64_t,
+    std::map< uint64_t, Iteration >,
+    traits::AccessIteration >;
+
+extern template float Iteration::time< float >() const;
 
 extern template
 double

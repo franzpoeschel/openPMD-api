@@ -291,9 +291,25 @@ Iteration::flush()
     }
 }
 
+void Iteration::deferRead( std::string path )
+{
+    *m_deferredRead = auxiliary::makeOption< std::string >( std::move( path ) );
+}
+
 void
 Iteration::read()
 {
+    if( !m_deferredRead->has_value() )
+    {
+        return;
+    }
+
+    Parameter< Operation::OPEN_PATH > pOpen;
+    pOpen.path = m_deferredRead->get();
+    IOHandler()->enqueue( IOTask( this, pOpen ) );
+    // reset this thing
+    *m_deferredRead = auxiliary::Option< std::string >();
+
     using DT = Datatype;
     Parameter< Operation::READ_ATT > aRead;
 
@@ -356,7 +372,6 @@ Iteration::read()
 
     if( hasMeshes )
     {
-        Parameter< Operation::OPEN_PATH > pOpen;
         pOpen.path = s->meshesPath();
         IOHandler()->enqueue(IOTask(&meshes, pOpen));
 
@@ -416,7 +431,6 @@ Iteration::read()
 
     if( hasParticles )
     {
-        Parameter< Operation::OPEN_PATH > pOpen;
         pOpen.path = s->particlesPath();
         IOHandler()->enqueue(IOTask(&particles, pOpen));
 

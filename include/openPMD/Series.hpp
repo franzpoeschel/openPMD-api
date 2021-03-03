@@ -81,7 +81,7 @@ public:
 
     virtual ~SeriesData() = default;
 
-    Container< Iteration, uint64_t > iterations{};
+    Iterations_t iterations{};
 
 OPENPMD_private :
     /**
@@ -318,8 +318,7 @@ OPENPMD_private:
     static constexpr char const * const BASEPATH = "/data/%T/";
 
     struct ParsedInput;
-    using iterations_t = decltype(internal::SeriesData::iterations);
-    using iterations_iterator = iterations_t::iterator;
+    using iterations_iterator = Iterations_t::iterator;
 
     internal::SeriesData * m_series;
 
@@ -439,7 +438,7 @@ public:
 
     virtual ~Series() = default;
 
-    Container< Iteration, uint64_t > iterations;
+    Iterations_t iterations;
 
     /**
      * @brief Entry point to the reading end of the streaming API.
@@ -575,19 +574,19 @@ class WriteIterations : private Container< Iteration, uint64_t >
     friend class Series;
 
 private:
-    using iterations_t = Container< Iteration, uint64_t >;
     struct SharedResources
     {
-        iterations_t iterations;
+        Iterations_t iterations;
         auxiliary::Option< uint64_t > currentlyOpen;
 
-        SharedResources( iterations_t );
+        SharedResources( Iterations_t );
         ~SharedResources();
     };
 
-    using key_type = typename iterations_t::key_type;
-    using value_type = typename iterations_t::key_type;
-    WriteIterations( iterations_t );
+    using key_type = typename Iterations_t::key_type;
+    // @todo: this is wrong
+    using value_type = typename Iterations_t::key_type;
+    WriteIterations( Iterations_t );
     explicit WriteIterations() = default;
     //! Index of the last opened iteration
     std::shared_ptr< SharedResources > shared;

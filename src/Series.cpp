@@ -968,9 +968,7 @@ SeriesImpl::read()
         {
             continue;
         }
-        pOpen.path = it;
-        IOHandler()->enqueue(IOTask(&i, pOpen));
-        i.read();
+        i.deferRead( it );
     }
 }
 
@@ -1449,7 +1447,7 @@ ReadIterations::end()
     return SeriesIterator::end();
 }
 
-WriteIterations::SharedResources::SharedResources( iterations_t _iterations )
+WriteIterations::SharedResources::SharedResources( Iterations_t _iterations )
     : iterations( std::move( _iterations ) )
 {
 }
@@ -1467,7 +1465,7 @@ WriteIterations::SharedResources::~SharedResources()
     }
 }
 
-WriteIterations::WriteIterations( iterations_t iterations )
+WriteIterations::WriteIterations( Iterations_t iterations )
     : shared{ std::make_shared< SharedResources >( std::move( iterations ) ) }
 {
 }

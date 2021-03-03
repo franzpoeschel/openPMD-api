@@ -36,7 +36,8 @@ class BaseRecordComponent : public LegacyAttributable
     template<
         typename T,
         typename T_key,
-        typename T_container
+        typename T_container,
+        typename T_access_policy
     >
     friend
     class Container;
