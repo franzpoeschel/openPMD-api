@@ -634,7 +634,7 @@ file_based_write_read( std::string file_ending )
 
     // check non-collective, parallel read
     {
-        Series read( name, Access::READ_ONLY, MPI_COMM_WORLD );
+        Series read( name, Access::READ_ONLY, MPI_COMM_WORLD, "{}", true );
         Iteration it = read.iterations[ 30 ];
         it.open(); // collective
         if( mpi_rank == 0 ) // non-collective branch
@@ -845,8 +845,10 @@ adios2_streaming()
         }
         )";
 
-        Series readSeries(
-            "../samples/adios2_stream.bp", Access::READ_ONLY, options );
+        Series readSeries = SeriesBuilder()
+            .filePath( "../samples/adios2_stream.sst" )
+            .access( Access::READ_ONLY )
+            .parseLazily();
 
         size_t last_iteration_index = 0;
         for( auto iteration : readSeries.readIterations() )
