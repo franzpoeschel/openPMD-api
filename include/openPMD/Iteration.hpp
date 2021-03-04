@@ -276,6 +276,11 @@ namespace traits
 {
 struct AccessIteration
 {
+    /*
+     * @todo
+     * Probably better to have this accept a Iteration const & and const_cast
+     * that away.
+     */
     static void policy( Iteration & iteration )
     {
         if( iteration.IOHandler()->m_frontendAccess == Access::CREATE )

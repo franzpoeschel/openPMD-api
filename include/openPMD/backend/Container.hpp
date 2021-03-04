@@ -55,8 +55,35 @@ namespace traits
     template< typename U >
     struct AccessPolicy
     {
-        static void policy( U & )
+        static void policy( U const & )
         {
+        }
+    };
+
+    template< typename WrappedIterator_t, typename AccessPolicy_t >
+    class AccessPolicyIterator : public WrappedIterator_t
+    {
+    public:
+        explicit AccessPolicyIterator() = default;
+        // todo make explicit
+        AccessPolicyIterator( WrappedIterator_t it )
+            : WrappedIterator_t{ std::move( it ) }
+        {
+        }
+
+        auto operator*() const -> decltype(
+            static_cast< WrappedIterator_t const * >( this )->operator*() )
+        {
+            auto const & result = WrappedIterator_t::operator*();
+            AccessPolicy_t::policy( result.second );
+            return result;
+        }
+
+        auto operator*() -> decltype( WrappedIterator_t::operator*() )
+        {
+            auto & result = WrappedIterator_t::operator*();
+            AccessPolicy_t::policy( result.second );
+            return result;
         }
     };
 } // traits
@@ -103,6 +130,10 @@ private:
         T_access_policy::policy( item );
         return item;
     }
+    T_container const & constContainer() const
+    {
+        return *m_container;
+    }
 
 public:
     using key_type = typename InternalContainer::key_type;
@@ -115,8 +146,10 @@ public:
     using const_reference = typename InternalContainer::const_reference;
     using pointer = typename InternalContainer::pointer;
     using const_pointer = typename InternalContainer::const_pointer;
-    using iterator = typename InternalContainer::iterator;
-    using const_iterator = typename InternalContainer::const_iterator;
+    using iterator = traits::AccessPolicyIterator<
+        typename InternalContainer::iterator, T_access_policy >;
+    using const_iterator = traits::AccessPolicyIterator<
+        typename InternalContainer::const_iterator, T_access_policy >;
 
     Container(Container const&) = default;
     virtual ~Container() = default;
@@ -125,12 +158,12 @@ public:
      * @todo override iterator types to execute access policies too
      */
     iterator begin() noexcept { return m_container->begin(); }
-    const_iterator begin() const noexcept { return m_container->begin(); }
-    const_iterator cbegin() const noexcept { return m_container->cbegin(); }
+    const_iterator begin() const noexcept { return constContainer().begin(); }
+    const_iterator cbegin() const noexcept { return constContainer().cbegin(); }
 
     iterator end() noexcept { return m_container->end(); }
-    const_iterator end() const noexcept { return m_container->end(); }
-    const_iterator cend() const noexcept { return m_container->cend(); }
+    const_iterator end() const noexcept { return constContainer().end(); }
+    const_iterator cend() const noexcept { return constContainer().cend(); }
 
     bool empty() const noexcept { return m_container->empty(); }
 
@@ -253,7 +286,7 @@ public:
     }
 
     iterator find(key_type const& key) { return m_container->find(key); }
-    const_iterator find(key_type const& key) const { return m_container->find(key); }
+    const_iterator find(key_type const& key) const { return constContainer().find(key); }
 
     /** This returns either 1 if the key is found in the container of 0 if not.
      *
