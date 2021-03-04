@@ -723,6 +723,8 @@ SeriesImpl::flushParticlesPath()
     IOHandler()->enqueue(IOTask(this, aWrite));
 }
 
+constexpr bool const READ_LAZILY = false;
+
 void
 SeriesImpl::readFileBased( )
 {
@@ -752,11 +754,6 @@ SeriesImpl::readFileBased( )
         }
     }
 
-    for( auto & iteration : series.iterations )
-    {
-        *iteration.second.m_closed = Iteration::CloseStatus::ClosedTemporarily;
-    }
-
     if( series.iterations.empty() )
     {
         /* Frontend access type might change during SeriesImpl::read() to allow parameter modification.
@@ -767,16 +764,28 @@ SeriesImpl::readFileBased( )
             std::cerr << "No matching iterations found: " << name() << std::endl;
     }
 
+    auto readIterationEagerly = []( Iteration & iteration )
+    {
+        iteration.accessLazily();
+        Parameter< Operation::CLOSE_FILE > fClose;
+        iteration.IOHandler()->enqueue( IOTask( &iteration, fClose ) );
+        iteration.IOHandler()->flush();
+        *iteration.m_closed = Iteration::CloseStatus::ClosedTemporarily;
+    };
+    if( READ_LAZILY )
     {
         // open the last iteration, just to parse Series attributes
         auto getLastIteration = series.iterations.end();
         getLastIteration--;
         auto & lastIteration = getLastIteration->second;
-        lastIteration.accessLazily();
-
-        Parameter< Operation::CLOSE_FILE > fClose;
-        IOHandler()->enqueue(IOTask(&lastIteration, fClose));
-        IOHandler()->flush();
+        readIterationEagerly( lastIteration );
+    }
+    else
+    {
+        for( auto & iteration : series.iterations )
+        {
+            readIterationEagerly( iteration.second );
+        }
     }
 
     if( paddings.size() == 1u )
@@ -928,6 +937,10 @@ SeriesImpl::readGroupBased( bool do_init )
             continue;
         }
         i.deferRead( {it, false, ""} );
+        if( !READ_LAZILY )
+        {
+            i.accessLazily();
+        }
     }
 }
 
