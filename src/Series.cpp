@@ -745,7 +745,9 @@ SeriesImpl::readFileBased( )
         std::tie(isContained, padding, iterationIndex) = isPartOfSeries(entry);
         if( isContained )
         {
-            Iteration & i = series.iterations[ iterationIndex ];
+            // this access should not trigger parsing
+            Iteration & i =
+                series.iterations.accessWithoutPolicy( iterationIndex );
             i.deferRead( { std::to_string( iterationIndex ), true, entry } );
             // TODO skip if the padding is exact the number of chars in an iteration?
             paddings.insert(padding);
@@ -923,7 +925,8 @@ SeriesImpl::readGroupBased( bool do_init )
 
     for( auto const& it : *pList.paths )
     {
-        Iteration& i = series.iterations[std::stoull(it)];
+        // this access should not trigger parsing
+        Iteration& i = series.iterations.accessWithoutPolicy(std::stoull(it));
         if ( i.closedByWriter( ) )
         {
             continue;

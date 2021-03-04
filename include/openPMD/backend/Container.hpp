@@ -191,6 +191,45 @@ public:
         return accessPolicy( m_container->at( key ) );
     }
 
+private:
+
+    template< typename Key, typename F >
+    mapped_type & accessOperatorImpl( Key && key, F && access )
+    {
+        auto it = m_container->find( key );
+        if( it != m_container->end() )
+        {
+            std::forward< F >( access )( it->second );
+            return it->second;
+        }
+        else
+        {
+            if( Access::READ_ONLY == IOHandler()->m_frontendAccess )
+            {
+                auxiliary::OutOfRangeMsg const out_of_range_msg;
+                throw std::out_of_range( out_of_range_msg( key ) );
+            }
+
+            T t = T();
+            t.linkHierarchy( writableShared() );
+            auto & ret =
+                m_container
+                    ->insert( { std::forward< Key >( key ), std::move( t ) } )
+                    .first->second;
+            traits::GenerationPolicy< T > gen;
+            gen( ret );
+            std::forward< F >( access )( ret );
+            return ret;
+        }
+    }
+
+    virtual mapped_type & accessWithoutPolicy( key_type const& key )
+    {
+        return accessOperatorImpl( key, []( auto const & ) {} );
+    }
+
+public:
+
     /** Access the value that is mapped to a key equivalent to key, creating it if such key does not exist already.
      *
      * @param   key Key of the element to find (lvalue).
@@ -199,24 +238,7 @@ public:
      */
     virtual mapped_type& operator[](key_type const& key)
     {
-        auto it = m_container->find(key);
-        if( it != m_container->end() )
-            return accessPolicy( it->second );
-        else
-        {
-            if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
-            {
-                auxiliary::OutOfRangeMsg const out_of_range_msg;
-                throw std::out_of_range(out_of_range_msg(key));
-            }
-
-            T t = T();
-            t.linkHierarchy(writableShared());
-            auto& ret = m_container->insert({key, std::move(t)}).first->second;
-            traits::GenerationPolicy< T > gen;
-            gen(ret);
-            return accessPolicy( ret );
-        }
+        return accessOperatorImpl( key, T_access_policy::policy );
     }
     /** Access the value that is mapped to a key equivalent to key, creating it if such key does not exist already.
      *
@@ -226,24 +248,8 @@ public:
      */
     virtual mapped_type& operator[](key_type&& key)
     {
-        auto it = m_container->find(key);
-        if( it != m_container->end() )
-            return accessPolicy( it->second );
-        else
-        {
-            if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
-            {
-                auxiliary::OutOfRangeMsg out_of_range_msg;
-                throw std::out_of_range(out_of_range_msg(key));
-            }
-
-            T t = T();
-            t.linkHierarchy(writableShared());
-            auto& ret = m_container->insert({std::move(key), std::move(t)}).first->second;
-            traits::GenerationPolicy< T > gen;
-            gen(ret);
-            return accessPolicy( ret );
-        }
+        return accessOperatorImpl(
+            std::forward< key_type >( key ), T_access_policy::policy );
     }
 
     iterator find(key_type const& key) { return m_container->find(key); }
