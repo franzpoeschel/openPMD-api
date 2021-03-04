@@ -772,11 +772,10 @@ SeriesImpl::readFileBased( )
         auto getLastIteration = series.iterations.end();
         getLastIteration--;
         auto & lastIteration = getLastIteration->second;
-        // @todo remove this line, should be taken care of by iterator
-        traits::AccessIteration::policy( lastIteration );
+        lastIteration.accessLazily();
 
         Parameter< Operation::CLOSE_FILE > fClose;
-        IOHandler()->enqueue(IOTask(this, fClose));
+        IOHandler()->enqueue(IOTask(&lastIteration, fClose));
         IOHandler()->flush();
     }
 

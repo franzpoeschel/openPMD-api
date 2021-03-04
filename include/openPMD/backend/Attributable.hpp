@@ -99,8 +99,7 @@ class AttributableImpl
     template<
         typename T,
         typename T_key,
-        typename T_container,
-        typename T_access_policy
+        typename T_container
     >
     friend class Container;
     template< typename T >

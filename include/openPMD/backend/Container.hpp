@@ -47,15 +47,8 @@ namespace traits
     template< typename U >
     struct GenerationPolicy
     {
-        void operator()( U & )
-        {
-        }
-    };
-
-    template< typename U >
-    struct AccessPolicy
-    {
-        static void policy( U & )
+        template< typename T >
+        void operator()(T &)
         {
         }
     };
@@ -77,8 +70,7 @@ class SeriesData;
 template<
         typename T,
         typename T_key = std::string,
-        typename T_container = std::map< T_key, T >,
-        typename T_access_policy = traits::AccessPolicy< T >
+        typename T_container = std::map< T_key, T >
 >
 class Container : public LegacyAttributable
 {
@@ -91,18 +83,6 @@ class Container : public LegacyAttributable
     friend class ParticleSpecies;
     friend class SeriesImpl;
     friend class internal::SeriesData;
-
-private:
-    static T accessPolicy( T && item )
-    {
-        T_access_policy::policy( item );
-        return item;
-    }
-    static T & accessPolicy( T & item )
-    {
-        T_access_policy::policy( item );
-        return item;
-    }
 
 public:
     using key_type = typename InternalContainer::key_type;
@@ -121,9 +101,6 @@ public:
     Container(Container const&) = default;
     virtual ~Container() = default;
 
-    /*
-     * @todo override iterator types to execute access policies too
-     */
     iterator begin() noexcept { return m_container->begin(); }
     const_iterator begin() const noexcept { return m_container->begin(); }
     const_iterator cbegin() const noexcept { return m_container->cbegin(); }
@@ -149,47 +126,20 @@ public:
         clear_unchecked();
     }
 
-    std::pair< iterator, bool > insert( value_type const & value )
-    {
-        return accessPolicy( m_container->insert( value ) );
-    }
+    std::pair< iterator, bool > insert(value_type const& value) { return m_container->insert(value); }
     template< class P >
-    std::pair< iterator, bool > insert( P && value )
-    {
-        return accessPolicy( m_container->insert( value ) );
-    }
-    iterator insert( const_iterator hint, value_type const & value )
-    {
-        return accessPolicy( m_container->insert( hint, value ) );
-    }
+    std::pair< iterator, bool > insert(P&& value) { return m_container->insert(value); }
+    iterator insert(const_iterator hint, value_type const& value) { return m_container->insert(hint, value); }
     template< class P >
-    iterator insert( const_iterator hint, P && value )
-    {
-        return accessPolicy( m_container->insert( hint, value ) );
-    }
+    iterator insert(const_iterator hint, P&& value) { return m_container->insert(hint, value); }
     template< class InputIt >
-    void insert( InputIt first, InputIt last )
-    {
-        m_container->insert( first, last );
-    }
-    void insert( std::initializer_list< value_type > ilist )
-    {
-        m_container->insert( ilist );
-    }
+    void insert(InputIt first, InputIt last) { m_container->insert(first, last); }
+    void insert(std::initializer_list< value_type > ilist) { m_container->insert(ilist); }
 
-    void swap( Container & other )
-    {
-        m_container->swap( other.m_container );
-    }
+    void swap(Container & other) { m_container->swap(other.m_container); }
 
-    mapped_type & at( key_type const & key )
-    {
-        return accessPolicy( m_container->at( key ) );
-    }
-    mapped_type const & at( key_type const & key ) const
-    {
-        return accessPolicy( m_container->at( key ) );
-    }
+    mapped_type& at(key_type const& key) { return m_container->at(key); }
+    mapped_type const& at(key_type const& key) const { return m_container->at(key); }
 
     /** Access the value that is mapped to a key equivalent to key, creating it if such key does not exist already.
      *
@@ -201,7 +151,7 @@ public:
     {
         auto it = m_container->find(key);
         if( it != m_container->end() )
-            return accessPolicy( it->second );
+            return it->second;
         else
         {
             if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
@@ -215,7 +165,7 @@ public:
             auto& ret = m_container->insert({key, std::move(t)}).first->second;
             traits::GenerationPolicy< T > gen;
             gen(ret);
-            return accessPolicy( ret );
+            return ret;
         }
     }
     /** Access the value that is mapped to a key equivalent to key, creating it if such key does not exist already.
@@ -228,7 +178,7 @@ public:
     {
         auto it = m_container->find(key);
         if( it != m_container->end() )
-            return accessPolicy( it->second );
+            return it->second;
         else
         {
             if(Access::READ_ONLY == IOHandler()->m_frontendAccess )
@@ -242,7 +192,7 @@ public:
             auto& ret = m_container->insert({std::move(key), std::move(t)}).first->second;
             traits::GenerationPolicy< T > gen;
             gen(ret);
-            return accessPolicy( ret );
+            return ret;
         }
     }
 

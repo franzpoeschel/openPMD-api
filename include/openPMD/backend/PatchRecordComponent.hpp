@@ -44,8 +44,7 @@ class PatchRecordComponent : public BaseRecordComponent
     template<
         typename T,
         typename T_key,
-        typename T_container,
-        typename T_access_policy
+        typename T_container
     >
     friend
     class Container;

@@ -46,8 +46,7 @@ class Iteration : public LegacyAttributable
     template<
             typename T,
             typename T_key,
-            typename T_container,
-            typename T_access_policy
+            typename T_container
     >
     friend class Container;
     friend class SeriesImpl;
@@ -270,25 +269,20 @@ private:
     dirtyRecursive() const;
 
     virtual void linkHierarchy(std::shared_ptr< Writable > const& w);
-};  // Iteration
 
-namespace traits
-{
-struct AccessIteration
-{
-    static void policy( Iteration & iteration )
+    void accessLazily()
     {
-        if( iteration.IOHandler()->m_frontendAccess == Access::CREATE )
+        if( IOHandler()->m_frontendAccess == Access::CREATE )
         {
             return;
         }
-        auto oldAccess = iteration.IOHandler()->m_frontendAccess;
+        auto oldAccess = IOHandler()->m_frontendAccess;
         auto newAccess =
-            const_cast< Access * >( &iteration.IOHandler()->m_frontendAccess );
+            const_cast< Access * >( &IOHandler()->m_frontendAccess );
         *newAccess = Access::READ_WRITE;
         try
         {
-            iteration.read();
+            read();
         }
         catch( ... )
         {
@@ -297,14 +291,12 @@ struct AccessIteration
         }
         *newAccess = oldAccess;
     }
-};
-}
+};  // Iteration
 
 using Iterations_t = Container<
     Iteration,
     uint64_t,
-    std::map< uint64_t, Iteration >,
-    traits::AccessIteration >;
+    std::map< uint64_t, Iteration >>;
 
 extern template float Iteration::time< float >() const;
 
