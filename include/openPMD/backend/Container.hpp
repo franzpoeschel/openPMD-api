@@ -71,15 +71,7 @@ namespace traits
         {
         }
 
-        auto operator*() const -> decltype(
-            static_cast< WrappedIterator_t const * >( this )->operator*() )
-        {
-            auto const & result = WrappedIterator_t::operator*();
-            AccessPolicy_t::policy( result.second );
-            return result;
-        }
-
-        auto operator*() -> decltype( WrappedIterator_t::operator*() )
+        auto operator*() const -> decltype( WrappedIterator_t::operator*() )
         {
             auto & result = WrappedIterator_t::operator*();
             AccessPolicy_t::policy( result.second );

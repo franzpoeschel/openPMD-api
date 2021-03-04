@@ -754,11 +754,6 @@ SeriesImpl::readFileBased( )
         }
     }
 
-    for( auto & iteration : series.iterations )
-    {
-        *iteration.second.m_closed = Iteration::CloseStatus::ClosedTemporarily;
-    }
-
     if( series.iterations.empty() )
     {
         /* Frontend access type might change during SeriesImpl::read() to allow parameter modification.
@@ -977,12 +972,12 @@ SeriesImpl::readBase()
         if( *aRead.dtype == DT::STRING )
         {
             /* allow setting the meshes path after completed IO */
-            for( auto& it : series.iterations )
+            for( auto& it : *series.iterations.m_container )
                 it.second.meshes.written() = false;
 
             setMeshesPath(Attribute(*aRead.resource).get< std::string >());
 
-            for( auto& it : series.iterations )
+            for( auto& it : *series.iterations.m_container )
                 it.second.meshes.written() = true;
         }
         else
@@ -997,13 +992,13 @@ SeriesImpl::readBase()
         if( *aRead.dtype == DT::STRING )
         {
             /* allow setting the meshes path after completed IO */
-            for( auto& it : series.iterations )
+            for( auto& it : *series.iterations.m_container )
                 it.second.particles.written() = false;
 
             setParticlesPath(Attribute(*aRead.resource).get< std::string >());
 
 
-            for( auto& it : series.iterations )
+            for( auto& it : *series.iterations.m_container )
                 it.second.particles.written() = true;
         }
         else
