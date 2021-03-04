@@ -28,6 +28,7 @@
 #include "openPMD/backend/Writable.hpp"
 
 #include <exception>
+#include <iostream>
 #include <tuple>
 
 
@@ -291,24 +292,51 @@ Iteration::flush()
     }
 }
 
-void Iteration::deferRead( std::string path )
+void Iteration::deferRead( DeferredRead dr )
 {
-    *m_deferredRead = auxiliary::makeOption< std::string >( std::move( path ) );
+    *m_deferredRead = auxiliary::makeOption< DeferredRead >( std::move( dr ) );
 }
 
-void
-Iteration::read()
+void Iteration::read()
 {
     if( !m_deferredRead->has_value() )
     {
         return;
     }
-
-    Parameter< Operation::OPEN_PATH > pOpen;
-    pOpen.path = m_deferredRead->get();
-    IOHandler()->enqueue( IOTask( this, pOpen ) );
+    auto const & deferred = m_deferredRead->get();
+    if( deferred.fileBased )
+    {
+        readFileBased( deferred.filename, deferred.index );
+    }
+    else
+    {
+        readGroupBased( deferred.index );
+    }
     // reset this thing
-    *m_deferredRead = auxiliary::Option< std::string >();
+    *m_deferredRead = auxiliary::Option< DeferredRead >();
+}
+
+void Iteration::readFileBased(
+    std::string filePath, std::string const & groupPath )
+{
+    auto & series = retrieveSeries();
+
+    series.readOneIterationFileBased( filePath );
+
+    read_impl( groupPath );
+}
+
+void Iteration::readGroupBased( std::string const & groupPath )
+{
+
+    read_impl(groupPath );
+}
+
+void Iteration::read_impl( std::string const & groupPath )
+{
+    Parameter< Operation::OPEN_PATH > pOpen;
+    pOpen.path = groupPath;
+    IOHandler()->enqueue( IOTask( this, pOpen ) );
 
     using DT = Datatype;
     Parameter< Operation::READ_ATT > aRead;

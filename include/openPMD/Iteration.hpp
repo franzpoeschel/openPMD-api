@@ -161,11 +161,21 @@ public:
 private:
     Iteration();
 
+    struct DeferredRead
+    {
+        std::string index;
+        bool fileBased = false;
+        std::string filename;
+    };
+
     void flushFileBased(std::string const&, uint64_t);
     void flushGroupBased(uint64_t);
     void flush();
-    void deferRead( std::string path );
+    void deferRead( DeferredRead );
     void read();
+    void readFileBased( std::string filePath, std::string const & groupPath );
+    void readGroupBased( std::string const & groupPath );
+    void read_impl( std::string const & groupPath );
 
     /**
      * @brief Whether an iteration has been closed yet.
@@ -203,9 +213,9 @@ private:
     std::shared_ptr< StepStatus > m_stepStatus =
         std::make_shared< StepStatus >( StepStatus::NoStep );
 
-    std::shared_ptr< auxiliary::Option< std::string > > m_deferredRead =
-        std::make_shared< auxiliary::Option< std::string > >(
-            auxiliary::Option< std::string >() );
+    std::shared_ptr< auxiliary::Option< DeferredRead > > m_deferredRead =
+        std::make_shared< auxiliary::Option< DeferredRead > >(
+            auxiliary::Option< DeferredRead >() );
 
     /**
      * @brief Begin an IO step on the IO file (or file-like object)

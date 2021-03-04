@@ -342,6 +342,7 @@ OPENPMD_private:
     void flushMeshesPath();
     void flushParticlesPath();
     void readFileBased( );
+    void readOneIterationFileBased( std::string const & filePath );
     /**
      * Note on re-parsing of a Series:
      * If init == false, the parsing process will seek for new
@@ -352,7 +353,6 @@ OPENPMD_private:
      */
     void readGroupBased( bool init = true );
     void readBase();
-    void read();
     std::string iterationFilename( uint64_t i );
     void openIteration( uint64_t index, Iteration iteration );
 
