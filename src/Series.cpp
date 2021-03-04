@@ -723,8 +723,6 @@ SeriesImpl::flushParticlesPath()
     IOHandler()->enqueue(IOTask(this, aWrite));
 }
 
-constexpr bool const READ_LAZILY = false;
-
 void
 SeriesImpl::readFileBased( )
 {
@@ -772,7 +770,7 @@ SeriesImpl::readFileBased( )
         iteration.IOHandler()->flush();
         *iteration.m_closed = Iteration::CloseStatus::ClosedTemporarily;
     };
-    if( READ_LAZILY )
+    if( series.m_parseLazily )
     {
         // open the last iteration, just to parse Series attributes
         auto getLastIteration = series.iterations.end();
@@ -937,7 +935,7 @@ SeriesImpl::readGroupBased( bool do_init )
             continue;
         }
         i.deferRead( {it, false, ""} );
-        if( !READ_LAZILY )
+        if( !series.m_parseLazily )
         {
             i.accessLazily();
         }
@@ -1196,11 +1194,13 @@ SeriesInternal::SeriesInternal(
     std::string const & filepath,
     Access at,
     MPI_Comm comm,
-    std::string const & options )
+    std::string const & options,
+    bool parseLazily )
     : SeriesImpl{
           static_cast< internal::SeriesData * >( this ),
           static_cast< internal::AttributableData * >( this ) }
 {
+    m_parseLazily = parseLazily;
     auto input = parseInput( filepath );
     auto handler =
         createIOHandler( input->path, at, input->format, comm, options );
@@ -1209,11 +1209,15 @@ SeriesInternal::SeriesInternal(
 #endif
 
 SeriesInternal::SeriesInternal(
-    std::string const & filepath, Access at, std::string const & options )
+    std::string const & filepath,
+    Access at,
+    std::string const & options,
+    bool parseLazily )
     : SeriesImpl{
           static_cast< internal::SeriesData * >( this ),
           static_cast< internal::AttributableData * >( this ) }
 {
+    m_parseLazily = parseLazily;
     auto input = parseInput( filepath );
     auto handler = createIOHandler( input->path, at, input->format, options );
     init( handler, std::move( input ) );
@@ -1242,10 +1246,11 @@ Series::Series(
     std::string const & filepath,
     Access at,
     MPI_Comm comm,
-    std::string const & options )
+    std::string const & options,
+    bool parseLazily )
     : SeriesImpl{ nullptr, nullptr }
     , m_series{ std::make_shared< internal::SeriesInternal >(
-          filepath, at, comm, options ) }
+          filepath, at, comm, options, parseLazily ) }
     , iterations{ m_series->iterations }
 {
     AttributableImpl::m_attri =
@@ -1255,10 +1260,13 @@ Series::Series(
 #endif
 
 Series::Series(
-    std::string const & filepath, Access at, std::string const & options )
+    std::string const & filepath,
+    Access at,
+    std::string const & options,
+    bool parseLazily )
     : SeriesImpl{ nullptr, nullptr }
     , m_series{ std::make_shared< internal::SeriesInternal >(
-          filepath, at, options ) }
+          filepath, at, options, parseLazily ) }
     , iterations{ m_series->iterations }
 {
     AttributableImpl::m_attri =
@@ -1372,6 +1380,16 @@ SeriesIterator::SeriesIterator( Series series )
     }
     else
     {
+        /*
+         * @todo
+         * Is that really clean?
+         * Use case: See Python ApiTest testListSeries:
+         * Call listSeries twice.
+         */
+        if( *it->second.m_closed != Iteration::CloseStatus::ClosedInBackend )
+        {
+            it->second.open();
+        }
         auto status = it->second.beginStep();
         if( status == AdvanceStatus::OVER )
         {
@@ -1431,6 +1449,10 @@ SeriesIterator::operator++()
         return *this;
     }
     m_currentIteration = it->first;
+    if( *it->second.m_closed != Iteration::CloseStatus::ClosedInBackend )
+    {
+        it->second.open();
+    }
     switch( series.iterationEncoding() )
     {
         using IE = IterationEncoding;
@@ -1455,8 +1477,10 @@ SeriesIterator::operator++()
 IndexedIteration
 SeriesIterator::operator*()
 {
-    return IndexedIteration(
-        m_series.get().iterations[ m_currentIteration ], m_currentIteration );
+    auto iteration = m_series.get().iterations[ m_currentIteration ];
+    // @todo can't do this unconditionally
+    // iteration.open();
+    return IndexedIteration( iteration, m_currentIteration );
 }
 
 bool

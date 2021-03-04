@@ -634,7 +634,7 @@ file_based_write_read( std::string file_ending )
 
     // check non-collective, parallel read
     {
-        Series read( name, Access::READ_ONLY, MPI_COMM_WORLD );
+        Series read( name, Access::READ_ONLY, MPI_COMM_WORLD, "{}", true );
         Iteration it = read.iterations[ 30 ];
         it.open(); // collective
         if( mpi_rank == 0 ) // non-collective branch

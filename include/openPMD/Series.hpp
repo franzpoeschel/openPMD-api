@@ -69,6 +69,7 @@ class SeriesData : public AttributableData
     friend class openPMD::SeriesImpl;
     friend class openPMD::Iteration;
     friend class openPMD::Series;
+    friend class SeriesInternal;
 
 public:
     explicit SeriesData() = default;
@@ -105,6 +106,7 @@ OPENPMD_private :
 
     std::shared_ptr< auxiliary::Option< WriteIterations > > m_writeIterations =
         std::make_shared< auxiliary::Option< WriteIterations > >();
+    bool m_parseLazily = false;
 }; // SeriesData
 
 class SeriesInternal;
@@ -398,13 +400,15 @@ public:
         std::string const & filepath,
         Access at,
         MPI_Comm comm,
-        std::string const & options = "{}" );
+        std::string const & options = "{}",
+        bool parseLazily = false );
 #endif
 
     SeriesInternal(
         std::string const & filepath,
         Access at,
-        std::string const & options = "{}" );
+        std::string const & options = "{}",
+        bool parseLazily = false );
     // @todo make AttributableImpl<>::linkHierarchy non-virtual
     virtual ~SeriesInternal();
 };
@@ -428,13 +432,18 @@ public:
         std::string const & filepath,
         Access at,
         MPI_Comm comm,
-        std::string const & options = "{}" );
+        std::string const & options = "{}",
+        bool parseLazily = false );
 #endif
 
+    /*
+     * @todo Think it's time for a SeriesBuilder.
+     */
     Series(
         std::string const & filepath,
         Access at,
-        std::string const & options = "{}" );
+        std::string const & options = "{}",
+        bool parseLazily = false );
 
     virtual ~Series() = default;
 
