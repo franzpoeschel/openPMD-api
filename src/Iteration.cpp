@@ -146,6 +146,7 @@ Iteration::close( bool _flush )
 Iteration &
 Iteration::open()
 {
+    accessLazily();
     internal::SeriesInternal * s = &retrieveSeries();
     // figure out my iteration number
     auto begin = s->indexOf( *this );
