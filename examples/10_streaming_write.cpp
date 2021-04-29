@@ -20,8 +20,21 @@ main()
         return 0;
     }
 
+    std::string const config = R"END(
+{
+    "adios2":
+    {
+        "engine":
+        {
+            "parameters":
+            {
+                "DataTransport": "RDMA"
+            }
+        }
+    }
+})END";
     // open file for writing
-    Series series = Series( "electrons.sst", Access::CREATE );
+    Series series = Series( "electrons.sst", Access::CREATE, config );
 
     Datatype datatype = determineDatatype< position_t >();
     constexpr unsigned long length = 10ul;

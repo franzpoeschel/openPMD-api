@@ -20,7 +20,21 @@ main()
         return 0;
     }
 
-    Series series = Series( "electrons.sst", Access::READ_ONLY );
+    std::string const config = R"END(
+{
+    "adios2":
+    {
+        "engine":
+        {
+            "parameters":
+            {
+                "DataTransport": "RDMA"
+            }
+        }
+    }
+})END";
+
+    Series series = Series( "electrons.sst", Access::READ_ONLY, config );
 
     for( IndexedIteration iteration : series.readIterations() )
     {
