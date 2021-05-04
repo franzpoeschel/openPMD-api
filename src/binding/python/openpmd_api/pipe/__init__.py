@@ -11,6 +11,7 @@ License: LGPLv3+
 from .. import openpmd_api_cxx as io
 import argparse
 import sys  # sys.stderr.write
+import time
 
 # MPI is an optional dependency
 try:
@@ -20,6 +21,25 @@ except ImportError:
     HAVE_MPI = False
 
 debug = True
+
+
+class DumpTimes:
+    def __init__(self, filename):
+        self.last_time_point = int(time.time() * 1000)
+        self.out_stream = open(filename, 'w')
+
+    def close(self):
+        self.out_stream.close()
+
+    def now(self, description, separator='\t'):
+        current = int(time.time() * 1000)
+        self.out_stream.write(
+            str(current) + separator + str(current - self.last_time_point) +
+            separator + description + '\n')
+        self.last_time_point = current
+
+    def flush(self):
+        self.out_stream.flush()
 
 
 class FallbackMPICommunicator:
@@ -102,7 +122,7 @@ class pipe:
         else:
             self.outranks = {i: str(i) for i in range(self.comm.size)}
 
-    def run(self):
+    def run(self, loggingfile):
         if self.comm.size == 1:
             print("Opening data source")
             sys.stdout.flush()
@@ -129,9 +149,13 @@ class pipe:
             self.inranks = inseries.mpi_ranks_meta_info
         else:
             self.inranks = {}
-        self.__copy(inseries, outseries)
+        dump_times = DumpTimes(loggingfile)
+        self.__copy(inseries, outseries, dump_times)
+        dump_times.close()
+        del inseries
+        del outseries
 
-    def __copy(self, src, dest, current_path="/data/"):
+    def __copy(self, src, dest, dump_times, current_path="/data/"):
         """
         Worker method.
         Copies data from src to dest. May represent any point in the openPMD
@@ -155,6 +179,8 @@ class pipe:
             # main loop: read iterations of src, write to dest
             write_iterations = dest.write_iterations()
             for in_iteration in src.read_iterations():
+                dump_times.now("Received iteration {}".format(
+                    in_iteration.iteration_index))
                 if self.comm.rank == 0:
                     print("Iteration {0} contains {1} meshes:".format(
                         in_iteration.iteration_index,
@@ -175,16 +201,23 @@ class pipe:
                 sys.stdout.flush()
                 self.__particle_patches = []
                 self.__copy(
-                    in_iteration, out_iteration,
+                    in_iteration, out_iteration, dump_times,
                     current_path + str(in_iteration.iteration_index) + "/")
                 for deferred in self.loads:
                     deferred.source.load_chunk(
                         deferred.dynamicView.current_buffer(), deferred.offset,
                         deferred.extent)
+                dump_times.now("Closing incoming iteration {}".format(
+                    in_iteration.iteration_index))
                 in_iteration.close()
                 for patch_load in self.__particle_patches:
                     patch_load.run()
+                dump_times.now("Closing outgoing iteration {}".format(
+                    in_iteration.iteration_index))
                 out_iteration.close()
+                dump_times.now("Closed outgoing iteration {}".format(
+                    in_iteration.iteration_index))
+                dump_times.flush()
                 self.__particle_patches.clear()
                 self.loads.clear()
                 sys.stdout.flush()
@@ -223,17 +256,20 @@ class pipe:
                 self.__particle_patches.append(
                     particle_patch_load(src.load(), dest))
         elif isinstance(src, io.Iteration):
-            self.__copy(src.meshes, dest.meshes, current_path + "meshes/")
-            self.__copy(src.particles, dest.particles,
+            self.__copy(src.meshes, dest.meshes, dump_times,
+                        current_path + "meshes/")
+            self.__copy(src.particles, dest.particles, dump_times,
                         current_path + "particles/")
         elif any([
                 isinstance(src, container_type)
                 for container_type in container_types
         ]):
             for key in src:
-                self.__copy(src[key], dest[key], current_path + key + "/")
+                self.__copy(src[key], dest[key], dump_times,
+                            current_path + key + "/")
             if isinstance(src, io.ParticleSpecies):
-                self.__copy(src.particle_patches, dest.particle_patches)
+                self.__copy(src.particle_patches, dest.particle_patches,
+                            dump_times)
         else:
             raise RuntimeError("Unknown openPMD class: " + str(src))
 
@@ -244,13 +280,15 @@ def main():
         print("Please specify parameters --infile and --outfile.")
         sys.exit(1)
     if (HAVE_MPI):
-        run_pipe = pipe(args.infile, args.outfile, args.inconfig,
-                        args.outconfig, MPI.COMM_WORLD)
+        communicator = MPI.COMM_WORLD
     else:
-        run_pipe = pipe(args.infile, args.outfile, args.inconfig,
-                        args.outconfig, FallbackMPICommunicator())
+        communicator = FallbackMPICommunicator()
 
-    run_pipe.run()
+    run_pipe = pipe(args.infile, args.outfile, args.inconfig, args.outconfig,
+                    communicator)
+
+    loggingfile = "./PIPE_times_{}.txt".format(communicator.rank)
+    run_pipe.run(loggingfile)
 
 
 if __name__ == "__main__":
