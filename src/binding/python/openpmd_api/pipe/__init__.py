@@ -287,7 +287,15 @@ def main():
     run_pipe = pipe(args.infile, args.outfile, args.inconfig, args.outconfig,
                     communicator)
 
-    loggingfile = "./PIPE_times_{}.txt".format(communicator.rank)
+    max_logs = 20
+    stride = (communicator.size + max_logs) // max_logs - 1  # sdiv, ceil(a/b)
+    if stride == 0:
+        stride += 1
+    if communicator.rank % stride == 0:
+        loggingfile = "./PIPE_times_{}.txt".format(communicator.rank)
+    else:
+        loggingfile = "/dev/null"
+
     run_pipe.run(loggingfile)
 
 
