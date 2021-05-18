@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAVE_MPI = False
 
-debug = True
+debug = False
 
 
 class DumpTimes:
@@ -116,7 +116,6 @@ def distribution_strategy(dataset_extent,
                           mpi_rank,
                           mpi_size,
                           strategy_identifier=None):
-    print("Looking up distribution strategy: {}".format(strategy_identifier))
     if strategy_identifier is None or not strategy_identifier:
         if 'OPENPMD_CHUNK_DISTRIBUTION' in os.environ:
             strategy_identifier = os.environ[
