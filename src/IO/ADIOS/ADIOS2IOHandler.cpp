@@ -22,6 +22,7 @@
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
 
 #include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2FilePosition.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
@@ -1052,31 +1053,20 @@ ADIOS2IOHandlerImpl::availableChunks(
 adios2::Mode
 ADIOS2IOHandlerImpl::adios2AccessMode( std::string const & fullPath )
 {
-    switch ( m_handler->m_backendAccess )
+    ( void )fullPath;
+    switch( m_handler->m_backendAccess )
     {
     case Access::CREATE:
         return adios2::Mode::Write;
     case Access::READ_ONLY:
         return adios2::Mode::Read;
     case Access::READ_WRITE:
-        if( auxiliary::directory_exists( fullPath ) ||
-            auxiliary::file_exists( fullPath ) )
-        {
-            std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
-                         "(Append) mode. "
-                      << "Replacing with Read mode." << std::endl;
-            return adios2::Mode::Read;
-        }
-        else
-        {
-            std::cerr << "ADIOS2 does currently not yet implement ReadWrite "
-                         "(Append) mode. "
-                      << "Replacing with Write mode." << std::endl;
-            return adios2::Mode::Write;
-        }
-    default:
-        return adios2::Mode::Undefined;
+        throw error::OperationUnsupportedInBackend(
+            "ADIOS2", "READ_WRITE mode" );
+    case Access::APPEND:
+        return adios2::Mode::Append;
     }
+    throw std::runtime_error( "Unreachable!" );
 }
 
 auxiliary::TracingJSON ADIOS2IOHandlerImpl::nullvalue = nlohmann::json();
@@ -2296,6 +2286,7 @@ namespace detail
                         delayOpeningTheFirstStep = true;
                         break;
                     case adios2::Mode::Write:
+                    case adios2::Mode::Append:
                         /*
                          * File engines, write mode:
                          * Default for old layout is no steps.
@@ -2455,6 +2446,7 @@ namespace detail
         {
             switch( m_mode )
             {
+            case adios2::Mode::Append:
             case adios2::Mode::Write: {
                 // usesSteps attribute only written upon ::advance()
                 // this makes sure that the attribute is only put in case

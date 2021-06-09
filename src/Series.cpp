@@ -544,7 +544,8 @@ SeriesInterface::flushFileBased( iterations_iterator begin, iterations_iterator 
         throw std::runtime_error(
             "fileBased output can not be written with no iterations." );
 
-    if( IOHandler()->m_frontendAccess == Access::READ_ONLY )
+    if( IOHandler()->m_frontendAccess == Access::READ_ONLY ||
+        IOHandler()->m_frontendAccess == Access::APPEND )
         for( auto it = begin; it != end; ++it )
         {
             switch( openIterationIfDirty( it->first, it->second ) )
@@ -1454,6 +1455,11 @@ SeriesInternal::~SeriesInternal()
         if( get().m_lastFlushSuccessful )
         {
             flush();
+        }
+        auto & series = get();
+        if( series.m_writeIterations.has_value() )
+        {
+            series.m_writeIterations = auxiliary::Option< WriteIterations >();
         }
     }
     catch( std::exception const & ex )
