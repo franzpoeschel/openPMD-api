@@ -595,7 +595,7 @@ Iteration::beginStep()
         case Access::APPEND:
             // no re-reading necessary
             break;
-        }    
+        }
     }
 
     return status;
