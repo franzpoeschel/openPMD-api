@@ -4559,8 +4559,7 @@ void append_mode_filebased( std::string const & extension )
     }
 })END";
     auto writeSomeIterations = []( WriteIterations && writeIterations,
-                                   std::vector< uint64_t > indices )
-    {
+                                   std::vector< uint64_t > indices ) {
         for( auto index : indices )
         {
             auto it = writeIterations[ index ];
@@ -4571,29 +4570,50 @@ void append_mode_filebased( std::string const & extension )
             it.close();
         }
     };
+    if( auxiliary::directory_exists( "../samples/append" ) )
+    {
+        auxiliary::remove_directory( "../samples/append" );
+    }
     {
         Series write(
-            "../samples/append_%T." + extension, Access::CREATE, jsonConfig );
+            "../samples/append/append_%T." + extension,
+            Access::CREATE,
+            jsonConfig );
         writeSomeIterations(
             write.writeIterations(), std::vector< uint64_t >{ 0, 1 } );
     }
     {
         Series write(
-            "../samples/append_%T." + extension, Access::APPEND, jsonConfig );
+            "../samples/append/append_%T." + extension,
+            Access::APPEND,
+            jsonConfig );
         writeSomeIterations(
             write.writeIterations(), std::vector< uint64_t >{ 4, 5 } );
         write.flush();
     }
     {
         Series write(
-            "../samples/append_%T." + extension, Access::APPEND, jsonConfig );
+            "../samples/append/append_%T." + extension,
+            Access::APPEND,
+            jsonConfig );
         writeSomeIterations(
             write.writeIterations(), std::vector< uint64_t >{ 2, 3 } );
         write.flush();
     }
     {
-        Series read( "../samples/append_%T." + extension, Access::READ_ONLY );
-        REQUIRE( read.iterations.size() == 6 );
+        Series write(
+            "../samples/append/append_%T." + extension,
+            Access::APPEND,
+            jsonConfig );
+        // overwrite a previous iteration
+        writeSomeIterations(
+            write.writeIterations(), std::vector< uint64_t >{ 4, 123 } );
+        write.flush();
+    }
+    {
+        Series read(
+            "../samples/append/append_%T." + extension, Access::READ_ONLY );
+        REQUIRE( read.iterations.size() == 7 );
     }
 }
 
@@ -4603,4 +4623,5 @@ TEST_CASE( "append_mode_filebased", "[serial]" )
     {
         append_mode_filebased( t );
     }
+    append_mode_filebased( "bp" );
 }
