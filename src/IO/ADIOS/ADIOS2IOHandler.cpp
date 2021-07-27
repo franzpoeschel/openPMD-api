@@ -216,10 +216,15 @@ ADIOS2IOHandlerImpl::fileSuffix() const
     // SST engine adds its suffix unconditionally
     // so we don't add it
     static std::map< std::string, std::string > endings{
-        { "sst", "" }, { "staging", "" }, { "bp4", ".bp" },
-        { "bp3", ".bp" },  { "file", ".bp" },     { "hdf5", ".h5" },
-        { "nullcore", ".nullcore" }, { "ssc", ".ssc" }
-    };
+        { "sst", "" },
+        { "staging", "" },
+        { "bp4", ".bp" },
+        { "bp3", ".bp" },
+        { "file", ".bp" },
+        { "hdf5", ".h5" },
+        { "nullcore", ".nullcore" },
+        { "ssc", ".ssc" },
+        { "dataman", ".dataman" } };
     auto it = endings.find( m_engineType );
     if( it != endings.end() )
     {
@@ -2240,12 +2245,11 @@ namespace detail
         finalized = true;
     }
 
-    void
-    BufferedActions::configure_IO( ADIOS2IOHandlerImpl & impl )
+    void BufferedActions::configure_IO( ADIOS2IOHandlerImpl & impl )
     {
         ( void )impl;
         static std::set< std::string > streamingEngines = {
-            "sst", "insitumpi", "inline", "staging", "nullcore", "ssc"
+            "sst", "insitumpi", "inline", "staging", "nullcore", "ssc", "dataman"
         };
         static std::set< std::string > fileEngines = {
             "bp4", "bp3", "hdf5", "file"
@@ -2321,7 +2325,7 @@ namespace detail
                     throw std::runtime_error(
                         "[ADIOS2IOHandler] Unknown engine type. Please choose "
                         "one out of "
-                        "[sst, staging, bp4, bp3, hdf5, file, null]" );
+                        "[sst, staging, bp4, bp3, hdf5, file, dataman, null]" );
                     // not listing unsupported engines
                 }
             }
