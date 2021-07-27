@@ -20,8 +20,20 @@ main()
         return 0;
     }
 
+    std::string config = R"END(
+{
+  "adios2": {
+    "schema": 20210209,
+    "engine": {
+      "type": "dataman",
+      "parameters": {
+        "IPAddress": "127.0.0.1"
+      }
+    }
+  }
+})END";
     // open file for writing
-    Series series = Series( "electrons.sst", Access::CREATE );
+    Series series = Series( "electrons.bp", Access::CREATE, config );
 
     Datatype datatype = determineDatatype< position_t >();
     constexpr unsigned long length = 10ul;

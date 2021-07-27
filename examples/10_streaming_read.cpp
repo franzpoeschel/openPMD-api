@@ -20,7 +20,20 @@ main()
         return 0;
     }
 
-    Series series = Series( "electrons.sst", Access::READ_ONLY );
+    std::string config = R"END(
+{
+  "adios2": {
+    "schema": 20210209,
+    "engine": {
+      "type": "dataman",
+      "parameters": {
+        "IPAddress": "127.0.0.1"
+      }
+    }
+  }
+})END";
+    // open file for writing
+    Series series = Series( "electrons.bp", Access::READ_ONLY, config );
 
     for( IndexedIteration iteration : series.readIterations() )
     {
