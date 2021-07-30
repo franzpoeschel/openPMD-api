@@ -97,7 +97,7 @@ enum class FlushLevel : unsigned char
  */
 class AbstractIOHandler
 {
-    friend class SeriesImpl;
+    friend class SeriesInterface;
 
 private:
     void setIterationEncoding( IterationEncoding encoding )

@@ -1456,6 +1456,7 @@ void SeriesInterface::openIteration( uint64_t index, Iteration iteration )
             break;
         }
         case Access::CREATE:
+        case Access::APPEND:
             // nothing to do, file will be opened by writing routines
             break;
         }
@@ -1541,7 +1542,6 @@ SeriesInternal::~SeriesInternal()
         {
             flush();
         }
-        auto & series = get();
         if( series.m_writeIterations.has_value() )
         {
             series.m_writeIterations = auxiliary::Option< WriteIterations >();
