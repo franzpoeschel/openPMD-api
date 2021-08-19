@@ -39,7 +39,7 @@ namespace openPMD
     {
     public:
         ParallelHDF5IOHandlerImpl(
-            AbstractIOHandler*, MPI_Comm, nlohmann::json config);
+            AbstractIOHandler*, MPI_Comm, json::TracingJSON config);
         ~ParallelHDF5IOHandlerImpl() override;
 
         MPI_Comm m_mpiComm;
