@@ -293,9 +293,6 @@ RecordComponent::storeChunk( Offset o, Extent e, F && createBuffer )
         dCreate.name = *m_name;
         dCreate.extent = getExtent();
         dCreate.dtype = getDatatype();
-        dCreate.chunkSize = m_dataset->chunkSize;
-        dCreate.compression = m_dataset->compression;
-        dCreate.transform = m_dataset->transform;
         dCreate.options = m_dataset->options;
         IOHandler()->enqueue(IOTask(this, dCreate));
     }
