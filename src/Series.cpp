@@ -1515,6 +1515,15 @@ void SeriesInterface::parseJsonOptions(
             auto it = backendDescriptors.find( backend );
             if( it != backendDescriptors.end() )
             {
+                if( input.format != Format::DUMMY &&
+                    suffix( input.format ) != suffix( it->second ) )
+                {
+                    std::cerr << "[Warning] Supplied filename extension '"
+                              << suffix( input.format )
+                              << "' contradicts the backend specified via the "
+                                 "'backend' key. Will go on with backend "
+                              << it->first << "." << std::endl;
+                }
                 input.format = it->second;
             }
             else
