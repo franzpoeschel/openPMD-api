@@ -9,7 +9,7 @@
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Option.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/Variant.hpp"

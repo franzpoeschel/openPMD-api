@@ -6,7 +6,7 @@
 #include "openPMD/openPMD.hpp"
 
 #include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 
 #include <catch2/catch.hpp>
 #include <nlohmann/json.hpp>

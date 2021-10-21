@@ -22,7 +22,7 @@
 
 #include "openPMD/config.hpp"
 #include "openPMD/auxiliary/Export.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 
 #if openPMD_HAVE_ADIOS1 && openPMD_HAVE_MPI

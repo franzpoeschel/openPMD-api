@@ -20,7 +20,7 @@
  */
 #include "openPMD/auxiliary/Date.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerHelper.hpp"

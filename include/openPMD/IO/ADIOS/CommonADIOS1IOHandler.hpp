@@ -27,7 +27,7 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"

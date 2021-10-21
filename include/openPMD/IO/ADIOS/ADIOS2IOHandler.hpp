@@ -28,7 +28,7 @@
 #include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Option.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"

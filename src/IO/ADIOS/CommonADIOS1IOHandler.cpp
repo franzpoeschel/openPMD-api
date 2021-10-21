@@ -23,7 +23,7 @@
 
 #if openPMD_HAVE_ADIOS1
 
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS1IOHandlerImpl.hpp"
 #include "openPMD/IO/ADIOS/ParallelADIOS1IOHandlerImpl.hpp"

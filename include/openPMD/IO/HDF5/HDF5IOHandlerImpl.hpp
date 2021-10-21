@@ -24,7 +24,7 @@
 #if openPMD_HAVE_HDF5
 #   include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 
-#   include "openPMD/auxiliary/JSON.hpp"
+#   include "openPMD/auxiliary/JSON_internal.hpp"
 #   include "openPMD/auxiliary/Option.hpp"
 
 #   include <hdf5.h>
