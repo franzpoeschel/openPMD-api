@@ -21,9 +21,50 @@
 // cstdlib does not have setenv
 #include <stdlib.h> // NOLINT(modernize-deprecated-headers)
 #include <string>
+#include <toml.hpp>
 #include <vector>
 
 using namespace openPMD;
+
+TEST_CASE( "toml_temp", "[core]" )
+{
+    std::string writeConfig = R"END(
+unused = "global parameter"
+
+[hdf5]
+unused = "hdf5 parameter please dont warn"
+
+[adios2]
+unused = "parameter"
+
+[adios2.engine]
+type = "bp3"
+unused = "as well"
+
+[adios2.engine.parameters]
+BufferGrowthFactor = 2
+Profile = "On"
+
+# double brackets, because the operators are a list
+[[adios2.dataset.operators]]
+type = "blosc"
+# It's possible to give parameters inline
+parameters.clevel = "1"
+parameters.doshuffle = "BLOSC_BITSHUFFLE"
+)END";
+    {
+        std::fstream file;
+        file.open( "write_config.toml", std::ios_base::out );
+        file << writeConfig;
+        file.flush();
+    }
+    {
+        std::fstream handle;
+        handle.open( "write_config.toml", std::ios_base::in );
+        toml::value tomlVal = toml::parse( handle, "write_config.toml" );
+        std::cout << "Read back TOML config:\n" << tomlVal << std::endl;
+    }
+}
 
 TEST_CASE( "versions_test", "[core]" )
 {

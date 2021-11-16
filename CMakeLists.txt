@@ -862,7 +862,8 @@ if(openPMD_BUILD_TESTING)
         endif()
 
         target_include_directories(${testname}Tests SYSTEM PRIVATE
-            $<TARGET_PROPERTY:openPMD::thirdparty::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>)
+            $<TARGET_PROPERTY:openPMD::thirdparty::nlohmann_json,INTERFACE_INCLUDE_DIRECTORIES>
+            $<TARGET_PROPERTY:openPMD::thirdparty::toml11,INTERFACE_INCLUDE_DIRECTORIES>)
     endforeach()
 endif()
 
