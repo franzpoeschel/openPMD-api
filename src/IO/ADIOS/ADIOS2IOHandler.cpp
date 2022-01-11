@@ -1470,7 +1470,7 @@ namespace detail
             if( AttributeTypes< T >::attributeUnchanged(
                     IO,
                     fullName,
-                    variantSrc::get< T >( parameters.resource ) ) )
+                    std::get< T >( parameters.resource ) ) )
             {
                 return;
             }
@@ -1492,7 +1492,7 @@ namespace detail
         }
 
         AttributeTypes< T >::oldCreateAttribute(
-            IO, fullName, variantSrc::get< T >( parameters.resource ) );
+            IO, fullName, std::get< T >( parameters.resource ) );
     }
 
     template< int n, typename... Params >
@@ -1512,7 +1512,7 @@ namespace detail
             fileData.m_IO,
             fileData.requireActiveStep(),
             params,
-            variantSrc::get< T >( params.resource ) );
+            std::get< T >( params.resource ) );
     }
 
     template< int n, typename... Params >
