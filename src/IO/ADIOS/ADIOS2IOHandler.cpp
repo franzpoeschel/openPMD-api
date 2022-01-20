@@ -726,7 +726,7 @@ struct HasOperators
         return !variable.Operations().empty();
     }
 
-    static constexpr char const * errorMsg = "ADIOS2: getBufferView()";
+    std::string errorMsg = "ADIOS2: getBufferView()";
 };
 } // namespace detail
 
