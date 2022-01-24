@@ -51,7 +51,7 @@ class SeriesIterator
 {
     using iteration_index_t = IndexedIteration::index_t;
 
-    using maybe_series_t = auxiliary::Option< Series >;
+    using maybe_series_t = std::optional< Series >;
 
     maybe_series_t m_series;
     iteration_index_t m_currentIteration = 0;

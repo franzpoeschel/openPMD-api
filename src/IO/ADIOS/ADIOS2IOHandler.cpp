@@ -153,7 +153,7 @@ ADIOS2IOHandlerImpl::init( json::TracingJSON cfg )
                     json::asLowerCaseStringDynamic( engineTypeConfig );
                 if( maybeEngine.has_value() )
                 {
-                    m_engineType = std::move( maybeEngine.get() );
+                    m_engineType = std::move( maybeEngine.value() );
                 }
                 else
                 {
@@ -166,17 +166,17 @@ ADIOS2IOHandlerImpl::init( json::TracingJSON cfg )
         auto operators = getOperators();
         if( operators )
         {
-            defaultOperators = std::move( operators.get() );
+            defaultOperators = std::move( operators.value() );
         }
     }
     // environment-variable based configuration
     m_schema = auxiliary::getEnvNum( "OPENPMD2_ADIOS2_SCHEMA", m_schema );
 }
 
-auxiliary::Option< std::vector< ADIOS2IOHandlerImpl::ParameterizedOperator > >
+std::optional< std::vector< ADIOS2IOHandlerImpl::ParameterizedOperator > >
 ADIOS2IOHandlerImpl::getOperators( json::TracingJSON cfg )
 {
-    using ret_t = auxiliary::Option< std::vector< ParameterizedOperator > >;
+    using ret_t = std::optional< std::vector< ParameterizedOperator > >;
     std::vector< ParameterizedOperator > res;
     if( !cfg.json().contains( "dataset" ) )
     {
@@ -208,7 +208,7 @@ ADIOS2IOHandlerImpl::getOperators( json::TracingJSON cfg )
                 if( maybeString.has_value() )
                 {
                     adiosParams[ paramIterator.key() ] =
-                        std::move( maybeString.get() );
+                        std::move( maybeString.value() );
                 }
                 else
                 {
@@ -221,19 +221,19 @@ ADIOS2IOHandlerImpl::getOperators( json::TracingJSON cfg )
                 }
             }
         }
-        auxiliary::Option< adios2::Operator > adiosOperator =
+        std::optional< adios2::Operator > adiosOperator =
             getCompressionOperator( type );
         if( adiosOperator )
         {
             res.emplace_back( ParameterizedOperator{
-                adiosOperator.get(), std::move( adiosParams ) } );
+                adiosOperator.value(), std::move( adiosParams ) } );
         }
     }
     _operators.declareFullyRead();
-    return auxiliary::makeOption( std::move( res ) );
+    return std::make_optional( std::move( res ) );
 }
 
-auxiliary::Option< std::vector< ADIOS2IOHandlerImpl::ParameterizedOperator > >
+std::optional< std::vector< ADIOS2IOHandlerImpl::ParameterizedOperator > >
 ADIOS2IOHandlerImpl::getOperators()
 {
     return getOperators( m_config );
@@ -388,7 +388,7 @@ void ADIOS2IOHandlerImpl::createDataset(
             json::TracingJSON datasetConfig( options[ "adios2" ] );
             auto datasetOperators = getOperators( datasetConfig );
 
-            operators = datasetOperators ? std::move( datasetOperators.get() )
+            operators = datasetOperators ? std::move( datasetOperators.value() )
                                          : defaultOperators;
         }
         else
@@ -1157,7 +1157,7 @@ std::shared_ptr< ADIOS2FilePosition > ADIOS2IOHandlerImpl::extendFilePosition(
                                                    oldPos->gd );
 }
 
-auxiliary::Option< adios2::Operator >
+std::optional< adios2::Operator >
 ADIOS2IOHandlerImpl::getCompressionOperator( std::string const & compression )
 {
     adios2::Operator res;
@@ -1173,7 +1173,7 @@ ADIOS2IOHandlerImpl::getCompressionOperator( std::string const & compression )
                          "method "
                       << compression << ". Continuing without compression."
                       << std::endl;
-            return auxiliary::Option< adios2::Operator >();
+            return std::optional< adios2::Operator >();
         }
         m_operators.emplace( compression, res );
     }
@@ -1181,7 +1181,7 @@ ADIOS2IOHandlerImpl::getCompressionOperator( std::string const & compression )
     {
         res = it->second;
     }
-    return auxiliary::makeOption( adios2::Operator( res ) );
+    return std::make_optional( adios2::Operator( res ) );
 }
 
 std::string
@@ -2252,7 +2252,7 @@ namespace detail
         }
         if( m_engine )
         {
-            auto & engine = m_engine.get();
+            auto & engine = m_engine.value();
             // might have been closed previously
             if( engine )
             {
@@ -2371,7 +2371,7 @@ namespace detail
                     if( maybeString.has_value() )
                     {
                         m_IO.SetParameter(
-                            it.key(), std::move( maybeString.get() ) );
+                            it.key(), std::move( maybeString.value() ) );
                     }
                     else
                     {
@@ -2532,12 +2532,12 @@ namespace detail
                 // the streaming API was used.
                 m_IO.DefineAttribute< ADIOS2Schema::schema_t >(
                     ADIOS2Defaults::str_adios2Schema, m_impl->m_schema );
-                m_engine = auxiliary::makeOption(
+                m_engine = std::make_optional(
                     adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
                 break;
             }
             case adios2::Mode::Read: {
-                m_engine = auxiliary::makeOption(
+                m_engine = std::make_optional(
                     adios2::Engine( m_IO.Open( m_file, m_mode ) ) );
                 // decide attribute layout
                 // in streaming mode, this needs to be done after opening
@@ -2570,7 +2570,7 @@ namespace detail
                         }
                         else
                         {
-                            if( m_engine.get().BeginStep() !=
+                            if( m_engine.value().BeginStep() !=
                                 adios2::StepStatus::OK )
                             {
                                 throw std::runtime_error(
@@ -2587,7 +2587,7 @@ namespace detail
                     break;
                 }
                 case StreamStatus::OutsideOfStep:
-                    if( m_engine.get().BeginStep() != adios2::StepStatus::OK )
+                    if( m_engine.value().BeginStep() != adios2::StepStatus::OK )
                     {
                         throw std::runtime_error(
                             "[ADIOS2] Unexpected step status when "
@@ -2601,7 +2601,7 @@ namespace detail
                 }
                 if( attributeLayout() == AttributeLayout::ByAdiosVariables )
                 {
-                    preloadAttributes.preloadAttributes( m_IO, m_engine.get() );
+                    preloadAttributes.preloadAttributes( m_IO, m_engine.value() );
                 }
                 break;
             }
@@ -2610,12 +2610,12 @@ namespace detail
                     "[ADIOS2] Invalid ADIOS access mode" );
             }
 
-            if( !m_engine.get() )
+            if( !m_engine.value() )
             {
                 throw std::runtime_error( "[ADIOS2] Failed opening Engine." );
             }
         }
-        return m_engine.get();
+        return m_engine.value();
     }
 
     adios2::Engine & BufferedActions::requireActiveStep( )
@@ -2627,7 +2627,7 @@ namespace detail
             if( m_mode == adios2::Mode::Read &&
                 attributeLayout() == AttributeLayout::ByAdiosVariables )
             {
-                preloadAttributes.preloadAttributes( m_IO, m_engine.get() );
+                preloadAttributes.preloadAttributes( m_IO, m_engine.value() );
             }
             streamStatus = StreamStatus::DuringStep;
         }
@@ -2852,7 +2852,7 @@ namespace detail
                         attributeLayout() == AttributeLayout::ByAdiosVariables )
                     {
                         preloadAttributes.preloadAttributes(
-                            m_IO, m_engine.get() );
+                            m_IO, m_engine.value() );
                     }
                 }
                 AdvanceStatus res = AdvanceStatus::OK;
@@ -2935,7 +2935,7 @@ namespace detail
     void
     BufferedActions::invalidateAttributesMap()
     {
-        m_availableAttributes = auxiliary::Option< AttributeMap_t >();
+        m_availableAttributes = std::optional< AttributeMap_t >();
     }
 
     BufferedActions::AttributeMap_t const &
@@ -2943,20 +2943,20 @@ namespace detail
     {
         if( m_availableAttributes )
         {
-            return m_availableAttributes.get();
+            return m_availableAttributes.value();
         }
         else
         {
             m_availableAttributes =
-                auxiliary::makeOption( m_IO.AvailableAttributes() );
-            return m_availableAttributes.get();
+                std::make_optional( m_IO.AvailableAttributes() );
+            return m_availableAttributes.value();
         }
     }
 
     void
     BufferedActions::invalidateVariablesMap()
     {
-        m_availableVariables = auxiliary::Option< AttributeMap_t >();
+        m_availableVariables = std::optional< AttributeMap_t >();
     }
 
     BufferedActions::AttributeMap_t const &
@@ -2964,13 +2964,13 @@ namespace detail
     {
         if( m_availableVariables )
         {
-            return m_availableVariables.get();
+            return m_availableVariables.value();
         }
         else
         {
             m_availableVariables =
-                auxiliary::makeOption( m_IO.AvailableVariables() );
-            return m_availableVariables.get();
+                std::make_optional( m_IO.AvailableVariables() );
+            return m_availableVariables.value();
         }
     }
 
