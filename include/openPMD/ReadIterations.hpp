@@ -23,6 +23,8 @@
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Series.hpp"
 
+#include <optional>
+
 namespace openPMD
 {
 /**
