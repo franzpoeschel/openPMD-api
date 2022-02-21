@@ -37,6 +37,7 @@
 #include <mpi.h>
 #endif
 
+#include <deque>
 #include <map>
 #include <optional>
 #include <set>
@@ -571,8 +572,10 @@ OPENPMD_private
      * Note on re-parsing of a Series:
      * If init == false, the parsing process will seek for new
      * Iterations/Records/Record Components etc.
+     * If series.iterations contains the attribute `snapshot`, returns its
+     * value.
      */
-    void readGorVBased(bool init = true);
+    std::optional<std::deque<uint64_t> > readGorVBased(bool init = true);
     void readBase();
     std::string iterationFilename(uint64_t i);
 

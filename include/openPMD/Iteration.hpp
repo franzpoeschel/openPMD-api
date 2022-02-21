@@ -28,7 +28,9 @@
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
 
+#include <deque>
 #include <optional>
+#include <tuple>
 
 namespace openPMD
 {
@@ -272,20 +274,55 @@ private:
     void read_impl(std::string const &groupPath);
 
     /**
+     * Status after beginning an IO step. Currently includes:
+     * * The advance status (OK, OVER, RANDOMACCESS)
+     * * The opened iterations, in case the snapshot attribute is found
+     */
+    struct BeginStepStatus
+    {
+        using AvailableIterations_t = std::optional<std::deque<uint64_t> >;
+
+        AdvanceStatus stepStatus{};
+        /*
+         * If the iteration attribute `snapshot` is present, the value of that
+         * attribute. Otherwise empty.
+         */
+        AvailableIterations_t iterationsInOpenedStep;
+
+        /*
+         * Most of the time, the AdvanceStatus part of this struct is what we
+         * need, so let's make it easy to access.
+         */
+        inline operator AdvanceStatus() const
+        {
+            return stepStatus;
+        }
+
+        /*
+         * Support for std::tie()
+         */
+        inline operator std::tuple<AdvanceStatus &, AvailableIterations_t &>()
+        {
+            return std::tuple<AdvanceStatus &, AvailableIterations_t &>{
+                stepStatus, iterationsInOpenedStep};
+        }
+    };
+
+    /**
      * @brief Begin an IO step on the IO file (or file-like object)
      *        containing this iteration. In case of group-based iteration
      *        layout, this will be the complete Series.
      *
-     * @return AdvanceStatus
+     * @return BeginStepStatus
      */
-    AdvanceStatus beginStep();
+    BeginStepStatus beginStep();
 
     /**
      * @brief End an IO step on the IO file (or file-like object)
      *        containing this iteration. In case of group-based iteration
      *        layout, this will be the complete Series.
      *
-     * @return AdvanceStatus
+     * @return void
      */
     void endStep();
 

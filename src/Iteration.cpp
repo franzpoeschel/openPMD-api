@@ -545,8 +545,9 @@ void Iteration::read_impl(std::string const &groupPath)
     readAttributes(ReadMode::FullyReread);
 }
 
-AdvanceStatus Iteration::beginStep()
+auto Iteration::beginStep() -> BeginStepStatus
 {
+    BeginStepStatus res;
     using IE = IterationEncoding;
     auto series = retrieveSeries();
     // Initialize file with this to quiet warnings
@@ -562,11 +563,17 @@ AdvanceStatus Iteration::beginStep()
         file = &series.get();
         break;
     }
+
     AdvanceStatus status = series.advance(
         AdvanceMode::BEGINSTEP, *file, series.indexOf(*this), *this);
-    if (status != AdvanceStatus::OK)
+    switch (status)
     {
-        return status;
+    case AdvanceStatus::OVER:
+        res.stepStatus = status;
+        return res;
+    case AdvanceStatus::OK:
+    case AdvanceStatus::RANDOMACCESS:
+        break;
     }
 
     // re-read -> new datasets might be available
@@ -584,6 +591,7 @@ AdvanceStatus Iteration::beginStep()
             auto oldType = this->IOHandler()->m_frontendAccess;
             auto newType =
                 const_cast<Access *>(&this->IOHandler()->m_frontendAccess);
+            res.iterationsInOpenedStep = series.readGorVBased(false);
             *newType = Access::READ_WRITE;
             series.readGorVBased(false);
             *newType = oldType;
@@ -597,7 +605,8 @@ AdvanceStatus Iteration::beginStep()
         }
     }
 
-    return status;
+    res.stepStatus = status;
+    return res;
 }
 
 void Iteration::endStep()
@@ -619,6 +628,7 @@ void Iteration::endStep()
     }
     // @todo filebased check
     series.advance(AdvanceMode::ENDSTEP, *file, series.indexOf(*this), *this);
+    series.get().m_currentlyActiveIterations.clear();
 }
 
 StepStatus Iteration::getStepStatus()

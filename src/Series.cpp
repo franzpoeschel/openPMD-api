@@ -1061,7 +1061,7 @@ void Series::readOneIterationFileBased(std::string const &filePath)
     series.iterations.readAttributes(ReadMode::OverrideExisting);
 }
 
-void Series::readGorVBased(bool do_init)
+std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
 {
     auto &series = get();
     Parameter<Operation::OPEN_FILE> fOpen;
@@ -1180,29 +1180,80 @@ void Series::readGorVBased(bool do_init)
         }
     };
 
+    auto currentSteps = [&series]() -> std::optional<std::vector<uint64_t> > {
+        using vec_t = std::vector<uint64_t>;
+        /*
+         * In variable-based iteration encoding, iterations have no distinct
+         * group within `series.iterations`, meaning that the `snapshot`
+         * attribute is not found at `/data/0/snapshot`, but at
+         * `/data/snapshot`. This makes it possible to retrieve it from
+         * `series.iterations`.
+         */
+        if (series.iterations.containsAttribute("snapshot"))
+        {
+            auto const &attribute = series.iterations.getAttribute("snapshot");
+            switch (attribute.dtype)
+            {
+            case Datatype::ULONGLONG:
+            case Datatype::VEC_ULONGLONG: {
+                auto const &vec =
+                    attribute.get<std::vector<unsigned long long> >();
+                return vec_t{vec.begin(), vec.end()};
+            }
+            case Datatype::ULONG:
+            case Datatype::VEC_ULONG: {
+                auto const &vec = attribute.get<std::vector<unsigned long> >();
+                return vec_t{vec.begin(), vec.end()};
+            }
+            default: {
+                std::stringstream s;
+                s << "Unexpected datatype for '/data/snapshot': "
+                  << attribute.dtype << std::endl;
+                throw std::runtime_error(s.str());
+            }
+            }
+        }
+        else
+        {
+            return std::optional<std::vector<uint64_t> >{};
+        }
+    }();
+
     switch (iterationEncoding())
     {
     case IterationEncoding::groupBased:
     /*
      * Sic! This happens when a file-based Series is opened in group-based mode.
      */
-    case IterationEncoding::fileBased:
+    case IterationEncoding::fileBased: {
         for (auto const &it : *pList.paths)
         {
             uint64_t index = std::stoull(it);
             readSingleIteration(index, it, true);
         }
-        break;
+        if (currentSteps.has_value())
+        {
+            auto const &vec = currentSteps.value();
+            return std::deque<uint64_t>{vec.begin(), vec.end()};
+        }
+        else
+        {
+            return std::optional<std::deque<uint64_t> >();
+        }
+    }
     case IterationEncoding::variableBased: {
         uint64_t index = 0;
-        if (series.iterations.containsAttribute("snapshot"))
+        if (currentSteps.has_value() && !currentSteps.value().empty())
         {
-            index = series.iterations.getAttribute("snapshot").get<uint64_t>();
+            // variable-based layout can only read one iteration at a time
+            // @todo warning or exception if the size is any other than 1?
+            index = currentSteps.value().at(0);
         }
         readSingleIteration(index, "", false);
-        break;
+        return std::deque<uint64_t>{index};
     }
     }
+    throw std::runtime_error("Unreachable!");
 }
 
 void Series::readBase()
