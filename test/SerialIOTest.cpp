@@ -5644,35 +5644,27 @@ void append_mode(
                 ++counter;
             }
             REQUIRE(counter == 5);
+            // Cannot do listSeries here because the Series is already drained
+            // @todo better error message if attempting this
+            // helper::listSeries( read );
         }
         else
         {
             REQUIRE(read.iterations.size() == 5);
+            /*
+             * Roadmap: for now, reading this should work by ignoring the last
+             * duplicate iteration.
+             * After merging https://github.com/openPMD/openPMD-api/pull/949, we
+             * should see both instances when reading.
+             * Final goal: Read only the last instance.
+             */
+            helper::listSeries(read);
         }
-        /*
-         * Roadmap: for now, reading this should work by ignoring the last
-         * duplicate iteration.
-         * After merging https://github.com/openPMD/openPMD-api/pull/949, we
-         * should see both instances when reading.
-         * Final goal: Read only the last instance.
-         */
-        helper::listSeries(read);
     }
 }
 
 TEST_CASE("append_mode", "[serial]")
 {
-    //     append_mode( "bp", false, R"END(
-    // {
-    //     "adios2":
-    //     {
-    //         "schema": 20210209,
-    //         "engine":
-    //         {
-    //             "usesteps" : true
-    //         }
-    //     }
-    // })END");
     for (auto const &t : testedFileExtensions())
     {
         if (t == "bp")
@@ -5701,8 +5693,8 @@ TEST_CASE("append_mode", "[serial]")
 })END";
             append_mode(t, false, jsonConfigOld);
             append_mode(t, false, jsonConfigNew);
-            // append_mode( t, true, jsonConfigOld );
-            // append_mode( t, true, jsonConfigNew );
+            append_mode(t, true, jsonConfigOld);
+            append_mode(t, true, jsonConfigNew);
         }
         else
         {
