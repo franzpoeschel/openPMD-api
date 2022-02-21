@@ -33,6 +33,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <system_error>
 
@@ -225,4 +226,20 @@ std::string collective_file_read(std::string const &path, MPI_Comm comm)
 
 #endif
 
+std::vector<std::string> read_file_by_lines(std::string const &path)
+{
+    std::vector<std::string> res;
+    std::ifstream file(path, std::ios_base::in);
+    if (file.fail())
+    {
+        throw no_such_file_error();
+    }
+    std::string line;
+    while (std::getline(file, line))
+    {
+        res.push_back(std::move(line));
+        line = std::string();
+    }
+    return res;
+}
 } // namespace openPMD::auxiliary
