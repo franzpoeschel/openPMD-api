@@ -20,7 +20,8 @@ namespace openPMD
 enum class AdvanceStatus : unsigned char
 {
     OK, /* stream goes on */
-    OVER /* stream is over */
+    OVER, /* stream is over */
+    RANDOMACCESS /* there is no stream, it will never be over */
 };
 
 /**

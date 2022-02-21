@@ -588,6 +588,11 @@ void ADIOS2IOHandlerImpl::writeAttribute(
     switch (attributeLayout())
     {
     case AttributeLayout::ByAdiosAttributes:
+        if (parameters.changesOverSteps)
+        {
+            // cannot do this
+            return;
+        }
         switchType<detail::OldAttributeWriter>(
             parameters.dtype, this, writable, parameters);
         break;
@@ -602,6 +607,13 @@ void ADIOS2IOHandlerImpl::writeAttribute(
         auto prefix = filePositionToString(pos);
 
         auto &filedata = getFileData(file, IfFileNotOpen::ThrowError);
+        if (parameters.changesOverSteps &&
+            filedata.streamStatus ==
+                detail::BufferedActions::StreamStatus::NoStream)
+        {
+            // cannot do this
+            return;
+        }
         filedata.invalidateAttributesMap();
         m_dirty.emplace(std::move(file));
 
@@ -2669,7 +2681,7 @@ namespace detail
             m_IO.DefineAttribute<bool_representation>(
                 ADIOS2Defaults::str_usesstepsAttribute, 0);
             flush(FlushLevel::UserFlush, /* writeAttributes = */ false);
-            return AdvanceStatus::OK;
+            return AdvanceStatus::RANDOMACCESS;
         }
 
         m_IO.DefineAttribute<bool_representation>(
