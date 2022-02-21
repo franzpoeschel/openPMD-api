@@ -1133,10 +1133,22 @@ std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
     IOHandler()->enqueue(IOTask(&series.iterations, pOpen));
 
     readAttributes(ReadMode::IgnoreExisting);
+
+    auto withRWAccess = [this](auto &&functor) {
+        auto oldType = IOHandler()->m_frontendAccess;
+        auto newType = const_cast<Access *>(&IOHandler()->m_frontendAccess);
+        *newType = Access::READ_WRITE;
+        std::forward<decltype(functor)>(functor)();
+        *newType = oldType;
+    };
+
     /*
      * 'snapshot' changes over steps, so reread that.
      */
-    series.iterations.readAttributes(ReadMode::OverrideExisting);
+    withRWAccess([&series]() {
+        series.iterations.readAttributes(ReadMode::OverrideExisting);
+    });
+
     /* obtain all paths inside the basepath (i.e. all iterations) */
     Parameter<Operation::LIST_PATHS> pList;
     IOHandler()->enqueue(IOTask(&series.iterations, pList));
@@ -1160,7 +1172,12 @@ std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
             {
                 pOpen.path = path;
                 IOHandler()->enqueue(IOTask(&i, pOpen));
+                auto oldType = IOHandler()->m_frontendAccess;
+                auto newType =
+                    const_cast<Access *>(&IOHandler()->m_frontendAccess);
+                *newType = Access::READ_WRITE;
                 i.reread(path);
+                *newType = oldType;
             }
         }
         else
@@ -1229,7 +1246,7 @@ std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
         for (auto const &it : *pList.paths)
         {
             uint64_t index = std::stoull(it);
-            readSingleIteration(index, it, true);
+            withRWAccess([&]() { readSingleIteration(index, it, true); });
         }
         if (currentSteps.has_value())
         {
@@ -1249,7 +1266,7 @@ std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
         }
         for (auto it : res)
         {
-            readSingleIteration(it, "", false);
+            withRWAccess([&]() { readSingleIteration(it, "", false); });
         }
         return res;
     }
