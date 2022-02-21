@@ -115,6 +115,7 @@ std::ostream &listSeries(Series &series, bool const longer, std::ostream &out)
 
         for (auto const &i : series.readIterations())
         {
+            std::cout << "Reading iteration " << i.iterationIndex << std::endl;
             if (longer)
                 out << i.iterationIndex << " ";
 

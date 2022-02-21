@@ -239,6 +239,13 @@ SeriesIterator &SeriesIterator::operator++()
     {
         iteration.open();
     }
+    else
+    {
+        // we had this one already, skip it
+        // @todo remove recursive call
+        iteration.endStep();
+        return operator++();
+    }
     return *this;
 }
 

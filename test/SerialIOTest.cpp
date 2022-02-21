@@ -5562,10 +5562,12 @@ void append_mode(
     bool variableBased,
     std::string jsonConfig = "{}")
 {
-
     std::string filename = (variableBased ? "../samples/append_variablebased."
                                           : "../samples/append_groupbased.") +
         extension;
+    std::cout << filename << ",\tvbased?: " << variableBased << "\n"
+              << jsonConfig << "\n\n"
+              << std::endl;
     std::vector<int> data(10, 0);
     auto writeSomeIterations = [&data](
                                    WriteIterations &&writeIterations,
@@ -5660,6 +5662,17 @@ void append_mode(
 
 TEST_CASE("append_mode", "[serial]")
 {
+    //     append_mode( "bp", false, R"END(
+    // {
+    //     "adios2":
+    //     {
+    //         "schema": 20210209,
+    //         "engine":
+    //         {
+    //             "usesteps" : true
+    //         }
+    //     }
+    // })END");
     for (auto const &t : testedFileExtensions())
     {
         if (t == "bp")
@@ -5688,8 +5701,8 @@ TEST_CASE("append_mode", "[serial]")
 })END";
             append_mode(t, false, jsonConfigOld);
             append_mode(t, false, jsonConfigNew);
-            append_mode(t, true, jsonConfigOld);
-            append_mode(t, true, jsonConfigNew);
+            // append_mode( t, true, jsonConfigOld );
+            // append_mode( t, true, jsonConfigNew );
         }
         else
         {
