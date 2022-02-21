@@ -5607,7 +5607,7 @@ void append_mode(
             // in variable-based encodings, iterations are not parsed ahead of
             // time but as they go
             unsigned counter = 0;
-            for (auto iteration : read.readIterations())
+            for (auto const &iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == counter);
                 ++counter;
