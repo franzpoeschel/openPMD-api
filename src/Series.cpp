@@ -1242,15 +1242,16 @@ std::optional<std::deque<uint64_t> > Series::readGorVBased(bool do_init)
         }
     }
     case IterationEncoding::variableBased: {
-        uint64_t index = 0;
+        std::deque<uint64_t> res = {0};
         if (currentSteps.has_value() && !currentSteps.value().empty())
         {
-            // variable-based layout can only read one iteration at a time
-            // @todo warning or exception if the size is any other than 1?
-            index = currentSteps.value().at(0);
+            res = {currentSteps.value().begin(), currentSteps.value().end()};
         }
-        readSingleIteration(index, "", false);
-        return std::deque<uint64_t>{index};
+        for (auto it : res)
+        {
+            readSingleIteration(it, "", false);
+        }
+        return res;
     }
     }
     throw std::runtime_error("Unreachable!");

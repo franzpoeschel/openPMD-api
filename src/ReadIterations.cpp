@@ -115,12 +115,12 @@ SeriesIterator::SeriesIterator(Series series) : m_series(std::move(series))
         }
         }
 
-        if (!setCurrentIteration())
+        if (status == AdvanceStatus::OVER)
         {
             *this = end();
             return;
         }
-        if (status == AdvanceStatus::OVER)
+        if (!setCurrentIteration())
         {
             *this = end();
             return;
