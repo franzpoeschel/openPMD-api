@@ -272,15 +272,18 @@ void Iteration::flushVariableBased(
 
 void Iteration::flush(internal::FlushParams const &flushParams)
 {
-    if (IOHandler()->m_frontendAccess == Access::READ_ONLY)
+    switch (IOHandler()->m_frontendAccess)
     {
+    case Access::READ_ONLY: {
         for (auto &m : meshes)
             m.second.flush(m.first, flushParams);
         for (auto &species : particles)
             species.second.flush(species.first, flushParams);
+        break;
     }
-    else
-    {
+    case Access::READ_WRITE:
+    case Access::CREATE:
+    case Access::APPEND: {
         /* Find the root point [Series] of this file,
          * meshesPath and particlesPath are stored there */
         Series s = retrieveSeries();
@@ -318,6 +321,8 @@ void Iteration::flush(internal::FlushParams const &flushParams)
         }
 
         flushAttributes(flushParams);
+        break;
+    }
     }
 }
 
@@ -570,15 +575,26 @@ AdvanceStatus Iteration::beginStep()
         (this->IOHandler()->m_frontendAccess == Access::READ_ONLY ||
          this->IOHandler()->m_frontendAccess == Access::READ_WRITE))
     {
-        bool previous = series.iterations.written();
-        series.iterations.written() = false;
-        auto oldType = this->IOHandler()->m_frontendAccess;
-        auto newType =
-            const_cast<Access *>(&this->IOHandler()->m_frontendAccess);
-        *newType = Access::READ_WRITE;
-        series.readGorVBased(false);
-        *newType = oldType;
-        series.iterations.written() = previous;
+        switch (IOHandler()->m_frontendAccess)
+        {
+        case Access::READ_ONLY:
+        case Access::READ_WRITE: {
+            bool previous = series.iterations.written();
+            series.iterations.written() = false;
+            auto oldType = this->IOHandler()->m_frontendAccess;
+            auto newType =
+                const_cast<Access *>(&this->IOHandler()->m_frontendAccess);
+            *newType = Access::READ_WRITE;
+            series.readGorVBased(false);
+            *newType = oldType;
+            series.iterations.written() = previous;
+            break;
+        }
+        case Access::CREATE:
+        case Access::APPEND:
+            // no re-reading necessary
+            break;
+        }
     }
 
     return status;
@@ -675,23 +691,30 @@ void Iteration::linkHierarchy(Writable &w)
 
 void Iteration::runDeferredParseAccess()
 {
-    if (IOHandler()->m_frontendAccess == Access::CREATE)
+    switch (IOHandler()->m_frontendAccess)
     {
+    case Access::READ_ONLY:
+    case Access::READ_WRITE: {
+        auto oldAccess = IOHandler()->m_frontendAccess;
+        auto newAccess = const_cast<Access *>(&IOHandler()->m_frontendAccess);
+        *newAccess = Access::READ_WRITE;
+        try
+        {
+            read();
+        }
+        catch (...)
+        {
+            *newAccess = oldAccess;
+            throw;
+        }
+        *newAccess = oldAccess;
+        break;
+    }
+    case Access::CREATE:
+    case Access::APPEND:
+        // no parsing in those modes
         return;
     }
-    auto oldAccess = IOHandler()->m_frontendAccess;
-    auto newAccess = const_cast<Access *>(&IOHandler()->m_frontendAccess);
-    *newAccess = Access::READ_WRITE;
-    try
-    {
-        read();
-    }
-    catch (...)
-    {
-        *newAccess = oldAccess;
-        throw;
-    }
-    *newAccess = oldAccess;
 }
 
 template float Iteration::time<float>() const;
