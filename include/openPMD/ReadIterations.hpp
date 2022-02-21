@@ -89,6 +89,12 @@ private:
         m_currentIteration = *m_iterationsInCurrentStep.begin();
         return true;
     }
+
+    std::optional<SeriesIterator *> nextIterationInStep(Iteration &);
+
+    std::optional<SeriesIterator *> nextStep(Iteration &);
+
+    std::optional<SeriesIterator *> loopBody();
 };
 
 /**

@@ -136,69 +136,57 @@ SeriesIterator::SeriesIterator(Series series) : m_series(std::move(series))
     }
 }
 
-SeriesIterator &SeriesIterator::operator++()
+std::optional<SeriesIterator *>
+SeriesIterator::nextIterationInStep(Iteration &currentIteration)
 {
-    if (!m_series.has_value())
-    {
-        *this = end();
-        return *this;
-    }
-    Series &series = m_series.value();
-    auto &iterations = series.iterations;
-    auto &currentIteration = iterations[m_currentIteration];
-    auto oldIterationIndex = m_currentIteration;
+    using ret_t = std::optional<SeriesIterator *>;
 
     m_iterationsInCurrentStep.pop_front();
-    if (!m_iterationsInCurrentStep.empty())
+    if (m_iterationsInCurrentStep.empty())
     {
-        m_currentIteration = *m_iterationsInCurrentStep.begin();
-        switch (series.iterationEncoding())
+        return ret_t{};
+    }
+    auto oldIterationIndex = m_currentIteration;
+    m_currentIteration = *m_iterationsInCurrentStep.begin();
+    auto &series = m_series.value();
+
+    switch (series.iterationEncoding())
+    {
+    case IterationEncoding::groupBased:
+    case IterationEncoding::variableBased: {
+        if (!currentIteration.closed())
         {
-        case IterationEncoding::groupBased:
-        case IterationEncoding::variableBased: {
-            if (!currentIteration.closed())
-            {
-                currentIteration.get().m_closed =
-                    internal::CloseStatus::ClosedInFrontend;
-            }
-            auto begin = series.iterations.find(oldIterationIndex);
-            auto end = begin;
-            ++end;
-            series.flush_impl(
-                begin,
-                end,
-                FlushLevel::UserFlush,
-                /* flushIOHandler = */ true);
-
-            series.iterations[m_currentIteration].open();
-            return *this;
+            currentIteration.get().m_closed =
+                internal::CloseStatus::ClosedInFrontend;
         }
-        case IterationEncoding::fileBased:
-            if (!currentIteration.closed())
-            {
-                currentIteration.close();
-            }
-            series.iterations[m_currentIteration].open();
-            series.iterations[m_currentIteration].beginStep();
-            return *this;
+        auto begin = series.iterations.find(oldIterationIndex);
+        auto end = begin;
+        ++end;
+        series.flush_impl(
+            begin,
+            end,
+            FlushLevel::UserFlush,
+            /* flushIOHandler = */ true);
+
+        series.iterations[m_currentIteration].open();
+        return {this};
+    }
+    case IterationEncoding::fileBased:
+        if (!currentIteration.closed())
+        {
+            currentIteration.close();
         }
-        throw std::runtime_error("Unreachable!");
+        series.iterations[m_currentIteration].open();
+        series.iterations[m_currentIteration].beginStep();
+        return {this};
     }
+    throw std::runtime_error("Unreachable!");
+}
 
-    // The currently active iterations have been exhausted.
-    // Now see if there are further iterations to be found.
-
-    if (series.iterationEncoding() == IterationEncoding::fileBased)
-    {
-        // this one is handled above, stream is over once it proceeds to here
-        *this = end();
-        return *this;
-    }
-
-    if (!currentIteration.closed())
-    {
-        currentIteration.close();
-    }
+std::optional<SeriesIterator *>
+SeriesIterator::nextStep(Iteration &currentIteration)
+{
+    using ret_t = std::optional<SeriesIterator *>;
 
     // since we are in group-based iteration layout, it does not
     // matter which iteration we begin a step upon
@@ -217,18 +205,19 @@ SeriesIterator &SeriesIterator::operator++()
          * Fallback implementation: Assume that each step corresponds
          * with an iteration in ascending order.
          */
-        auto it = iterations.find(m_currentIteration);
-        auto itEnd = iterations.end();
+        auto &series = m_series.value();
+        auto it = series.iterations.find(m_currentIteration);
+        auto itEnd = series.iterations.end();
         if (it == itEnd)
         {
             *this = end();
-            return *this;
+            return {this};
         }
         ++it;
         if (it == itEnd)
         {
             *this = end();
-            return *this;
+            return {this};
         }
         m_iterationsInCurrentStep = {it->first};
     }
@@ -237,8 +226,51 @@ SeriesIterator &SeriesIterator::operator++()
     if (status == AdvanceStatus::OVER)
     {
         *this = end();
-        return *this;
+        return {this};
     }
+
+    return ret_t{};
+}
+
+std::optional<SeriesIterator *> SeriesIterator::loopBody()
+{
+    using ret_t = std::optional<SeriesIterator *>;
+
+    Series &series = m_series.value();
+    auto &iterations = series.iterations;
+    auto &currentIteration = iterations[m_currentIteration];
+
+    {
+        auto option = nextIterationInStep(currentIteration);
+        if (option.has_value())
+        {
+            return option;
+        }
+    }
+
+    // The currently active iterations have been exhausted.
+    // Now see if there are further iterations to be found.
+
+    if (series.iterationEncoding() == IterationEncoding::fileBased)
+    {
+        // this one is handled above, stream is over once it proceeds to here
+        *this = end();
+        return {this};
+    }
+
+    if (!currentIteration.closed())
+    {
+        currentIteration.close();
+    }
+
+    {
+        auto option = nextStep(currentIteration);
+        if (option.has_value())
+        {
+            return option;
+        }
+    }
+
     currentIteration.setStepStatus(StepStatus::DuringStep);
 
     auto iteration = iterations.at(m_currentIteration);
@@ -248,12 +280,31 @@ SeriesIterator &SeriesIterator::operator++()
     }
     else
     {
-        // we had this one already, skip it
-        // @todo remove recursive call
+        // we had this iteration already, skip it
         iteration.endStep();
-        return operator++();
+        return ret_t{}; // empty, go into next iteration
     }
-    return *this;
+    return {this};
+}
+
+SeriesIterator &SeriesIterator::operator++()
+{
+    if (!m_series.has_value())
+    {
+        *this = end();
+        return *this;
+    }
+    std::optional<SeriesIterator *> res;
+    /*
+     * loopBody() might return an empty option to indicate a skipped iteration.
+     * Loop until it returns something real for us.
+     */
+    do
+    {
+        res = loopBody();
+    } while (!res.has_value());
+
+    return *res.value();
 }
 
 IndexedIteration SeriesIterator::operator*()
