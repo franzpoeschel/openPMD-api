@@ -37,6 +37,13 @@ SeriesIterator::SeriesIterator(Series series) : m_series(std::move(series))
         *this = end();
         return;
     }
+    else if (
+        it->second.get().m_closed == internal::CloseStatus::ClosedInBackend)
+    {
+        throw error::WrongAPIUsage(
+            "Trying to call Series::readIterations() on a (partially) read "
+            "Series.");
+    }
     else
     {
         auto openIteration = [](Iteration &iteration) {

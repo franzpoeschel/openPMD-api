@@ -5645,8 +5645,7 @@ void append_mode(
             }
             REQUIRE(counter == 5);
             // Cannot do listSeries here because the Series is already drained
-            // @todo better error message if attempting this
-            // helper::listSeries( read );
+            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
         }
         else
         {
