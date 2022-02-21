@@ -4284,8 +4284,10 @@ void serial_iterator(std::string const &file)
     Series readSeries(file, Access::READ_ONLY);
 
     size_t last_iteration_index = 0;
+    size_t numberOfIterations = 0;
     for (auto iteration : readSeries.readIterations())
     {
+        ++numberOfIterations;
         auto E_x = iteration.meshes["E"]["x"];
         REQUIRE(E_x.getDimensionality() == 1);
         REQUIRE(E_x.getExtent()[0] == extent);
@@ -4298,6 +4300,7 @@ void serial_iterator(std::string const &file)
         last_iteration_index = iteration.iterationIndex;
     }
     REQUIRE(last_iteration_index == 9);
+    REQUIRE(numberOfIterations == 10);
 }
 
 TEST_CASE("serial_iterator", "[serial][adios2]")
@@ -5431,11 +5434,12 @@ TEST_CASE("deferred_parsing", "[serial]")
     }
 }
 
-// @todo merge this back with the chaotic_stream test of PR #949
-// (bug noticed while working on that branch)
-void no_explicit_flush(std::string filename)
+void chaotic_stream(std::string filename, bool variableBased)
 {
-    std::vector<uint64_t> sampleData{5, 9, 1, 3, 4, 6, 7, 8, 2, 0};
+    /*
+     * We will write iterations in the following order.
+     */
+    std::vector<uint64_t> iterations{5, 9, 1, 3, 4, 6, 7, 8, 2, 0};
     std::string jsonConfig = R"(
 {
     "adios2": {
@@ -5447,16 +5451,31 @@ void no_explicit_flush(std::string filename)
     }
 })";
 
+    bool weirdOrderWhenReading{};
+
     {
         Series series(filename, Access::CREATE, jsonConfig);
-        for (uint64_t currentIteration = 0; currentIteration < 10;
-             ++currentIteration)
+        /*
+         * When using ADIOS2 steps, iterations are read not by logical order
+         * (iteration index), but by order of writing.
+         */
+        weirdOrderWhenReading = series.backend() == "ADIOS2" &&
+            series.iterationEncoding() != IterationEncoding::fileBased;
+        if (variableBased)
+        {
+            if (series.backend() != "ADIOS2")
+            {
+                return;
+            }
+            series.setIterationEncoding(IterationEncoding::variableBased);
+        }
+        for (auto currentIteration : iterations)
         {
             auto dataset =
                 series.writeIterations()[currentIteration]
                     .meshes["iterationOrder"][MeshRecordComponent::SCALAR];
             dataset.resetDataset({determineDatatype<uint64_t>(), {10}});
-            dataset.storeChunk(sampleData, {0}, {10});
+            dataset.storeChunk(iterations, {0}, {10});
             // series.writeIterations()[ currentIteration ].close();
         }
     }
@@ -5466,19 +5485,27 @@ void no_explicit_flush(std::string filename)
         size_t index = 0;
         for (const auto &iteration : series.readIterations())
         {
-            REQUIRE(iteration.iterationIndex == index);
+            if (weirdOrderWhenReading)
+            {
+                REQUIRE(iteration.iterationIndex == iterations[index]);
+            }
+            else
+            {
+                REQUIRE(iteration.iterationIndex == index);
+            }
             ++index;
         }
-        REQUIRE(index == 10);
+        REQUIRE(index == iterations.size());
     }
 }
 
-TEST_CASE("no_explicit_flush", "[serial]")
+TEST_CASE("chaotic_stream", "[serial]")
 {
     for (auto const &t : testedFileExtensions())
     {
-        no_explicit_flush("../samples/no_explicit_flush_filebased_%T." + t);
-        no_explicit_flush("../samples/no_explicit_flush." + t);
+        chaotic_stream("../samples/chaotic_stream_filebased_%T." + t, false);
+        chaotic_stream("../samples/chaotic_stream." + t, false);
+        chaotic_stream("../samples/chaotic_stream_vbased." + t, true);
     }
 }
 
