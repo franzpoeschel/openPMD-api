@@ -5628,7 +5628,25 @@ void append_mode(
         }
 
         writeSomeIterations(
-            write.writeIterations(), std::vector<uint64_t>{4, 3});
+            write.writeIterations(), std::vector<uint64_t>{4, 3, 10});
+        write.flush();
+    }
+    {
+        Series write(filename, Access::APPEND, jsonConfig);
+        if (variableBased)
+        {
+            write.setIterationEncoding(IterationEncoding::variableBased);
+        }
+        if (write.backend() == "ADIOS1")
+        {
+            REQUIRE_THROWS_AS(
+                write.flush(), error::OperationUnsupportedInBackend);
+            // destructor will be noisy now
+            return;
+        }
+
+        writeSomeIterations(
+            write.writeIterations(), std::vector<uint64_t>{7, 1, 11});
         write.flush();
     }
     {
@@ -5638,18 +5656,19 @@ void append_mode(
             // in variable-based encodings, iterations are not parsed ahead of
             // time but as they go
             unsigned counter = 0;
+            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 7, 11};
             for (auto const &iteration : read.readIterations())
             {
-                REQUIRE(iteration.iterationIndex == counter);
+                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
                 ++counter;
             }
-            REQUIRE(counter == 5);
+            REQUIRE(counter == 8);
             // Cannot do listSeries here because the Series is already drained
             REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
         }
         else
         {
-            REQUIRE(read.iterations.size() == 5);
+            REQUIRE(read.iterations.size() == 8);
             /*
              * Roadmap: for now, reading this should work by ignoring the last
              * duplicate iteration.
