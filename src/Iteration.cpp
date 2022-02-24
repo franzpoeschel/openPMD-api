@@ -128,7 +128,7 @@ Iteration &Iteration::close(bool _flush)
             auto end = begin;
             ++end;
 
-            s->flush_impl(begin, end, FlushLevel::UserFlush);
+            s->flush_impl(begin, end, {FlushLevel::UserFlush});
         }
     }
     else
@@ -154,7 +154,7 @@ Iteration &Iteration::open()
     // figure out my iteration number
     auto begin = s->indexOf(*this);
     s->openIteration(begin->first, *this);
-    IOHandler()->flush();
+    IOHandler()->flush(internal::defaultFlushParams);
     return *this;
 }
 
@@ -191,7 +191,10 @@ bool Iteration::closedByWriter() const
     }
 }
 
-void Iteration::flushFileBased(std::string const &filename, uint64_t i)
+void Iteration::flushFileBased(
+    std::string const &filename,
+    uint64_t i,
+    internal::FlushParams const &flushParams)
 {
     /* Find the root point [Series] of this file,
      * meshesPath and particlesPath are stored there */
@@ -227,7 +230,7 @@ void Iteration::flushFileBased(std::string const &filename, uint64_t i)
             fOpen.name = filename;
             fOpen.encoding = IterationEncoding::fileBased;
             IOHandler()->enqueue(IOTask(s, fOpen));
-            flush();
+            flush(flushParams);
 
             return;
         }
@@ -237,10 +240,11 @@ void Iteration::flushFileBased(std::string const &filename, uint64_t i)
         s->openIteration(i, *this);
     }
 
-    flush();
+    flush(flushParams);
 }
 
-void Iteration::flushGroupBased(uint64_t i)
+void Iteration::flushGroupBased(
+    uint64_t i, internal::FlushParams const &flushParams)
 {
     if (!written())
     {
@@ -250,10 +254,11 @@ void Iteration::flushGroupBased(uint64_t i)
         IOHandler()->enqueue(IOTask(this, pCreate));
     }
 
-    flush();
+    flush(flushParams);
 }
 
-void Iteration::flushVariableBased(uint64_t i)
+void Iteration::flushVariableBased(
+    uint64_t i, internal::FlushParams const &flushParams)
 {
     if (!written())
     {
@@ -264,17 +269,17 @@ void Iteration::flushVariableBased(uint64_t i)
         this->setAttribute("snapshot", i);
     }
 
-    flush();
+    flush(flushParams);
 }
 
-void Iteration::flush()
+void Iteration::flush(internal::FlushParams const &flushParams)
 {
     if (IOHandler()->m_frontendAccess == Access::READ_ONLY)
     {
         for (auto &m : meshes)
-            m.second.flush(m.first);
+            m.second.flush(m.first, flushParams);
         for (auto &species : particles)
-            species.second.flush(species.first);
+            species.second.flush(species.first, flushParams);
     }
     else
     {
@@ -289,9 +294,9 @@ void Iteration::flush()
                 s->setMeshesPath("meshes/");
                 s->flushMeshesPath();
             }
-            meshes.flush(s->meshesPath());
+            meshes.flush(s->meshesPath(), flushParams);
             for (auto &m : meshes)
-                m.second.flush(m.first);
+                m.second.flush(m.first, flushParams);
         }
         else
         {
@@ -305,16 +310,16 @@ void Iteration::flush()
                 s->setParticlesPath("particles/");
                 s->flushParticlesPath();
             }
-            particles.flush(s->particlesPath());
+            particles.flush(s->particlesPath(), flushParams);
             for (auto &species : particles)
-                species.second.flush(species.first);
+                species.second.flush(species.first, flushParams);
         }
         else
         {
             particles.dirty() = false;
         }
 
-        flushAttributes();
+        flushAttributes(flushParams);
     }
 }
 
@@ -383,7 +388,7 @@ void Iteration::read_impl(std::string const &groupPath)
 
     aRead.name = "dt";
     IOHandler()->enqueue(IOTask(this, aRead));
-    IOHandler()->flush();
+    IOHandler()->flush(internal::defaultFlushParams);
     if (*aRead.dtype == DT::FLOAT)
         setDt(Attribute(*aRead.resource).get<float>());
     else if (*aRead.dtype == DT::DOUBLE)
@@ -395,7 +400,7 @@ void Iteration::read_impl(std::string const &groupPath)
 
     aRead.name = "time";
     IOHandler()->enqueue(IOTask(this, aRead));
-    IOHandler()->flush();
+    IOHandler()->flush(internal::defaultFlushParams);
     if (*aRead.dtype == DT::FLOAT)
         setTime(Attribute(*aRead.resource).get<float>());
     else if (*aRead.dtype == DT::DOUBLE)
@@ -407,7 +412,7 @@ void Iteration::read_impl(std::string const &groupPath)
 
     aRead.name = "timeUnitSI";
     IOHandler()->enqueue(IOTask(this, aRead));
-    IOHandler()->flush();
+    IOHandler()->flush(internal::defaultFlushParams);
     if (*aRead.dtype == DT::DOUBLE)
         setTimeUnitSI(Attribute(*aRead.resource).get<double>());
     else
@@ -425,7 +430,7 @@ void Iteration::read_impl(std::string const &groupPath)
     if (version == "1.0.0" || version == "1.0.1")
     {
         IOHandler()->enqueue(IOTask(this, pList));
-        IOHandler()->flush();
+        IOHandler()->flush(internal::defaultFlushParams);
         hasMeshes = std::count(
                         pList.paths->begin(),
                         pList.paths->end(),
@@ -454,7 +459,7 @@ void Iteration::read_impl(std::string const &groupPath)
 
         /* obtain all non-scalar meshes */
         IOHandler()->enqueue(IOTask(&meshes, pList));
-        IOHandler()->flush();
+        IOHandler()->flush(internal::defaultFlushParams);
 
         Parameter<Operation::LIST_ATTS> aList;
         for (auto const &mesh_name : *pList.paths)
@@ -464,7 +469,7 @@ void Iteration::read_impl(std::string const &groupPath)
             aList.attributes->clear();
             IOHandler()->enqueue(IOTask(&m, pOpen));
             IOHandler()->enqueue(IOTask(&m, aList));
-            IOHandler()->flush();
+            IOHandler()->flush(internal::defaultFlushParams);
 
             auto att_begin = aList.attributes->begin();
             auto att_end = aList.attributes->end();
@@ -475,7 +480,7 @@ void Iteration::read_impl(std::string const &groupPath)
                 MeshRecordComponent &mrc = m[MeshRecordComponent::SCALAR];
                 mrc.parent() = m.parent();
                 IOHandler()->enqueue(IOTask(&mrc, pOpen));
-                IOHandler()->flush();
+                IOHandler()->flush(internal::defaultFlushParams);
                 *mrc.m_isConstant = true;
             }
             m.read();
@@ -484,7 +489,7 @@ void Iteration::read_impl(std::string const &groupPath)
         /* obtain all scalar meshes */
         Parameter<Operation::LIST_DATASETS> dList;
         IOHandler()->enqueue(IOTask(&meshes, dList));
-        IOHandler()->flush();
+        IOHandler()->flush(internal::defaultFlushParams);
 
         Parameter<Operation::OPEN_DATASET> dOpen;
         for (auto const &mesh_name : *dList.datasets)
@@ -492,11 +497,11 @@ void Iteration::read_impl(std::string const &groupPath)
             Mesh &m = map[mesh_name];
             dOpen.name = mesh_name;
             IOHandler()->enqueue(IOTask(&m, dOpen));
-            IOHandler()->flush();
+            IOHandler()->flush(internal::defaultFlushParams);
             MeshRecordComponent &mrc = m[MeshRecordComponent::SCALAR];
             mrc.parent() = m.parent();
             IOHandler()->enqueue(IOTask(&mrc, dOpen));
-            IOHandler()->flush();
+            IOHandler()->flush(internal::defaultFlushParams);
             mrc.written() = false;
             mrc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
             mrc.written() = true;
@@ -518,7 +523,7 @@ void Iteration::read_impl(std::string const &groupPath)
         /* obtain all particle species */
         pList.paths->clear();
         IOHandler()->enqueue(IOTask(&particles, pList));
-        IOHandler()->flush();
+        IOHandler()->flush(internal::defaultFlushParams);
 
         auto map = particles.eraseStaleEntries();
         for (auto const &species_name : *pList.paths)
@@ -526,7 +531,7 @@ void Iteration::read_impl(std::string const &groupPath)
             ParticleSpecies &p = map[species_name];
             pOpen.path = species_name;
             IOHandler()->enqueue(IOTask(&p, pOpen));
-            IOHandler()->flush();
+            IOHandler()->flush(internal::defaultFlushParams);
             p.read();
         }
     }

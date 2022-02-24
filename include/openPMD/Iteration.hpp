@@ -179,10 +179,11 @@ private:
         std::string filename;
     };
 
-    void flushFileBased(std::string const &, uint64_t);
-    void flushGroupBased(uint64_t);
-    void flushVariableBased(uint64_t);
-    void flush();
+    void flushFileBased(
+        std::string const &, uint64_t, internal::FlushParams const &);
+    void flushGroupBased(uint64_t, internal::FlushParams const &);
+    void flushVariableBased(uint64_t, internal::FlushParams const &);
+    void flush(internal::FlushParams const &);
     void deferParseAccess(DeferredParseAccess);
     /*
      * Control flow for read(), readFileBased(), readGroupBased() and
