@@ -227,12 +227,8 @@ void Mesh::flush_impl(std::string const &name)
             if (scalar())
             {
                 MeshRecordComponent &mrc = at(RecordComponent::SCALAR);
-                mrc.parent() = parent();
                 mrc.flush(name);
                 IOHandler()->flush();
-                writable().abstractFilePosition =
-                    mrc.writable().abstractFilePosition;
-                written() = true;
             }
             else
             {
@@ -249,8 +245,6 @@ void Mesh::flush_impl(std::string const &name)
             for (auto &comp : *this)
             {
                 comp.second.flush(name);
-                writable().abstractFilePosition =
-                    comp.second.writable().abstractFilePosition;
             }
         }
         else

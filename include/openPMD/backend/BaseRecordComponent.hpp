@@ -125,6 +125,8 @@ protected:
 
     BaseRecordComponent(std::shared_ptr<internal::BaseRecordComponentData>);
 
+    virtual void datasetDefined();
+
 private:
     BaseRecordComponent();
 }; // BaseRecordComponent

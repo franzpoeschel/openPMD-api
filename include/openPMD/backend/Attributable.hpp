@@ -125,7 +125,7 @@ class Attributable
     friend class BaseRecord;
     template <typename T_elem>
     friend class BaseRecordInterface;
-    template <typename>
+    template <typename, typename>
     friend class internal::BaseRecordData;
     template <
         typename T,

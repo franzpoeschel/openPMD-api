@@ -83,6 +83,9 @@ public:
      */
     template <typename T>
     MeshRecordComponent &makeConstant(T);
+
+protected:
+    void datasetDefined() override;
 };
 
 template <typename T>

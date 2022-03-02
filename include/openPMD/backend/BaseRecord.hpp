@@ -138,6 +138,12 @@ public:
     using iterator = typename T_container::iterator;
     using const_iterator = typename T_container::const_iterator;
 
+    // this avoids object slicing
+    operator T_RecordComponent() const
+    {
+        return {m_baseRecordData};
+    }
+
     virtual ~BaseRecord() = default;
 
     mapped_type &operator[](key_type const &key) override;
@@ -175,6 +181,8 @@ public:
 
 protected:
     void readBase();
+
+    void datasetDefined() override;
 
 private:
     void flush(std::string const &) final;
@@ -235,12 +243,11 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type const &key)
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = T_container::operator[](key);
         if (keyScalar)
         {
-            get().m_containsScalar = true;
-            ret.parent() = this->parent();
+            datasetDefined();
         }
+        mapped_type &ret = keyScalar ? *this : T_container::operator[](key);
         return ret;
     }
 }
@@ -261,12 +268,12 @@ inline auto BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = T_container::operator[](std::move(key));
         if (keyScalar)
         {
-            get().m_containsScalar = true;
-            ret.parent() = this->parent();
+            datasetDefined();
         }
+        mapped_type &ret =
+            keyScalar ? *this : T_container::operator[](std::move(key));
         return ret;
     }
 }
@@ -420,5 +427,19 @@ inline bool BaseRecord<T_elem, T_RecordComponent>::dirtyRecursive() const
         }
     }
     return false;
+}
+
+template <typename T_elem, typename T_RecordComponent>
+void BaseRecord<T_elem, T_RecordComponent>::datasetDefined()
+{
+    // If the RecordComponent API of this object has been used, then the record
+    // is a scalar one
+    T_container::emplace(
+        RecordComponent::SCALAR,
+        // need to construct it in this line already, construction inside
+        // emplace is impossible due to private constructors
+        T_RecordComponent{m_baseRecordData});
+    get().m_containsScalar = true;
+    T_RecordComponent::datasetDefined();
 }
 } // namespace openPMD
