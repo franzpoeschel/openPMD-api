@@ -133,7 +133,7 @@ class RecordComponent : public BaseRecordComponent
     friend class Container;
     friend class Iteration;
     friend class ParticleSpecies;
-    template <typename T_elem>
+    template <typename T_elem, typename T_RecordComponent>
     friend class BaseRecord;
     template <typename T_elem>
     friend class BaseRecordInterface;

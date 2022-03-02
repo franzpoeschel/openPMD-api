@@ -34,11 +34,20 @@ class MeshRecordComponent : public RecordComponent
         typename T_container,
         typename T_AttributableBase>
     friend class Container;
-
     friend class Mesh;
+    template <typename, typename>
+    friend class BaseRecord;
 
 private:
+    using DataClass = RecordComponent::DataClass;
+
     MeshRecordComponent();
+
+    // parent-class constructor
+    MeshRecordComponent(std::shared_ptr<DataClass> data)
+        : RecordComponent{std::move(data)}
+    {}
+
     void read() override;
 
 public:

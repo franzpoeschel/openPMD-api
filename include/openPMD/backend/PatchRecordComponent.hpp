@@ -67,7 +67,7 @@ class PatchRecordComponent : public BaseRecordComponent
         typename T_container,
         typename T_AttributableBase>
     friend class Container;
-    template <typename>
+    template <typename, typename>
     friend class BaseRecord;
     friend class ParticlePatches;
     friend class PatchRecord;
@@ -108,8 +108,9 @@ OPENPMD_private
      */
     bool dirtyRecursive() const;
 
-    std::shared_ptr<internal::PatchRecordComponentData>
-        m_patchRecordComponentData{new internal::PatchRecordComponentData()};
+    using DataClass = internal::PatchRecordComponentData;
+
+    std::shared_ptr<DataClass> m_patchRecordComponentData{new DataClass()};
 
     PatchRecordComponent();
 
@@ -119,18 +120,17 @@ OPENPMD_protected
 
     PatchRecordComponent(std::shared_ptr<internal::PatchRecordComponentData>);
 
-    inline internal::PatchRecordComponentData const &get() const
+    inline DataClass const &get() const
     {
         return *m_patchRecordComponentData;
     }
 
-    inline internal::PatchRecordComponentData &get()
+    inline DataClass &get()
     {
         return *m_patchRecordComponentData;
     }
 
-    inline void
-    setData(std::shared_ptr<internal::PatchRecordComponentData> data)
+    inline void setData(std::shared_ptr<DataClass> data)
     {
         m_patchRecordComponentData = std::move(data);
         BaseRecordComponent::setData(m_patchRecordComponentData);

@@ -47,9 +47,9 @@ namespace detail
 
 namespace internal
 {
-    template <typename T_elem>
+    template <typename T_elem, typename T_RecordComponentData>
     class BaseRecordData
-        : public detail::ContainerDataWithBase<T_elem, RecordComponentData>
+        : public detail::ContainerDataWithBase<T_elem, T_RecordComponentData>
     {
     public:
         /**
@@ -58,7 +58,7 @@ namespace internal
          * and the last hierarchical layer is skipped (i.e. only one OPEN_PATH
          * task for Record and RecordComponent).
          */
-        bool m_containsScalar = false;
+        bool m_containsScalar = false; // rename to m_isScalar
 
         BaseRecordData();
 
@@ -80,32 +80,35 @@ namespace internal
  * We specify the above concept by BaseRecord<void> instead and use the
  * auxiliary::OkOr class template to treat the void type specially.
  */
-template <typename T_elem_maybe_void>
+template <
+    typename T_elem_maybe_void,
+    typename T_RecordComponent = T_elem_maybe_void>
 class BaseRecord
     : public detail::ContainerWithBase<
-          typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type,
-          RecordComponent>
+          typename auxiliary::OkOr<
+              T_elem_maybe_void,
+              BaseRecord<void, T_RecordComponent> >::type,
+          T_RecordComponent>
 {
-    using T_elem =
-        typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type;
-    using T_container = detail::ContainerWithBase<
-        typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type,
-        RecordComponent>;
+    using T_elem = typename auxiliary::
+        OkOr<T_elem_maybe_void, BaseRecord<void, T_RecordComponent> >::type;
+    using T_container = detail::ContainerWithBase<T_elem, T_RecordComponent>;
     friend class Iteration;
     friend class ParticleSpecies;
     friend class PatchRecord;
     friend class Record;
     friend class Mesh;
 
-    std::shared_ptr<internal::BaseRecordData<T_elem> > m_baseRecordData{
-        new internal::BaseRecordData<T_elem>()};
+    using DataClass =
+        internal::BaseRecordData<T_elem, typename T_RecordComponent::DataClass>;
+    std::shared_ptr<DataClass> m_baseRecordData{new DataClass()};
 
-    inline internal::BaseRecordData<T_elem> &get()
+    inline DataClass &get()
     {
         return *m_baseRecordData;
     }
 
-    inline internal::BaseRecordData<T_elem> const &get() const
+    inline DataClass const &get() const
     {
         return *m_baseRecordData;
     }
@@ -113,9 +116,9 @@ class BaseRecord
     BaseRecord();
 
 protected:
-    BaseRecord(std::shared_ptr<internal::BaseRecordData<T_elem> >);
+    BaseRecord(std::shared_ptr<DataClass>);
 
-    inline void setData(internal::BaseRecordData<T_elem> *data)
+    inline void setData(std::shared_ptr<DataClass> data)
     {
         m_baseRecordData = std::move(data);
         T_container::setData(m_baseRecordData);
@@ -171,13 +174,12 @@ public:
     bool scalar() const;
 
 protected:
-    BaseRecord(internal::BaseRecordData<T_elem> *);
     void readBase();
 
 private:
     void flush(std::string const &) final;
     virtual void flush_impl(std::string const &) = 0;
-    virtual void read() override = 0;
+    virtual void read() = 0;
 
     /**
      * @brief Check recursively whether this BaseRecord is dirty.
@@ -194,8 +196,8 @@ private:
 
 namespace internal
 {
-    template <typename T_elem>
-    BaseRecordData<T_elem>::BaseRecordData()
+    template <typename T_elem, typename T_RecordComponentData>
+    BaseRecordData<T_elem, T_RecordComponentData>::BaseRecordData()
     {
         Attributable impl{{this, [](auto const *) {}}};
         impl.setAttribute(
@@ -204,21 +206,22 @@ namespace internal
     }
 } // namespace internal
 
-template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord() : T_container{nullptr}
+template <typename T_elem, typename T_RecordComponent>
+BaseRecord<T_elem, T_RecordComponent>::BaseRecord() : T_container{nullptr}
 {
     T_container::setData(m_baseRecordData);
 }
 
-template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord(
-    std::shared_ptr<internal::BaseRecordData<T_elem> > data)
+template <typename T_elem, typename T_RecordComponent>
+BaseRecord<T_elem, T_RecordComponent>::BaseRecord(
+    std::shared_ptr<DataClass> data)
     : T_container{data}, m_baseRecordData{std::move(data)}
 {}
 
-template <typename T_elem>
-inline typename BaseRecord<T_elem>::mapped_type &
-BaseRecord<T_elem>::operator[](key_type const &key)
+template <typename T_elem, typename T_RecordComponent>
+inline auto
+BaseRecord<T_elem, T_RecordComponent>::operator[](key_type const &key)
+    -> mapped_type &
 {
     auto it = this->find(key);
     if (it != this->end())
@@ -242,9 +245,9 @@ BaseRecord<T_elem>::operator[](key_type const &key)
     }
 }
 
-template <typename T_elem>
-inline typename BaseRecord<T_elem>::mapped_type &
-BaseRecord<T_elem>::operator[](key_type &&key)
+template <typename T_elem, typename T_RecordComponent>
+inline auto BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
+    -> mapped_type &
 {
     auto it = this->find(key);
     if (it != this->end())
@@ -268,9 +271,9 @@ BaseRecord<T_elem>::operator[](key_type &&key)
     }
 }
 
-template <typename T_elem>
-inline typename BaseRecord<T_elem>::size_type
-BaseRecord<T_elem>::erase(key_type const &key)
+template <typename T_elem, typename T_RecordComponent>
+inline auto BaseRecord<T_elem, T_RecordComponent>::erase(key_type const &key)
+    -> size_type
 {
     bool const keyScalar = (key == RecordComponent::SCALAR);
     size_type res;
@@ -298,9 +301,9 @@ BaseRecord<T_elem>::erase(key_type const &key)
     return res;
 }
 
-template <typename T_elem>
-inline typename BaseRecord<T_elem>::iterator
-BaseRecord<T_elem>::erase(iterator res)
+template <typename T_elem, typename T_RecordComponent>
+inline auto BaseRecord<T_elem, T_RecordComponent>::erase(iterator res)
+    -> iterator
 {
     bool const keyScalar = (res->first == RecordComponent::SCALAR);
     iterator ret;
@@ -328,21 +331,22 @@ BaseRecord<T_elem>::erase(iterator res)
     return ret;
 }
 
-template <typename T_elem>
-inline std::array<double, 7> BaseRecord<T_elem>::unitDimension() const
+template <typename T_elem, typename T_RecordComponent>
+inline std::array<double, 7>
+BaseRecord<T_elem, T_RecordComponent>::unitDimension() const
 {
     return this->getAttribute("unitDimension")
         .template get<std::array<double, 7> >();
 }
 
-template <typename T_elem>
-inline bool BaseRecord<T_elem>::scalar() const
+template <typename T_elem, typename T_RecordComponent>
+inline bool BaseRecord<T_elem, T_RecordComponent>::scalar() const
 {
     return get().m_containsScalar;
 }
 
-template <typename T_elem>
-inline void BaseRecord<T_elem>::readBase()
+template <typename T_elem, typename T_RecordComponent>
+inline void BaseRecord<T_elem, T_RecordComponent>::readBase()
 {
     using DT = Datatype;
     Parameter<Operation::READ_ATT> aRead;
@@ -386,8 +390,9 @@ inline void BaseRecord<T_elem>::readBase()
             "Unexpected Attribute datatype for 'timeOffset'");
 }
 
-template <typename T_elem>
-inline void BaseRecord<T_elem>::flush(std::string const &name)
+template <typename T_elem, typename T_RecordComponent>
+inline void
+BaseRecord<T_elem, T_RecordComponent>::flush(std::string const &name)
 {
     if (!this->written() && this->empty())
         throw std::runtime_error(
@@ -400,8 +405,8 @@ inline void BaseRecord<T_elem>::flush(std::string const &name)
     // method doesn't do it
 }
 
-template <typename T_elem>
-inline bool BaseRecord<T_elem>::dirtyRecursive() const
+template <typename T_elem, typename T_RecordComponent>
+inline bool BaseRecord<T_elem, T_RecordComponent>::dirtyRecursive() const
 {
     if (this->dirty())
     {
