@@ -123,8 +123,8 @@ class Attributable
     friend Writable *getWritable(Attributable *);
     template <typename T_elem>
     friend class BaseRecord;
-    template <typename>
-    friend class BaseRecordComponent;
+    template <typename T_elem>
+    friend class BaseRecordInterface;
     template <typename>
     friend class internal::BaseRecordData;
     template <typename T, typename T_key, typename T_container>
@@ -135,8 +135,6 @@ class Attributable
     friend class Series;
     friend class Writable;
     friend class WriteIterations;
-
-    using DataClass = internal::AttributableData;
 
 protected:
     std::shared_ptr<internal::AttributableData> m_attri{

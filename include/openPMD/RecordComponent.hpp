@@ -78,8 +78,7 @@ class RecordComponent;
 
 namespace internal
 {
-    class RecordComponentData
-        : public BaseRecordComponentData<internal::AttributableData>
+    class RecordComponentData : public BaseRecordComponentData
     {
     public:
         RecordComponentData();
@@ -124,7 +123,7 @@ namespace internal
     };
 } // namespace internal
 
-class RecordComponent : public BaseRecordComponent<Attributable>
+class RecordComponent : public BaseRecordComponent
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;

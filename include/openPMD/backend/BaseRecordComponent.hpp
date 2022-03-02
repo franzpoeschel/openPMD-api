@@ -33,8 +33,7 @@ namespace openPMD
 {
 namespace internal
 {
-    template <typename AttributableData_t>
-    class BaseRecordComponentData : public AttributableData_t
+    class BaseRecordComponentData : public AttributableData
     {
     public:
         /**
@@ -60,15 +59,10 @@ namespace internal
     };
 } // namespace internal
 
-template <typename Attributable_t = Attributable>
-class BaseRecordComponent : public Attributable_t
+class BaseRecordComponent : public Attributable
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
-
-    using Self_t = BaseRecordComponent<Attributable_t>;
-    using DataClass =
-        internal::BaseRecordComponentData<typename Attributable_t::DataClass>;
 
 public:
     double unitSI() const;
@@ -106,25 +100,26 @@ public:
     ChunkTable availableChunks();
 
 protected:
-    std::shared_ptr<DataClass> m_baseRecordComponentData{new DataClass};
+    std::shared_ptr<internal::BaseRecordComponentData>
+        m_baseRecordComponentData{new internal::BaseRecordComponentData()};
 
-    inline DataClass const &get() const
+    inline internal::BaseRecordComponentData const &get() const
     {
         return *m_baseRecordComponentData;
     }
 
-    inline DataClass &get()
+    inline internal::BaseRecordComponentData &get()
     {
         return *m_baseRecordComponentData;
     }
 
-    inline void setData(std::shared_ptr<DataClass> data)
+    inline void setData(std::shared_ptr<internal::BaseRecordComponentData> data)
     {
         m_baseRecordComponentData = std::move(data);
-        Attributable_t::setData(m_baseRecordComponentData);
+        Attributable::setData(m_baseRecordComponentData);
     }
 
-    BaseRecordComponent(std::shared_ptr<DataClass>);
+    BaseRecordComponent(std::shared_ptr<internal::BaseRecordComponentData>);
 
 private:
     BaseRecordComponent();
