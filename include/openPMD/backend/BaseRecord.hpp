@@ -22,6 +22,7 @@
 
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/UnitDimension.hpp"
+#include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Container.hpp"
 
 #include <array>
@@ -54,9 +55,23 @@ namespace internal
     };
 } // namespace internal
 
-template <typename T_elem>
-class BaseRecord : public Container<T_elem>
+/*
+ * We want to specify different child classes for BaseRecord, depending on
+ * the position in the openPMD object hierarchy that is being described.
+ * The child class might be RecordComponent or MeshRecordComponent.
+ * But also, we want to be able to have BaseRecord recursively as a child class.
+ * This would be an infinite type BaseRecord<BaseRecord<BaseRecord<...>>>, so
+ * we need to use a little trick.
+ * We specify the above concept by BaseRecord<void> instead and use the
+ * auxiliary::OkOr class template to treat the void type specially.
+ */
+template <typename T_elem_maybe_void>
+class BaseRecord
+    : public Container<
+          typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type>
 {
+    using T_elem =
+        typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type;
     friend class Iteration;
     friend class ParticleSpecies;
     friend class PatchRecord;

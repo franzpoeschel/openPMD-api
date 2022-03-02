@@ -59,4 +59,16 @@ inline constexpr bool IsVector_v = detail::IsVector<T>::value;
 
 template <typename T>
 inline constexpr bool IsArray_v = detail::IsArray<T>::value;
+
+template <typename T, typename /* U */>
+struct OkOr
+{
+    using type = T;
+};
+
+template <typename U>
+struct OkOr<void, U>
+{
+    using type = U;
+};
 } // namespace openPMD::auxiliary

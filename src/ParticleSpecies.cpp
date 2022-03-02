@@ -101,7 +101,7 @@ void ParticleSpecies::read()
             dOpen.name = record_name;
             IOHandler()->enqueue(IOTask(&r, dOpen));
             IOHandler()->flush();
-            internal::EraseStaleEntries<Record &> scalarMap(r);
+            auto &scalarMap = r;
             RecordComponent &rc = scalarMap[RecordComponent::SCALAR];
             rc.parent() = r.parent();
             IOHandler()->enqueue(IOTask(&rc, dOpen));
