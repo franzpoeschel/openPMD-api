@@ -36,7 +36,8 @@ namespace openPMD
 {
 namespace internal
 {
-    class PatchRecordComponentData : public BaseRecordComponentData
+    class PatchRecordComponentData
+        : public BaseRecordComponentData<internal::AttributableData>
     {
     public:
         /**
@@ -59,7 +60,7 @@ namespace internal
 /**
  * @todo add support for constant patch record components
  */
-class PatchRecordComponent : public BaseRecordComponent
+class PatchRecordComponent : public BaseRecordComponent<Attributable>
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
