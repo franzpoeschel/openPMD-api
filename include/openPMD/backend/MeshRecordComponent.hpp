@@ -28,7 +28,11 @@ namespace openPMD
 {
 class MeshRecordComponent : public RecordComponent
 {
-    template <typename T, typename T_key, typename T_container>
+    template <
+        typename T,
+        typename T_key,
+        typename T_container,
+        typename T_AttributableBase>
     friend class Container;
 
     friend class Mesh;

@@ -125,7 +125,11 @@ namespace internal
 
 class RecordComponent : public BaseRecordComponent
 {
-    template <typename T, typename T_key, typename T_container>
+    template <
+        typename T,
+        typename T_key,
+        typename T_container,
+        typename T_AttributableBase>
     friend class Container;
     friend class Iteration;
     friend class ParticleSpecies;

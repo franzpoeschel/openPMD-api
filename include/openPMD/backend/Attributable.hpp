@@ -127,7 +127,11 @@ class Attributable
     friend class BaseRecordInterface;
     template <typename>
     friend class internal::BaseRecordData;
-    template <typename T, typename T_key, typename T_container>
+    template <
+        typename T,
+        typename T_key,
+        typename T_container,
+        typename T_AttributableBase>
     friend class Container;
     template <typename T>
     friend struct traits::GenerationPolicy;
@@ -137,8 +141,9 @@ class Attributable
     friend class WriteIterations;
 
 protected:
-    std::shared_ptr<internal::AttributableData> m_attri{
-        new internal::AttributableData()};
+    using DataClass = internal::AttributableData;
+
+    std::shared_ptr<DataClass> m_attri{new DataClass()};
 
     // Should not be called publicly, only by implementing classes
     Attributable(std::shared_ptr<internal::AttributableData>);

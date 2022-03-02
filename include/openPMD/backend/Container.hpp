@@ -64,8 +64,9 @@ namespace internal
     template <
         typename T,
         typename T_key = std::string,
-        typename T_container = std::map<T_key, T> >
-    class ContainerData : public AttributableData
+        typename T_container = std::map<T_key, T>,
+        typename T_BaseAttributableData = AttributableData>
+    class ContainerData : public T_BaseAttributableData
     {
     public:
         using InternalContainer = T_container;
@@ -127,8 +128,9 @@ namespace detail
 template <
     typename T,
     typename T_key = std::string,
-    typename T_container = std::map<T_key, T> >
-class Container : public Attributable
+    typename T_container = std::map<T_key, T>,
+    typename T_AttributableBase = Attributable>
+class Container : public T_AttributableBase
 {
     static_assert(
         std::is_base_of<Attributable, T>::value,
@@ -143,15 +145,19 @@ class Container : public Attributable
     friend class internal::EraseStaleEntries;
 
 protected:
-    using ContainerData = internal::ContainerData<T, T_key, T_container>;
+    using DataClass = internal::ContainerData<
+        T,
+        T_key,
+        T_container,
+        typename T_AttributableBase::DataClass>;
     using InternalContainer = T_container;
 
-    std::shared_ptr<ContainerData> m_containerData{new ContainerData()};
+    std::shared_ptr<DataClass> m_containerData{new DataClass()};
 
-    inline void setData(std::shared_ptr<ContainerData> containerData)
+    inline void setData(std::shared_ptr<DataClass> containerData)
     {
         m_containerData = std::move(containerData);
-        Attributable::setData(m_containerData);
+        T_AttributableBase::setData(m_containerData);
     }
 
     inline InternalContainer const &container() const
@@ -222,7 +228,7 @@ public:
      */
     void clear()
     {
-        if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
+        if (Access::READ_ONLY == this->IOHandler()->m_frontendAccess)
             throw std::runtime_error(
                 "Can not clear a container in a read-only Series.");
 
@@ -288,17 +294,17 @@ public:
             return it->second;
         else
         {
-            if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
+            if (Access::READ_ONLY == this->IOHandler()->m_frontendAccess)
             {
                 auxiliary::OutOfRangeMsg const out_of_range_msg;
                 throw std::out_of_range(out_of_range_msg(key));
             }
 
             T t = T();
-            t.linkHierarchy(writable());
+            t.linkHierarchy(this->writable());
             auto &ret = container().insert({key, std::move(t)}).first->second;
             ret.writable().ownKeyWithinParent =
-                detail::keyAsString(key, writable().ownKeyWithinParent);
+                detail::keyAsString(key, this->writable().ownKeyWithinParent);
             traits::GenerationPolicy<T> gen;
             gen(ret);
             return ret;
@@ -321,17 +327,17 @@ public:
             return it->second;
         else
         {
-            if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
+            if (Access::READ_ONLY == this->IOHandler()->m_frontendAccess)
             {
                 auxiliary::OutOfRangeMsg out_of_range_msg;
                 throw std::out_of_range(out_of_range_msg(key));
             }
 
             T t = T();
-            t.linkHierarchy(writable());
+            t.linkHierarchy(this->writable());
             auto &ret = container().insert({key, std::move(t)}).first->second;
             ret.writable().ownKeyWithinParent = detail::keyAsString(
-                std::move(key), writable().ownKeyWithinParent);
+                std::move(key), this->writable().ownKeyWithinParent);
             traits::GenerationPolicy<T> gen;
             gen(ret);
             return ret;
@@ -378,7 +384,7 @@ public:
      */
     virtual size_type erase(key_type const &key)
     {
-        if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
+        if (Access::READ_ONLY == this->IOHandler()->m_frontendAccess)
             throw std::runtime_error(
                 "Can not erase from a container in a read-only Series.");
 
@@ -387,8 +393,8 @@ public:
         {
             Parameter<Operation::DELETE_PATH> pDelete;
             pDelete.path = ".";
-            IOHandler()->enqueue(IOTask(&res->second, pDelete));
-            IOHandler()->flush();
+            this->IOHandler()->enqueue(IOTask(&res->second, pDelete));
+            this->IOHandler()->flush();
         }
         return container().erase(key);
     }
@@ -396,7 +402,7 @@ public:
     //! @todo why does const_iterator not work compile with pybind11?
     virtual iterator erase(iterator res)
     {
-        if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
+        if (Access::READ_ONLY == this->IOHandler()->m_frontendAccess)
             throw std::runtime_error(
                 "Can not erase from a container in a read-only Series.");
 
@@ -404,8 +410,8 @@ public:
         {
             Parameter<Operation::DELETE_PATH> pDelete;
             pDelete.path = ".";
-            IOHandler()->enqueue(IOTask(&res->second, pDelete));
-            IOHandler()->flush();
+            this->IOHandler()->enqueue(IOTask(&res->second, pDelete));
+            this->IOHandler()->flush();
         }
         return container().erase(res);
     }
@@ -423,13 +429,14 @@ public:
 OPENPMD_protected
     // clang-format on
 
-    Container(std::shared_ptr<ContainerData> containerData)
-        : Attributable{containerData}, m_containerData{std::move(containerData)}
+    Container(std::shared_ptr<DataClass> containerData)
+        : T_AttributableBase{containerData}
+        , m_containerData{std::move(containerData)}
     {}
 
     void clear_unchecked()
     {
-        if (written())
+        if (this->written())
             throw std::runtime_error(
                 "Clearing a written container not (yet) implemented.");
 
@@ -438,23 +445,23 @@ OPENPMD_protected
 
     virtual void flush(std::string const &path)
     {
-        if (!written())
+        if (!this->written())
         {
             Parameter<Operation::CREATE_PATH> pCreate;
             pCreate.path = path;
-            IOHandler()->enqueue(IOTask(this, pCreate));
+            this->IOHandler()->enqueue(IOTask(this, pCreate));
         }
 
-        flushAttributes();
+        this->flushAttributes();
     }
 
     // clang-format off
 OPENPMD_private
     // clang-format on
 
-    Container() : Attributable{nullptr}
+    Container() : T_AttributableBase{nullptr}
     {
-        Attributable::setData(m_containerData);
+        T_AttributableBase::setData(m_containerData);
     }
 };
 
