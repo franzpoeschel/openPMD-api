@@ -430,7 +430,7 @@ OPENPMD_protected
     // clang-format on
 
     Container(std::shared_ptr<DataClass> containerData)
-        : T_AttributableBase{containerData}
+        : T_AttributableBase(containerData)
         , m_containerData{std::move(containerData)}
     {}
 
@@ -461,6 +461,7 @@ OPENPMD_private
 
     Container() : T_AttributableBase{nullptr}
     {
+        // @todo write Attributable::setData here and in other places?
         T_AttributableBase::setData(m_containerData);
     }
 };

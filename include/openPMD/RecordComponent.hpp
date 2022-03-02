@@ -323,19 +323,21 @@ private:
 OPENPMD_protected
     // clang-format on
 
-    RecordComponent(std::shared_ptr<internal::RecordComponentData>);
+    using DataClass = internal::RecordComponentData;
 
-    inline internal::RecordComponentData const &get() const
+    RecordComponent(std::shared_ptr<DataClass>);
+
+    inline DataClass const &get() const
     {
         return *m_recordComponentData;
     }
 
-    inline internal::RecordComponentData &get()
+    inline DataClass &get()
     {
         return *m_recordComponentData;
     }
 
-    inline void setData(std::shared_ptr<internal::RecordComponentData> data)
+    inline void setData(std::shared_ptr<DataClass> data)
     {
         m_recordComponentData = std::move(data);
         BaseRecordComponent::setData(m_recordComponentData);

@@ -31,10 +31,25 @@
 
 namespace openPMD
 {
+namespace detail
+{
+    template <typename T, typename T_AttributableBase>
+    using ContainerWithBase =
+        Container<T, std::string, std::map<std::string, T>, T_AttributableBase>;
+
+    template <typename T, typename T_AttributableBaseData>
+    using ContainerDataWithBase = internal::ContainerData<
+        T,
+        std::string,
+        std::map<std::string, T>,
+        T_AttributableBaseData>;
+} // namespace detail
+
 namespace internal
 {
     template <typename T_elem>
-    class BaseRecordData : public ContainerData<T_elem>
+    class BaseRecordData
+        : public detail::ContainerDataWithBase<T_elem, RecordComponentData>
     {
     public:
         /**
@@ -67,11 +82,15 @@ namespace internal
  */
 template <typename T_elem_maybe_void>
 class BaseRecord
-    : public Container<
-          typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type>
+    : public detail::ContainerWithBase<
+          typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type,
+          RecordComponent>
 {
     using T_elem =
         typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type;
+    using T_container = detail::ContainerWithBase<
+        typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type,
+        RecordComponent>;
     friend class Iteration;
     friend class ParticleSpecies;
     friend class PatchRecord;
@@ -99,22 +118,22 @@ protected:
     inline void setData(internal::BaseRecordData<T_elem> *data)
     {
         m_baseRecordData = std::move(data);
-        Container<T_elem>::setData(m_baseRecordData);
+        T_container::setData(m_baseRecordData);
     }
 
 public:
-    using key_type = typename Container<T_elem>::key_type;
-    using mapped_type = typename Container<T_elem>::mapped_type;
-    using value_type = typename Container<T_elem>::value_type;
-    using size_type = typename Container<T_elem>::size_type;
-    using difference_type = typename Container<T_elem>::difference_type;
-    using allocator_type = typename Container<T_elem>::allocator_type;
-    using reference = typename Container<T_elem>::reference;
-    using const_reference = typename Container<T_elem>::const_reference;
-    using pointer = typename Container<T_elem>::pointer;
-    using const_pointer = typename Container<T_elem>::const_pointer;
-    using iterator = typename Container<T_elem>::iterator;
-    using const_iterator = typename Container<T_elem>::const_iterator;
+    using key_type = typename T_container::key_type;
+    using mapped_type = typename T_container::mapped_type;
+    using value_type = typename T_container::value_type;
+    using size_type = typename T_container::size_type;
+    using difference_type = typename T_container::difference_type;
+    using allocator_type = typename T_container::allocator_type;
+    using reference = typename T_container::reference;
+    using const_reference = typename T_container::const_reference;
+    using pointer = typename T_container::pointer;
+    using const_pointer = typename T_container::const_pointer;
+    using iterator = typename T_container::iterator;
+    using const_iterator = typename T_container::const_iterator;
 
     virtual ~BaseRecord() = default;
 
@@ -158,7 +177,7 @@ protected:
 private:
     void flush(std::string const &) final;
     virtual void flush_impl(std::string const &) = 0;
-    virtual void read() = 0;
+    virtual void read() override = 0;
 
     /**
      * @brief Check recursively whether this BaseRecord is dirty.
@@ -186,15 +205,15 @@ namespace internal
 } // namespace internal
 
 template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord() : Container<T_elem>{nullptr}
+BaseRecord<T_elem>::BaseRecord() : T_container{nullptr}
 {
-    Container<T_elem>::setData(m_baseRecordData);
+    T_container::setData(m_baseRecordData);
 }
 
 template <typename T_elem>
 BaseRecord<T_elem>::BaseRecord(
     std::shared_ptr<internal::BaseRecordData<T_elem> > data)
-    : Container<T_elem>{data}, m_baseRecordData{std::move(data)}
+    : T_container{data}, m_baseRecordData{std::move(data)}
 {}
 
 template <typename T_elem>
@@ -207,13 +226,13 @@ BaseRecord<T_elem>::operator[](key_type const &key)
     else
     {
         bool const keyScalar = (key == RecordComponent::SCALAR);
-        if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
+        if ((keyScalar && !T_container::empty() && !scalar()) ||
             (scalar() && !keyScalar))
             throw std::runtime_error(
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = Container<T_elem>::operator[](key);
+        mapped_type &ret = T_container::operator[](key);
         if (keyScalar)
         {
             get().m_containsScalar = true;
@@ -233,13 +252,13 @@ BaseRecord<T_elem>::operator[](key_type &&key)
     else
     {
         bool const keyScalar = (key == RecordComponent::SCALAR);
-        if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
+        if ((keyScalar && !T_container::empty() && !scalar()) ||
             (scalar() && !keyScalar))
             throw std::runtime_error(
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = Container<T_elem>::operator[](std::move(key));
+        mapped_type &ret = T_container::operator[](std::move(key));
         if (keyScalar)
         {
             get().m_containsScalar = true;
@@ -256,7 +275,7 @@ BaseRecord<T_elem>::erase(key_type const &key)
     bool const keyScalar = (key == RecordComponent::SCALAR);
     size_type res;
     if (!keyScalar || (keyScalar && this->at(key).constant()))
-        res = Container<T_elem>::erase(key);
+        res = T_container::erase(key);
     else
     {
         mapped_type &rc = this->find(RecordComponent::SCALAR)->second;
@@ -267,7 +286,7 @@ BaseRecord<T_elem>::erase(key_type const &key)
             this->IOHandler()->enqueue(IOTask(&rc, dDelete));
             this->IOHandler()->flush();
         }
-        res = Container<T_elem>::erase(key);
+        res = T_container::erase(key);
     }
 
     if (keyScalar)
@@ -286,7 +305,7 @@ BaseRecord<T_elem>::erase(iterator res)
     bool const keyScalar = (res->first == RecordComponent::SCALAR);
     iterator ret;
     if (!keyScalar || (keyScalar && this->at(res->first).constant()))
-        ret = Container<T_elem>::erase(res);
+        ret = T_container::erase(res);
     else
     {
         mapped_type &rc = this->find(RecordComponent::SCALAR)->second;
@@ -297,7 +316,7 @@ BaseRecord<T_elem>::erase(iterator res)
             this->IOHandler()->enqueue(IOTask(&rc, dDelete));
             this->IOHandler()->flush();
         }
-        ret = Container<T_elem>::erase(res);
+        ret = T_container::erase(res);
     }
 
     if (keyScalar)
