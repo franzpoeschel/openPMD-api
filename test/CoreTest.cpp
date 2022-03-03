@@ -1185,3 +1185,28 @@ TEST_CASE("DoConvert_single_value_to_vector", "[core]")
             std::vector<int>{0, 1, 2, 3, 4, 5, 6});
     }
 }
+
+TEST_CASE("unavailable_backend", "[core]")
+{
+#if !openPMD_HAVE_ADIOS1 && !openPMD_HAVE_ADIOS2
+    {
+        auto fail = []() { Series("unavailable.bp", Access::CREATE); };
+        REQUIRE_THROWS_WITH(
+            fail(),
+            "openPMD-api built without support for backend "
+            "'ADIOS2'.");
+    }
+#endif
+
+#if openPMD_HAVE_MPI && !openPMD_HAVE_ADIOS1 && !openPMD_HAVE_ADIOS2
+    {
+        auto fail = []() {
+            Series("unavailable.bp", Access::CREATE, MPI_COMM_WORLD);
+        };
+        REQUIRE_THROWS_WITH(
+            fail(),
+            "openPMD-api built without support for backend "
+            "'ADIOS2'.");
+    }
+#endif
+}
