@@ -408,7 +408,7 @@ public:
      *
      * @param begin Start of the range of iterations to flush.
      * @param end End of the range of iterations to flush.
-     * @param level Flush level, as documented in AbstractIOHandler.hpp.
+     * @param flushParams Flush params, as documented in AbstractIOHandler.hpp.
      * @param flushIOHandler Tasks will always be enqueued to the backend.
      *     If this flag is true, tasks will be flushed to the backend.
      */
