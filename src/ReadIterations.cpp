@@ -165,7 +165,7 @@ SeriesIterator::nextIterationInStep(Iteration &currentIteration)
         series.flush_impl(
             begin,
             end,
-            FlushLevel::UserFlush,
+            {FlushLevel::UserFlush},
             /* flushIOHandler = */ true);
 
         series.iterations[m_currentIteration].open();
