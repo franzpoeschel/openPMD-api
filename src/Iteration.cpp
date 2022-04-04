@@ -240,9 +240,15 @@ void Iteration::flushFileBased(
         s->openIteration(i, *this);
     }
 
-    if (flushParams.flushLevel != FlushLevel::CreateOrOpenFiles)
+    switch (flushParams.flushLevel)
     {
+    case FlushLevel::CreateOrOpenFiles:
+        break;
+    case FlushLevel::SkeletonOnly:
+    case FlushLevel::InternalFlush:
+    case FlushLevel::UserFlush:
         flush(flushParams);
+        break;
     }
 }
 
@@ -257,9 +263,15 @@ void Iteration::flushGroupBased(
         IOHandler()->enqueue(IOTask(this, pCreate));
     }
 
-    if (flushParams.flushLevel != FlushLevel::CreateOrOpenFiles)
+    switch (flushParams.flushLevel)
     {
+    case FlushLevel::CreateOrOpenFiles:
+        break;
+    case FlushLevel::SkeletonOnly:
+    case FlushLevel::InternalFlush:
+    case FlushLevel::UserFlush:
         flush(flushParams);
+        break;
     }
 }
 
@@ -275,9 +287,15 @@ void Iteration::flushVariableBased(
         this->setAttribute("snapshot", i);
     }
 
-    if (flushParams.flushLevel != FlushLevel::CreateOrOpenFiles)
+    switch (flushParams.flushLevel)
     {
+    case FlushLevel::CreateOrOpenFiles:
+        break;
+    case FlushLevel::SkeletonOnly:
+    case FlushLevel::InternalFlush:
+    case FlushLevel::UserFlush:
         flush(flushParams);
+        break;
     }
 }
 
