@@ -23,6 +23,8 @@
 
 #include "openPMD/Series.hpp"
 
+#include <iostream>
+
 namespace openPMD
 {
 
@@ -167,13 +169,31 @@ std::optional<SeriesIterator *> SeriesIterator::nextIterationInStep()
             {FlushLevel::UserFlush},
             /* flushIOHandler = */ true);
 
-        series.iterations[m_currentIteration].open();
+        try
+        {
+            series.iterations[m_currentIteration].open();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read iteration '" << m_currentIteration
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            return nextIterationInStep();
+        }
+
         return {this};
     }
     case IterationEncoding::fileBased:
-        series.iterations[m_currentIteration].open();
         try
         {
+            /*
+             * Errors in here might appear due to deferred iteration parsing.
+             */
+            series.iterations[m_currentIteration].open();
+            /*
+             * Errors in here might appear due to reparsing after opening a
+             * new step.
+             */
             series.iterations[m_currentIteration].beginStep(
                 /* reread = */ true);
         }
@@ -190,11 +210,11 @@ std::optional<SeriesIterator *> SeriesIterator::nextIterationInStep()
     throw std::runtime_error("Unreachable!");
 }
 
-std::optional<SeriesIterator *> SeriesIterator::nextStep()
+std::optional<SeriesIterator *> SeriesIterator::nextStep(size_t recursion_depth)
 {
     // since we are in group-based iteration layout, it does not
     // matter which iteration we begin a step upon
-    AdvanceStatus status;
+    AdvanceStatus status{};
     Iteration::BeginStepStatus::AvailableIterations_t availableIterations;
     try
     {
@@ -206,13 +226,8 @@ std::optional<SeriesIterator *> SeriesIterator::nextStep()
         std::cerr << "[SeriesIterator] Cannot read iteration due to error "
                      "below, will skip it.\n"
                   << err.what() << std::endl;
-        // Need to close the current step manually because there is no
-        // iteration to close
-        Parameter<Operation::ADVANCE> param;
-        param.mode = AdvanceMode::ENDSTEP;
-        m_series->IOHandler()->enqueue(IOTask(&*m_series, std::move(param)));
-        m_series->IOHandler()->flush({FlushLevel::UserFlush});
-        return nextStep();
+        m_series->advance(AdvanceMode::ENDSTEP);
+        return nextStep(recursion_depth + 1);
     }
 
     if (availableIterations.has_value() &&
@@ -252,7 +267,10 @@ std::optional<SeriesIterator *> SeriesIterator::nextStep()
         }
         else
         {
-            ++it;
+            for (size_t i = 0; i < recursion_depth && it != itEnd; ++i)
+            {
+                ++it;
+            }
 
             if (it == itEnd)
             {
@@ -323,9 +341,22 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
         auto iteration = iterations.at(currentIterationIndex.value());
         if (iteration.get().m_closed != internal::CloseStatus::ClosedInBackend)
         {
-            iteration.open();
-            option.value()->setCurrentIteration();
-            return option;
+            try
+            {
+                iteration.open();
+                option.value()->setCurrentIteration();
+                return option;
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read iteration '"
+                          << currentIterationIndex.value()
+                          << "' and will skip it due to read error:\n"
+                          << err.what() << std::endl;
+                option.value()->deactivateDeadIteration(
+                    currentIterationIndex.value());
+                return std::nullopt;
+            }
         }
         else
         {
@@ -353,8 +384,32 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
         return {this};
     }
 
-    auto option = nextStep();
+    auto option = nextStep(/*recursion_depth = */ 1);
     return guardReturn(option);
+}
+
+void SeriesIterator::deactivateDeadIteration(iteration_index_t index)
+{
+    switch (m_series->iterationEncoding())
+    {
+    case IterationEncoding::fileBased: {
+        Parameter<Operation::CLOSE_FILE> param;
+        m_series->IOHandler()->enqueue(
+            IOTask(&m_series->iterations[index], std::move(param)));
+        m_series->IOHandler()->flush({FlushLevel::UserFlush});
+    }
+    break;
+    case IterationEncoding::variableBased:
+    case IterationEncoding::groupBased: {
+        Parameter<Operation::ADVANCE> param;
+        param.mode = AdvanceMode::ENDSTEP;
+        m_series->IOHandler()->enqueue(
+            IOTask(&m_series->iterations[index], std::move(param)));
+        m_series->IOHandler()->flush({FlushLevel::UserFlush});
+    }
+    break;
+    }
+    m_series->iterations.container().erase(index);
 }
 
 SeriesIterator &SeriesIterator::operator++()
@@ -368,6 +423,9 @@ SeriesIterator &SeriesIterator::operator++()
     /*
      * loopBody() might return an empty option to indicate a skipped iteration.
      * Loop until it returns something real for us.
+     * Note that this is not an infinite loop:
+     * Upon end of the Series, loopBody() does not return an empty option,
+     * but the end iterator.
      */
     do
     {

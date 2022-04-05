@@ -104,9 +104,11 @@ private:
 
     std::optional<SeriesIterator *> nextIterationInStep();
 
-    std::optional<SeriesIterator *> nextStep();
+    std::optional<SeriesIterator *> nextStep(size_t recursion_depth);
 
     std::optional<SeriesIterator *> loopBody();
+
+    void deactivateDeadIteration(iteration_index_t);
 };
 
 /**

@@ -584,7 +584,8 @@ Given file pattern: ')END"
             if (input->iterationEncoding == IterationEncoding::fileBased)
                 readFileBased();
             else
-                readGorVBased();
+                readGorVBased(
+                    /* do_always_throw_errors = */ false, /* do_init = */ true);
 
             if (series.iterations.empty())
             {
@@ -1217,7 +1218,33 @@ void Series::readOneIterationFileBased(std::string const &filePath)
     series.iterations.readAttributes(ReadMode::OverrideExisting);
 }
 
-std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
+namespace
+{
+    /*
+     * This function is efficient if subtract is empty and inefficient
+     * otherwise. Use only where an empty subtract vector is the
+     * common case.
+     */
+    template <typename T>
+    void
+    vectorDifference(std::vector<T> &baseVector, std::vector<T> const &subtract)
+    {
+        for (auto const &elem : subtract)
+        {
+            for (auto it = baseVector.begin(); it != baseVector.end(); ++it)
+            {
+                if (*it == elem)
+                {
+                    baseVector.erase(it);
+                    break;
+                }
+            }
+        }
+    }
+} // namespace
+
+std::optional<std::deque<uint64_t>>
+Series::readGorVBased(bool do_always_throw_errors, bool do_init)
 {
     auto &series = get();
     Parameter<Operation::OPEN_FILE> fOpen;
@@ -1400,21 +1427,31 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
      * Sic! This happens when a file-based Series is opened in group-based mode.
      */
     case IterationEncoding::fileBased: {
+        std::vector<uint64_t> unreadableIterations;
         for (auto const &it : *pList.paths)
         {
             uint64_t index = std::stoull(it);
-            /*
-             * For now: parse a Series in RandomAccess mode.
-             * (beginStep = false)
-             * A streaming read mode might come in a future API addition.
-             */
-            internal::withRWAccess(IOHandler()->m_seriesStatus, [&]() {
-                readSingleIteration(index, it, true, false);
-            });
+            if (auto err = internal::withRWAccess(
+                    IOHandler()->m_seriesStatus,
+                    [&]() {
+                        return readSingleIteration(index, it, true, false);
+                    });
+                err)
+            {
+                std::cerr << "Cannot read iteration " << index
+                          << " and will skip it due to read error:\n"
+                          << err.value().what() << std::endl;
+                if (do_always_throw_errors)
+                {
+                    throw *err;
+                }
+                unreadableIterations.push_back(index);
+            }
         }
         if (currentSteps.has_value())
         {
-            auto const &vec = currentSteps.value();
+            auto &vec = currentSteps.value();
+            vectorDifference(vec, unreadableIterations);
             return std::deque<uint64_t>{vec.begin(), vec.end()};
         }
         else

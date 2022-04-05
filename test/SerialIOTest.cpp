@@ -6335,8 +6335,10 @@ void unfinished_iteration_test(
         auto electron_mass =
             it10.particles["e"]["mass"][RecordComponent::SCALAR];
     }
-    {
-        Series read(file, Access::READ_ONLY, config);
+    auto tryReading = [&config,
+                       file](std::string const &additionalConfig = "{}") {
+        Series read(
+            file, Access::READ_ONLY, json::merge(config, additionalConfig));
 
         std::vector<decltype(Series::iterations)::key_type> iterations;
         std::cout << "Going to list iterations in " << file << ":" << std::endl;
@@ -6361,7 +6363,10 @@ void unfinished_iteration_test(
         REQUIRE(
             (iterations ==
              std::vector<decltype(Series::iterations)::key_type>{0, 10}));
-    }
+    };
+
+    tryReading();
+    tryReading("defer_iteration_parsing = true");
 }
 
 TEST_CASE("unfinished_iteration_test", "[serial]")
@@ -6372,9 +6377,9 @@ TEST_CASE("unfinished_iteration_test", "[serial]")
         "bp",
         false,
         R"(
-backend = "adios2"
-iteration_encoding = "variable_based"
-adios2.schema = 20210209)");
+    backend = "adios2"
+    iteration_encoding = "variable_based"
+    adios2.schema = 20210209)");
     unfinished_iteration_test("bp", true, "backend = \"adios2\"");
 #endif
 #if openPMD_HAVE_ADIOS1
