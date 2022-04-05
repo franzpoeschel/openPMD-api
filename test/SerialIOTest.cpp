@@ -6052,7 +6052,7 @@ void deferred_parsing(std::string const &extension)
         Series series(basename + "%06T." + extension, Access::CREATE);
         std::vector<float> buffer(20);
         std::iota(buffer.begin(), buffer.end(), 0.f);
-        auto dataset = series.iterations[1000].meshes["E"]["x"];
+        auto dataset = series.iterations[0].meshes["E"]["x"];
         dataset.resetDataset({Datatype::FLOAT, {20}});
         dataset.storeChunk(buffer, {0}, {20});
         series.flush();
@@ -6060,7 +6060,7 @@ void deferred_parsing(std::string const &extension)
     // create some empty pseudo files
     // if the reader tries accessing them it's game over
     {
-        for (size_t i = 0; i < 1000; i += 100)
+        for (size_t i = 1; i < 1000; i += 100)
         {
             std::string infix = std::to_string(i);
             std::string padding;
@@ -6080,7 +6080,7 @@ void deferred_parsing(std::string const &extension)
             Access::READ_ONLY,
             "{\"defer_iteration_parsing\": true}");
         auto dataset =
-            series.iterations[1000].open().meshes["E"]["x"].loadChunk<float>(
+            series.iterations[0].open().meshes["E"]["x"].loadChunk<float>(
                 {0}, {20});
         series.flush();
         for (size_t i = 0; i < 20; ++i)
@@ -6096,7 +6096,7 @@ void deferred_parsing(std::string const &extension)
             Access::READ_WRITE,
             "{\"defer_iteration_parsing\": true}");
         auto dataset =
-            series.iterations[1000].open().meshes["E"]["x"].loadChunk<float>(
+            series.iterations[0].open().meshes["E"]["x"].loadChunk<float>(
                 {0}, {20});
         series.flush();
         for (size_t i = 0; i < 20; ++i)
@@ -6253,6 +6253,84 @@ TEST_CASE("chaotic_stream", "[serial]")
         chaotic_stream("../samples/chaotic_stream_vbased." + t, true);
     }
 }
+
+#ifdef openPMD_USE_INVASIVE_TESTS
+void unfinished_iteration_test(
+    std::string const &ext, bool filebased, std::string const &config = "{}")
+{
+    std::cout << "\n\nTESTING " << ext << "\n\n" << std::endl;
+    std::string file = std::string("../samples/unfinished_iteration") +
+        (filebased ? "_%T." : ".") + ext;
+    {
+        Series write(file, Access::CREATE, config);
+        auto it0 = write.writeIterations()[0];
+        auto it5 = write.writeIterations()[5];
+        /*
+         * With enabled invasive tests, this attribute will let the Iteration
+         * fail parsing.
+         */
+        it5.setAttribute("__openPMD_internal_fail", "asking for trouble");
+        auto it10 = write.writeIterations()[10];
+        auto E_x = it10.meshes["E"]["x"];
+        auto e_density = it10.meshes["e_density"][RecordComponent::SCALAR];
+        auto electron_x = it10.particles["e"]["position"]["x"];
+        auto electron_mass =
+            it10.particles["e"]["mass"][RecordComponent::SCALAR];
+    }
+    {
+        Series read(file, Access::READ_ONLY, config);
+
+        std::vector<decltype(Series::iterations)::key_type> iterations;
+        std::cout << "Going to list iterations in " << file << ":" << std::endl;
+        for (auto iteration : read.readIterations())
+        {
+            std::cout << "Seeing iteration " << iteration.iterationIndex
+                      << std::endl;
+            iterations.push_back(iteration.iterationIndex);
+
+            Parameter<Operation::READ_ATT> readAttribute;
+            readAttribute.name = "this_does_definitely_not_exist";
+            read.IOHandler()->enqueue(IOTask(&iteration, readAttribute));
+            // enqueue a second time to check that the queue is cleared upon
+            // exception
+            read.IOHandler()->enqueue(IOTask(&iteration, readAttribute));
+
+            REQUIRE_THROWS_AS(
+                read.IOHandler()->flush({FlushLevel::InternalFlush}),
+                error::ReadError);
+            REQUIRE(read.IOHandler()->m_work.empty());
+        }
+        REQUIRE(
+            (iterations ==
+             std::vector<decltype(Series::iterations)::key_type>{0, 10}));
+    }
+}
+
+TEST_CASE("unfinished_iteration_test", "[serial]")
+{
+#if openPMD_HAVE_ADIOS2
+    unfinished_iteration_test("bp", false, "backend = \"adios2\"");
+    unfinished_iteration_test(
+        "bp",
+        false,
+        R"(
+backend = "adios2"
+iteration_encoding = "variable_based"
+adios2.schema = 20210209)");
+    unfinished_iteration_test("bp", true, "backend = \"adios2\"");
+#endif
+#if openPMD_HAVE_ADIOS1
+    unfinished_iteration_test("adios1.bp", false, "backend = \"adios1\"");
+    unfinished_iteration_test("adios1.bp", true, "backend = \"adios1\"");
+#endif
+#if openPMD_HAVE_HDF5
+    unfinished_iteration_test("h5", false);
+    unfinished_iteration_test("h5", true);
+#endif
+    unfinished_iteration_test("json", false);
+    unfinished_iteration_test("json", true);
+}
+#endif
 
 TEST_CASE("late_setting_of_iterationencoding", "[serial]")
 {
