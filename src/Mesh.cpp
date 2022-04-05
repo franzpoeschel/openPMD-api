@@ -387,7 +387,17 @@ void Mesh::read()
             pOpen.path = component;
             IOHandler()->enqueue(IOTask(&rc, pOpen));
             rc.get().m_isConstant = true;
-            rc.read();
+            try
+            {
+                rc.read();
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read record component '" << component
+                          << "' and will skip it due to read error:\n"
+                          << err.what() << std::endl;
+                map.forget(component);
+            }
         }
 
         Parameter<Operation::LIST_DATASETS> dList;
@@ -404,7 +414,17 @@ void Mesh::read()
             rc.written() = false;
             rc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
             rc.written() = true;
-            rc.read();
+            try
+            {
+                rc.read();
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read record component '" << component
+                          << "' and will skip it due to read error:\n"
+                          << err.what() << std::endl;
+                map.forget(component);
+            }
         }
     }
 

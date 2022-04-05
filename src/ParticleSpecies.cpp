@@ -111,12 +111,11 @@ void ParticleSpecies::read()
             rc.written() = true;
             r.read();
         }
-        catch (std::runtime_error const &)
+        catch (error::ReadError const &err)
         {
-            std::cerr << "WARNING: Skipping invalid openPMD record '"
-                      << record_name << "'" << std::endl;
-            while (!IOHandler()->m_work.empty())
-                IOHandler()->m_work.pop();
+            std::cerr << "Cannot read particle record '" << record_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
 
             map.forget(record_name);
             //(*this)[record_name].erase(RecordComponent::SCALAR);
