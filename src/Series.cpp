@@ -1020,13 +1020,26 @@ void Series::readFileBased()
                       << std::endl;
     }
 
-    auto readIterationEagerly = [](Iteration &iteration) {
-        iteration.runDeferredParseAccess();
+    /*
+     * Return true if parsing was successful
+     */
+    auto readIterationEagerly =
+        [](Iteration &iteration) -> std::optional<std::string> {
+        try
+        {
+            iteration.runDeferredParseAccess();
+        }
+        catch (error::ReadError const &err)
+        {
+            return err.what();
+        }
         Parameter<Operation::CLOSE_FILE> fClose;
         iteration.IOHandler()->enqueue(IOTask(&iteration, fClose));
         iteration.IOHandler()->flush(internal::defaultFlushParams);
         iteration.get().m_closed = internal::CloseStatus::ClosedTemporarily;
+        return {};
     };
+    std::vector<decltype(Series::iterations)::key_type> unparseableIterations;
     if (series.m_parseLazily)
     {
         for (auto &iteration : series.iterations)
@@ -1034,18 +1047,60 @@ void Series::readFileBased()
             iteration.second.get().m_closed =
                 internal::CloseStatus::ParseAccessDeferred;
         }
-        // open the last iteration, just to parse Series attributes
-        auto getLastIteration = series.iterations.end();
-        getLastIteration--;
-        auto &lastIteration = getLastIteration->second;
-        readIterationEagerly(lastIteration);
+        // open the first iteration, just to parse Series attributes
+        bool atLeastOneIterationSuccessful = false;
+        for (auto &pair : series.iterations)
+        {
+            if (auto error = readIterationEagerly(pair.second); error)
+            {
+                std::cerr << "Cannot read iteration '" << pair.first
+                          << "' and will skip it due to read error:\n"
+                          << *error << std::endl;
+                unparseableIterations.push_back(pair.first);
+            }
+            else
+            {
+                atLeastOneIterationSuccessful = true;
+                break;
+            }
+        }
+        if (!atLeastOneIterationSuccessful)
+        {
+            throw error::ParseError(
+                "Not a single iteration can be successfully parsed (see above "
+                "errors). Need to access at least one iteration even in "
+                "deferred parsing mode in order to read global Series "
+                "attributes.");
+        }
     }
     else
     {
+        bool atLeastOneIterationSuccessful = false;
         for (auto &iteration : series.iterations)
         {
-            readIterationEagerly(iteration.second);
+            if (auto error = readIterationEagerly(iteration.second); error)
+            {
+                std::cerr << "Cannot read iteration '" << iteration.first
+                          << "' and will skip it due to read error:\n"
+                          << *error << std::endl;
+                unparseableIterations.push_back(iteration.first);
+            }
+            else
+            {
+                atLeastOneIterationSuccessful = true;
+            }
         }
+        if (!atLeastOneIterationSuccessful)
+        {
+            throw error::ParseError(
+                "Not a single iteration can be successfully parsed (see above "
+                "warnings).");
+        }
+    }
+
+    for (auto index : unparseableIterations)
+    {
+        series.iterations.container().erase(index);
     }
 
     if (padding > 0)
@@ -1212,25 +1267,25 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
 
     readAttributes(ReadMode::IgnoreExisting);
 
-    auto withRWAccess = [this](auto &&functor) {
-        auto oldStatus = IOHandler()->m_seriesStatus;
-        IOHandler()->m_seriesStatus = internal::SeriesStatus::Parsing;
-        try
-        {
-            std::forward<decltype(functor)>(functor)();
-        }
-        catch (...)
-        {
-            IOHandler()->m_seriesStatus = oldStatus;
-            throw;
-        }
-        IOHandler()->m_seriesStatus = oldStatus;
-    };
+    // auto withRWAccess = [this](auto &&functor) {
+    //     auto oldStatus = IOHandler()->m_seriesStatus;
+    //     IOHandler()->m_seriesStatus = internal::SeriesStatus::Parsing;
+    //     try
+    //     {
+    //         std::forward<decltype(functor)>(functor)();
+    //     }
+    //     catch (...)
+    //     {
+    //         IOHandler()->m_seriesStatus = oldStatus;
+    //         throw;
+    //     }
+    //     IOHandler()->m_seriesStatus = oldStatus;
+    // };
 
     /*
      * 'snapshot' changes over steps, so reread that.
      */
-    withRWAccess([&series]() {
+    internal::withRWAccess(IOHandler()->m_seriesStatus, [&series]() {
         series.iterations.readAttributes(ReadMode::OverrideExisting);
     });
 
@@ -1239,11 +1294,15 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
     IOHandler()->enqueue(IOTask(&series.iterations, pList));
     IOHandler()->flush(internal::defaultFlushParams);
 
-    auto readSingleIteration = [&series, &pOpen, this, withRWAccess](
-                                   uint64_t index,
-                                   std::string path,
-                                   bool guardAgainstRereading,
-                                   bool beginStep) {
+    /*
+     * Return error if one is caught.
+     */
+    auto readSingleIteration =
+        [&series, &pOpen, this](
+            uint64_t index,
+            std::string path,
+            bool guardAgainstRereading,
+            bool beginStep) -> std::optional<error::ReadError> {
         if (series.iterations.contains(index))
         {
             // maybe re-read
@@ -1252,13 +1311,16 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
             // reparsing is not needed
             if (guardAgainstRereading && i.written())
             {
-                return;
+                return {};
             }
             if (i.get().m_closed != internal::CloseStatus::ParseAccessDeferred)
             {
                 pOpen.path = path;
                 IOHandler()->enqueue(IOTask(&i, pOpen));
-                withRWAccess([&i, &path]() { i.reread(path); });
+                // @todo catch stuff from here too
+                internal::withRWAccess(
+                    IOHandler()->m_seriesStatus,
+                    [&i, &path]() { i.reread(path); });
             }
         }
         else
@@ -1268,7 +1330,18 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
             i.deferParseAccess({path, index, false, "", beginStep});
             if (!series.m_parseLazily)
             {
-                i.runDeferredParseAccess();
+                try
+                {
+                    i.runDeferredParseAccess();
+                }
+                catch (error::ReadError const &err)
+                {
+                    std::cerr << "Cannot read iteration '" << index
+                              << "' and will skip it due to read error:\n"
+                              << err.what() << std::endl;
+                    series.iterations.container().erase(index);
+                    return {err};
+                }
                 i.get().m_closed = internal::CloseStatus::Open;
             }
             else
@@ -1276,6 +1349,7 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
                 i.get().m_closed = internal::CloseStatus::ParseAccessDeferred;
             }
         }
+        return {};
     };
 
     /*
@@ -1298,8 +1372,9 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
              * (beginStep = false)
              * A streaming read mode might come in a future API addition.
              */
-            withRWAccess(
-                [&]() { readSingleIteration(index, it, true, false); });
+            internal::withRWAccess(IOHandler()->m_seriesStatus, [&]() {
+                readSingleIteration(index, it, true, false);
+            });
         }
         if (currentSteps.has_value())
         {
@@ -1323,7 +1398,21 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
              * Variable-based iteration encoding relies on steps, so parsing
              * must happen after opening the first step.
              */
-            withRWAccess([&]() { readSingleIteration(it, "", false, true); });
+            if (auto err = internal::withRWAccess(
+                    IOHandler()->m_seriesStatus,
+                    [&readSingleIteration, it]() {
+                        return readSingleIteration(it, "", false, true);
+                    });
+                err)
+            {
+                /*
+                 * Cannot recover from errors in this place.
+                 * If there is an error in the first iteration, the Series
+                 * cannot be read in variable-based encoding. The read API will
+                 * try to skip other iterations that have errors.
+                 */
+                throw *err;
+            }
         }
         return res;
     }
