@@ -2305,9 +2305,11 @@ namespace detail
 
         if (type == Datatype::UNDEFINED)
         {
-            throw std::runtime_error(
-                "[ADIOS2] Requested attribute (" + name +
-                ") not found in backend.");
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::NotFound,
+                "ADIOS2",
+                name);
         }
 
         Datatype ret = switchType<detail::OldAttributeReader>(
@@ -2325,9 +2327,11 @@ namespace detail
 
         if (type == Datatype::UNDEFINED)
         {
-            throw std::runtime_error(
-                "[ADIOS2] Requested attribute (" + name +
-                ") not found in backend.");
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::NotFound,
+                "ADIOS2",
+                name);
         }
 
         Datatype ret = switchType<detail::AttributeReader>(
@@ -2844,8 +2848,28 @@ namespace detail
             std::unique_ptr<BufferedAction>(new _BA(std::forward<BA>(ba))));
     }
 
+    template <typename... Args>
+    void BufferedActions::flush(Args &&...args)
+    {
+        try
+        {
+            flush_impl(std::forward<Args>(args)...);
+        }
+        catch (error::ReadError const &)
+        {
+            /*
+             * @todo Check exactly what state to reset this to
+             * Ideally every action from the current IOHandler->flush() call
+             * should be reset.
+             */
+            m_buffer.clear();
+            m_attributeReads.clear();
+            throw;
+        }
+    }
+
     template <typename F>
-    void BufferedActions::flush(
+    void BufferedActions::flush_impl(
         ADIOS2FlushParams flushParams,
         F &&performPutGets,
         bool writeAttributes,
@@ -2947,8 +2971,8 @@ namespace detail
         }
     }
 
-    void
-    BufferedActions::flush(ADIOS2FlushParams flushParams, bool writeAttributes)
+    void BufferedActions::flush_impl(
+        ADIOS2FlushParams flushParams, bool writeAttributes)
     {
         auto decideFlushAPICall = [this, flushTarget = flushParams.flushTarget](
                                       adios2::Engine &engine) {
@@ -2984,7 +3008,7 @@ namespace detail
 #endif
         };
 
-        flush(
+        flush_impl(
             flushParams,
             [decideFlushAPICall = std::move(decideFlushAPICall)](
                 BufferedActions &ba, adios2::Engine &eng) {
@@ -3019,7 +3043,9 @@ namespace detail
         {
             m_IO.DefineAttribute<bool_representation>(
                 ADIOS2Defaults::str_usesstepsAttribute, 0);
-            flush({FlushLevel::UserFlush}, /* writeAttributes = */ false);
+            flush(
+                ADIOS2FlushParams{FlushLevel::UserFlush},
+                /* writeAttributes = */ false);
             return AdvanceStatus::RANDOMACCESS;
         }
 
@@ -3059,7 +3085,7 @@ namespace detail
                 }
             }
             flush(
-                {FlushLevel::UserFlush},
+                ADIOS2FlushParams{FlushLevel::UserFlush},
                 [](BufferedActions &, adios2::Engine &eng) { eng.EndStep(); },
                 /* writeAttributes = */ true,
                 /* flushUnconditionally = */ true);
