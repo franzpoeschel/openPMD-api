@@ -986,7 +986,10 @@ void Series::readFileBased()
     fOpen.encoding = iterationEncoding();
 
     if (!auxiliary::directory_exists(IOHandler()->directory))
-        throw no_such_file_error(
+        throw error::ReadError(
+            error::AffectedObject::Other,
+            error::Reason::Inaccessible,
+            {},
             "Supplied directory is not valid: " + IOHandler()->directory);
 
     auto isPartOfSeries = matcher(
@@ -1014,7 +1017,11 @@ void Series::readFileBased()
          * parameter modification. Backend access type stays unchanged for the
          * lifetime of a Series. */
         if (IOHandler()->m_backendAccess == Access::READ_ONLY)
-            throw no_such_file_error("No matching iterations found: " + name());
+            throw error::ReadError(
+                error::AffectedObject::Other,
+                error::Reason::Inaccessible,
+                {},
+                "No matching iterations found: " + name());
         else
             std::cerr << "No matching iterations found: " << name()
                       << std::endl;
@@ -1066,7 +1073,10 @@ void Series::readFileBased()
         }
         if (!atLeastOneIterationSuccessful)
         {
-            throw error::ParseError(
+            throw error::ReadError(
+                error::AffectedObject::Other,
+                error::Reason::Other,
+                {},
                 "Not a single iteration can be successfully parsed (see above "
                 "errors). Need to access at least one iteration even in "
                 "deferred parsing mode in order to read global Series "
@@ -1092,7 +1102,10 @@ void Series::readFileBased()
         }
         if (!atLeastOneIterationSuccessful)
         {
-            throw error::ParseError(
+            throw error::ReadError(
+                error::AffectedObject::Other,
+                error::Reason::Other,
+                {},
                 "Not a single iteration can be successfully parsed (see above "
                 "warnings).");
         }
@@ -1154,14 +1167,21 @@ void Series::readOneIterationFileBased(std::string const &filePath)
              * Unlike if the file were group-based, this one doesn't work
              * at all since the group paths are different.
              */
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Other,
+                error::Reason::Other,
+                {},
                 "Series constructor called with iteration "
                 "regex '%T' suggests loading a "
                 "time series with fileBased iteration "
                 "encoding. Loaded file is variableBased.");
         }
         else
-            throw std::runtime_error("Unknown iterationEncoding: " + encoding);
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
+                "Unknown iterationEncoding: " + encoding);
         setAttribute("iterationEncoding", encoding);
     }
     else
@@ -1179,7 +1199,10 @@ void Series::readOneIterationFileBased(std::string const &filePath)
         written() = true;
     }
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'iterationFormat'");
 
     Parameter<Operation::OPEN_PATH> pOpen;
@@ -1235,12 +1258,18 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
                 series.m_overrideFilebasedFilename = series.m_name;
             }
             else
-                throw std::runtime_error(
+                throw error::ReadError(
+                    error::AffectedObject::Attribute,
+                    error::Reason::UnexpectedContent,
+                    {},
                     "Unknown iterationEncoding: " + encoding);
             setAttribute("iterationEncoding", encoding);
         }
         else
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
                 "Unexpected Attribute datatype for 'iterationEncoding'");
 
         aRead.name = "iterationFormat";
@@ -1253,7 +1282,10 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
             written() = true;
         }
         else
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
                 "Unexpected Attribute datatype for 'iterationFormat'");
     }
 
@@ -1262,7 +1294,11 @@ std::optional<std::deque<uint64_t>> Series::readGorVBased(bool do_init)
     if (version == "1.0.0" || version == "1.0.1" || version == "1.1.0")
         pOpen.path = auxiliary::replace_first(basePath(), "/%T/", "");
     else
-        throw std::runtime_error("Unknown openPMD version - " + version);
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
+            "Unknown openPMD version - " + version);
     IOHandler()->enqueue(IOTask(&series.iterations, pOpen));
 
     readAttributes(ReadMode::IgnoreExisting);
@@ -1432,7 +1468,11 @@ void Series::readBase()
         val.has_value())
         setOpenPMD(val.value());
     else
-        throw std::runtime_error("Unexpected Attribute datatype for 'openPMD'");
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
+            "Unexpected Attribute datatype for 'openPMD'");
 
     aRead.name = "openPMDextension";
     IOHandler()->enqueue(IOTask(this, aRead));
@@ -1441,7 +1481,10 @@ void Series::readBase()
         val.has_value())
         setOpenPMDextension(val.value());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'openPMDextension'");
 
     aRead.name = "basePath";
@@ -1451,7 +1494,10 @@ void Series::readBase()
         val.has_value())
         setAttribute("basePath", val.value());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'basePath'");
 
     Parameter<Operation::LIST_ATTS> aList;
@@ -1477,7 +1523,10 @@ void Series::readBase()
                 it.second.meshes.written() = true;
         }
         else
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
                 "Unexpected Attribute datatype for 'meshesPath'");
     }
 
@@ -1502,7 +1551,10 @@ void Series::readBase()
                 it.second.particles.written() = true;
         }
         else
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
                 "Unexpected Attribute datatype for 'particlesPath'");
     }
 }
@@ -2164,7 +2216,11 @@ std::optional<std::vector<uint64_t>> Series::currentSnapshot() const
             std::stringstream s;
             s << "Unexpected datatype for '/data/snapshot': " << attribute.dtype
               << std::endl;
-            throw std::runtime_error(s.str());
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
+                s.str());
         }
         }
     }

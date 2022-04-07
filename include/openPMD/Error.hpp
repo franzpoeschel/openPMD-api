@@ -95,6 +95,7 @@ namespace error
         NotFound,
         CannotRead,
         UnexpectedContent,
+        Inaccessible,
         Other
     };
 

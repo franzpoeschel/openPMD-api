@@ -82,6 +82,8 @@ namespace error
                 return "CannotRead";
             case Re::UnexpectedContent:
                 return "UnexpectedContent";
+            case Re::Inaccessible:
+                return "Inaccessible";
             case Re::Other:
                 return "Other";
             }

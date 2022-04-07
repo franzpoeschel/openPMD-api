@@ -18,7 +18,9 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include "openPMD/Mesh.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
@@ -297,7 +299,10 @@ void Mesh::read()
             setGeometry(tmpGeometry);
     }
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'geometry'");
 
     aRead.name = "dataOrder";
@@ -313,11 +318,17 @@ void Mesh::read()
         if (tmpDataOrder.size() == 1)
             setDataOrder(static_cast<DataOrder>(tmpDataOrder[0]));
         else
-            throw std::runtime_error(
+            throw error::ReadError(
+                error::AffectedObject::Attribute,
+                error::Reason::UnexpectedContent,
+                {},
                 "Unexpected Attribute value for 'dataOrder': " + tmpDataOrder);
     }
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'dataOrder'");
 
     aRead.name = "axisLabels";
@@ -327,7 +338,10 @@ void Mesh::read()
         setAxisLabels(
             Attribute(*aRead.resource).get<std::vector<std::string> >());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'axisLabels'");
 
     aRead.name = "gridSpacing";
@@ -345,7 +359,10 @@ void Mesh::read()
     else if (auto val = a.getOptional<std::vector<double> >(); val.has_value())
         setGridSpacing(val.value());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'gridSpacing'");
 
     aRead.name = "gridGlobalOffset";
@@ -356,7 +373,10 @@ void Mesh::read()
         val.has_value())
         setGridGlobalOffset(val.value());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'gridGlobalOffset'");
 
     aRead.name = "gridUnitSI";
@@ -366,7 +386,10 @@ void Mesh::read()
         val.has_value())
         setGridUnitSI(val.value());
     else
-        throw std::runtime_error(
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::UnexpectedContent,
+            {},
             "Unexpected Attribute datatype for 'gridUnitSI'");
 
     if (scalar())

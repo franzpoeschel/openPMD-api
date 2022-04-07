@@ -52,7 +52,17 @@ void ParticleSpecies::read()
             hasParticlePatches = true;
             pOpen.path = "particlePatches";
             IOHandler()->enqueue(IOTask(&particlePatches, pOpen));
-            particlePatches.read();
+            try
+            {
+                particlePatches.read();
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read particle patches and will skip them "
+                             "due to read error:\n"
+                          << err.what() << std::endl;
+                hasParticlePatches = false;
+            }
         }
         else
         {
@@ -76,7 +86,20 @@ void ParticleSpecies::read()
                 IOHandler()->flush(internal::defaultFlushParams);
                 rc.get().m_isConstant = true;
             }
-            r.read();
+            try
+            {
+                r.read();
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read particle record '" << record_name
+                          << "' and will skip it due to read error:\n"
+                          << err.what() << std::endl;
+
+                map.forget(record_name);
+                //(*this)[record_name].erase(RecordComponent::SCALAR);
+                // this->erase(record_name);
+            }
         }
     }
 

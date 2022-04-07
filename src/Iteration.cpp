@@ -590,6 +590,17 @@ void Iteration::readMeshes(std::string const &meshesPath)
             mrc.get().m_isConstant = true;
         }
         m.read();
+        try
+        {
+            m.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read mesh with name '" << mesh_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(mesh_name);
+        }
     }
 
     /* obtain all scalar meshes */
@@ -611,7 +622,17 @@ void Iteration::readMeshes(std::string const &meshesPath)
         mrc.written() = false;
         mrc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
         mrc.written() = true;
-        m.read();
+        try
+        {
+            m.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read mesh with name '" << mesh_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(mesh_name);
+        }
     }
 }
 
@@ -637,7 +658,18 @@ void Iteration::readParticles(std::string const &particlesPath)
         pOpen.path = species_name;
         IOHandler()->enqueue(IOTask(&p, pOpen));
         IOHandler()->flush(internal::defaultFlushParams);
-        p.read();
+        try
+        {
+            p.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read particle species with name '"
+                      << species_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(species_name);
+        }
     }
 }
 

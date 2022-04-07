@@ -2379,9 +2379,16 @@ inline void optional_paths_110_test(const std::string &backend)
             REQUIRE(s.iterations[400].particles.empty());
         }
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "issue sample not accessible. (" << e.what() << ")\n";
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "issue sample not accessible. (" << e.what() << ")\n";
+        }
+        else
+        {
+            throw;
+        }
     }
 
     {
@@ -2450,10 +2457,14 @@ void git_early_chunk_query(
             }
         }
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 }
 
@@ -2490,9 +2501,16 @@ TEST_CASE("empty_alternate_fbpic", "[serial][hdf5]")
             helper::listSeries(list);
         }
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "issue sample not accessible. (" << e.what() << ")\n";
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "issue sample not accessible. (" << e.what() << ")\n";
+        }
+        else
+        {
+            throw;
+        }
     }
 }
 
@@ -2679,10 +2697,14 @@ TEST_CASE("git_hdf5_sample_structure_test", "[serial][hdf5]")
         int32_t i32 = 32;
         REQUIRE_THROWS(o.setAttribute("setAttributeFail", i32));
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 #else
     std::cerr << "Invasive tests not enabled. Hierarchy is not visible.\n";
@@ -2936,10 +2958,14 @@ TEST_CASE("git_hdf5_sample_attribute_test", "[serial][hdf5]")
         REQUIRE(weighting_scalar.getDimensionality() == 1);
         REQUIRE(weighting_scalar.getExtent() == e);
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 }
 
@@ -3010,10 +3036,14 @@ TEST_CASE("git_hdf5_sample_content_test", "[serial][hdf5]")
                 REQUIRE(raw_ptr[i] == constant_value);
         }
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 }
 
@@ -3034,10 +3064,14 @@ TEST_CASE("git_hdf5_sample_fileBased_read_test", "[serial][hdf5]")
         REQUIRE(o.get().m_filenamePadding == 8);
 #endif
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 
     try
@@ -3056,15 +3090,19 @@ TEST_CASE("git_hdf5_sample_fileBased_read_test", "[serial][hdf5]")
         REQUIRE(o.get().m_filenamePadding == 8);
 #endif
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 
-    REQUIRE_THROWS_WITH(
+    REQUIRE_THROWS_AS(
         Series("../samples/git-sample/data%07T.h5", Access::READ_ONLY),
-        Catch::Equals("No matching iterations found: data%07T"));
+        error::ReadError);
 
     try
     {
@@ -3101,10 +3139,14 @@ TEST_CASE("git_hdf5_sample_fileBased_read_test", "[serial][hdf5]")
             auxiliary::remove_file(file);
         }
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 }
 
@@ -3181,10 +3223,14 @@ TEST_CASE("git_hdf5_sample_read_thetaMode", "[serial][hdf5][thetaMode]")
         auto data = B_z.loadChunk<double>(offset, extent);
         o.flush();
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
+        throw;
     }
 }
 
@@ -3654,10 +3700,13 @@ TEST_CASE("hzdr_hdf5_sample_content_test", "[serial][hdf5]")
         REQUIRE(
             isSame(e_offset_z.getDatatype(), determineDatatype<uint64_t>()));
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "HZDR sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "HZDR sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
     }
 }
 
@@ -3848,10 +3897,13 @@ TEST_CASE("hzdr_adios1_sample_content_test", "[serial][adios1]")
                 for (int c = 0; c < 3; ++c)
                     REQUIRE(raw_ptr[((a * 3) + b) * 3 + c] == actual[a][b][c]);
     }
-    catch (no_such_file_error &e)
+    catch (error::ReadError &e)
     {
-        std::cerr << "HZDR sample not accessible. (" << e.what() << ")\n";
-        return;
+        if (e.reason == error::Reason::Inaccessible)
+        {
+            std::cerr << "HZDR sample not accessible. (" << e.what() << ")\n";
+            return;
+        }
     }
 }
 

@@ -109,7 +109,18 @@ void Record::read()
     if (scalar())
     {
         /* using operator[] will incorrectly update parent */
-        this->at(RecordComponent::SCALAR).read();
+        auto &scalarComponent = this->at(RecordComponent::SCALAR);
+        try
+        {
+            scalarComponent.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read scalar record component and will skip it "
+                         "due to read error:\n"
+                      << err.what() << std::endl;
+            this->container().erase(RecordComponent::SCALAR);
+        }
     }
     else
     {

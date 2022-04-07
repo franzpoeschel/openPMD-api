@@ -172,7 +172,19 @@ std::optional<SeriesIterator *> SeriesIterator::nextIterationInStep()
     }
     case IterationEncoding::fileBased:
         series.iterations[m_currentIteration].open();
-        series.iterations[m_currentIteration].beginStep(/* reread = */ true);
+        try
+        {
+            series.iterations[m_currentIteration].beginStep(
+                /* reread = */ true);
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "[SeriesIterator] Cannot read iteration due to error "
+                         "below, will skip it.\n"
+                      << err.what() << std::endl;
+            return nextIterationInStep();
+        }
+
         return {this};
     }
     throw std::runtime_error("Unreachable!");
@@ -184,8 +196,24 @@ std::optional<SeriesIterator *> SeriesIterator::nextStep()
     // matter which iteration we begin a step upon
     AdvanceStatus status;
     Iteration::BeginStepStatus::AvailableIterations_t availableIterations;
-    std::tie(status, availableIterations) =
-        Iteration::beginStep({}, *m_series, /* reread = */ true);
+    try
+    {
+        std::tie(status, availableIterations) =
+            Iteration::beginStep({}, *m_series, /* reread = */ true);
+    }
+    catch (error::ReadError const &err)
+    {
+        std::cerr << "[SeriesIterator] Cannot read iteration due to error "
+                     "below, will skip it.\n"
+                  << err.what() << std::endl;
+        // Need to close the current step manually because there is no
+        // iteration to close
+        Parameter<Operation::ADVANCE> param;
+        param.mode = AdvanceMode::ENDSTEP;
+        m_series->IOHandler()->enqueue(IOTask(&*m_series, std::move(param)));
+        m_series->IOHandler()->flush({FlushLevel::UserFlush});
+        return nextStep();
+    }
 
     if (availableIterations.has_value() &&
         status != AdvanceStatus::RANDOMACCESS)
