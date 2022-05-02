@@ -8,15 +8,18 @@ int main()
 {
     using field_dt = uint32_t;
     openPMD::Offset imageOffset{0, 0};
-    openPMD::Extent imageExtent{10240, 1024};
+    openPMD::Extent imageExtent{10240, 5120};
     openPMD::Extent::value_type flattenedExtent = std::accumulate(
         imageExtent.begin(), imageExtent.end(), 1, [](auto left, auto right) {
             return left * right;
         });
     unsigned numImagesPerShot = 10;
-    unsigned numIterations = 100;
+    unsigned numIterations = 25;
     std::string filename = "./stream.sst";
     std::string tomlConfig = R"(
+[adios2.engine]
+usesteps = true
+
 [adios2.engine.parameters]
 QueueLimit = 2
 )";
