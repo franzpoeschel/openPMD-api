@@ -3148,6 +3148,12 @@ TEST_CASE("git_hdf5_sample_fileBased_read_test", "[serial][hdf5]")
         }
         throw;
     }
+    // @todo maybe unify error types
+    catch (no_such_file_error &e)
+    {
+        std::cerr << "git sample not accessible. (" << e.what() << ")\n";
+        return;
+    }
 }
 
 TEST_CASE("git_hdf5_early_chunk_query", "[serial][hdf5]")
