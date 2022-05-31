@@ -3961,6 +3961,12 @@ TEST_CASE("git_adios2_early_chunk_query", "[serial][adios2]")
 
 TEST_CASE("adios2_engines_and_file_endings")
 {
+    if (auxiliary::getEnvNum("SKIP_ADIOS2_FILE_ENDINGS_TEST", 0) != 0)
+    {
+        std::cout << "SKIPPING TEST adios2_engines_and_file_endings"
+                  << std::endl;
+        return;
+    }
     size_t filenameCounter = 0;
     auto groupbased_test_explicit_backend =
         [&filenameCounter](
@@ -3974,6 +3980,8 @@ TEST_CASE("adios2_engines_and_file_endings")
             auto basename = "../samples/file_endings/groupbased" +
                 std::to_string(filenameCounter++);
             auto name = basename + ext;
+            std::cout << "Writing to file '" << name << "', should be engine "
+                      << requiredEngine << " (explicit backend)." << std::endl;
             auto filesystemname =
                 filesystemExt.empty() ? name : basename + filesystemExt;
             {
@@ -4039,6 +4047,9 @@ TEST_CASE("adios2_engines_and_file_endings")
             auto basename = "../samples/file_endings/groupbased" +
                 std::to_string(filenameCounter++);
             auto name = basename + ext;
+            std::cout << "Writing to file '" << name << "', should be engine "
+                      << requiredEngine << " (no explicit backend)."
+                      << std::endl;
             auto filesystemname =
                 filesystemExt.empty() ? name : basename + filesystemExt;
             {
@@ -4107,6 +4118,8 @@ TEST_CASE("adios2_engines_and_file_endings")
             auto basename = "../samples/file_endings/filebased" +
                 std::to_string(filenameCounter++);
             auto name = basename + "_%T" + ext;
+            std::cout << "Writing to file '" << name << "', should be engine "
+                      << requiredEngine << " (explicit backend)." << std::endl;
             auto filesystemname =
                 basename + "_0" + (filesystemExt.empty() ? ext : filesystemExt);
             {
@@ -4183,6 +4196,9 @@ TEST_CASE("adios2_engines_and_file_endings")
             auto basename = "../samples/file_endings/filebased" +
                 std::to_string(filenameCounter++);
             auto name = basename + "_%T" + ext;
+            std::cout << "Writing to file '" << name << "', should be engine "
+                      << requiredEngine << " (no explicit backend)."
+                      << std::endl;
             auto filesystemname =
                 basename + "_0" + (filesystemExt.empty() ? ext : filesystemExt);
             {
