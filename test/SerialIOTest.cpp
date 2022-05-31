@@ -3961,12 +3961,6 @@ TEST_CASE("git_adios2_early_chunk_query", "[serial][adios2]")
 
 TEST_CASE("adios2_engines_and_file_endings")
 {
-    if (auxiliary::getEnvNum("SKIP_ADIOS2_FILE_ENDINGS_TEST", 0) != 0)
-    {
-        std::cout << "SKIPPING TEST adios2_engines_and_file_endings"
-                  << std::endl;
-        return;
-    }
     size_t filenameCounter = 0;
     auto groupbased_test_explicit_backend =
         [&filenameCounter](
