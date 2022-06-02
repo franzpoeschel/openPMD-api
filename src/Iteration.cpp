@@ -752,7 +752,7 @@ auto Iteration::beginStep(
             try
             {
                 res.iterationsInOpenedStep = series.readGorVBased(
-                    /* do_always_throw_errors = */ true, /* do_init = */ false);
+                    /* do_always_throw_errors = */ true, /* init = */ false);
             }
             catch (...)
             {

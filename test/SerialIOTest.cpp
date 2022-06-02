@@ -6366,25 +6366,30 @@ void unfinished_iteration_test(
     };
 
     tryReading();
-    tryReading("defer_iteration_parsing = true");
+    tryReading(R"({"defer_iteration_parsing": true})");
 }
 
 TEST_CASE("unfinished_iteration_test", "[serial]")
 {
 #if openPMD_HAVE_ADIOS2
-    unfinished_iteration_test("bp", false, "backend = \"adios2\"");
+    unfinished_iteration_test("bp", false, R"({"backend": "adios2"})");
     unfinished_iteration_test(
         "bp",
         false,
         R"(
-    backend = "adios2"
-    iteration_encoding = "variable_based"
-    adios2.schema = 20210209)");
-    unfinished_iteration_test("bp", true, "backend = \"adios2\"");
+{
+  "backend": "adios2",
+  "iteration_encoding": "variable_based",
+  "adios2": {
+    "schema": 20210209
+  }
+}
+)");
+    unfinished_iteration_test("bp", true, R"({"backend": "adios2"})");
 #endif
 #if openPMD_HAVE_ADIOS1
-    unfinished_iteration_test("adios1.bp", false, "backend = \"adios1\"");
-    unfinished_iteration_test("adios1.bp", true, "backend = \"adios1\"");
+    unfinished_iteration_test("adios1.bp", false, R"({"backend": "adios1"})");
+    unfinished_iteration_test("adios1.bp", true, R"({"backend": "adios1"})");
 #endif
 #if openPMD_HAVE_HDF5
     unfinished_iteration_test("h5", false);

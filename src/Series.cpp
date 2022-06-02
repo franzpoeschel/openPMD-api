@@ -585,7 +585,7 @@ Given file pattern: ')END"
                 readFileBased();
             else
                 readGorVBased(
-                    /* do_always_throw_errors = */ false, /* do_init = */ true);
+                    /* do_always_throw_errors = */ false, /* init = */ true);
 
             if (series.iterations.empty())
             {
