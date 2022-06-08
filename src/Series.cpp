@@ -575,6 +575,7 @@ Given file pattern: ')END"
     switch (IOHandler()->m_frontendAccess)
     {
     case Access::READ_ONLY:
+    case Access::READ_LINEAR: // @todo don't parse the whole thing here
     case Access::READ_WRITE: {
         /* Allow creation of values in Containers and setting of Attributes
          * Would throw for Access::READ_ONLY */
@@ -734,6 +735,7 @@ void Series::flushFileBased(
     switch (IOHandler()->m_frontendAccess)
     {
     case Access::READ_ONLY:
+    case Access::READ_LINEAR:
         for (auto it = begin; it != end; ++it)
         {
             // Phase 1
@@ -843,9 +845,8 @@ void Series::flushGorVBased(
     bool flushIOHandler)
 {
     auto &series = get();
-    switch (IOHandler()->m_frontendAccess)
+    if (access::readOnly(IOHandler()->m_frontendAccess))
     {
-    case Access::READ_ONLY:
         for (auto it = begin; it != end; ++it)
         {
             // Phase 1
@@ -878,10 +879,9 @@ void Series::flushGorVBased(
                 IOHandler()->flush(flushParams);
             }
         }
-        break;
-    case Access::READ_WRITE:
-    case Access::CREATE:
-    case Access::APPEND: {
+    }
+    else
+    {
         if (!written())
         {
             if (IOHandler()->m_frontendAccess == Access::APPEND)
@@ -955,8 +955,6 @@ void Series::flushGorVBased(
         {
             IOHandler()->flush(flushParams);
         }
-        break;
-    }
     }
 }
 
@@ -1018,7 +1016,7 @@ void Series::readFileBased()
         /* Frontend access type might change during Series::read() to allow
          * parameter modification. Backend access type stays unchanged for the
          * lifetime of a Series. */
-        if (IOHandler()->m_backendAccess == Access::READ_ONLY)
+        if (access::readOnly(IOHandler()->m_backendAccess))
             throw error::ReadError(
                 error::AffectedObject::File,
                 error::Reason::Inaccessible,

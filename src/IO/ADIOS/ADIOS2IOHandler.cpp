@@ -461,7 +461,7 @@ void ADIOS2IOHandlerImpl::createFile(
     Writable *writable, Parameter<Operation::CREATE_FILE> const &parameters)
 {
     VERIFY_ALWAYS(
-        m_handler->m_backendAccess != Access::READ_ONLY,
+        access::write(m_handler->m_backendAccess),
         "[ADIOS2] Creating a file in read-only mode is not possible.");
 
     if (!writable->written)
@@ -586,7 +586,7 @@ void ADIOS2IOHandlerImpl::createPath(
 void ADIOS2IOHandlerImpl::createDataset(
     Writable *writable, const Parameter<Operation::CREATE_DATASET> &parameters)
 {
-    if (m_handler->m_backendAccess == Access::READ_ONLY)
+    if (access::readOnly(m_handler->m_backendAccess))
     {
         throw std::runtime_error(
             "[ADIOS2] Creating a dataset in a file opened as read "
@@ -669,7 +669,7 @@ void ADIOS2IOHandlerImpl::extendDataset(
     Writable *writable, const Parameter<Operation::EXTEND_DATASET> &parameters)
 {
     VERIFY_ALWAYS(
-        m_handler->m_backendAccess != Access::READ_ONLY,
+        access::write(m_handler->m_backendAccess),
         "[ADIOS2] Cannot extend datasets in read-only mode.");
     setAndGetFilePosition(writable);
     auto file = refreshFileFromParent(writable, /* preferParentFile = */ false);
@@ -800,7 +800,7 @@ void ADIOS2IOHandlerImpl::writeDataset(
     Writable *writable, const Parameter<Operation::WRITE_DATASET> &parameters)
 {
     VERIFY_ALWAYS(
-        m_handler->m_backendAccess != Access::READ_ONLY,
+        access::write(m_handler->m_backendAccess),
         "[ADIOS2] Cannot write data in read-only mode.");
     setAndGetFilePosition(writable);
     auto file = refreshFileFromParent(writable, /* preferParentFile = */ false);
@@ -829,7 +829,7 @@ void ADIOS2IOHandlerImpl::writeAttribute(
         break;
     case AttributeLayout::ByAdiosVariables: {
         VERIFY_ALWAYS(
-            m_handler->m_backendAccess != Access::READ_ONLY,
+            access::write(m_handler->m_backendAccess),
             "[ADIOS2] Cannot write attribute in read-only mode.");
         auto pos = setAndGetFilePosition(writable);
         auto file =
@@ -1264,7 +1264,7 @@ void ADIOS2IOHandlerImpl::closePath(
     VERIFY_ALWAYS(
         writable->written,
         "[ADIOS2] Cannot close a path that has not been written yet.");
-    if (m_handler->m_backendAccess == Access::READ_ONLY)
+    if (access::readOnly(m_handler->m_backendAccess))
     {
         // nothing to do
         return;
@@ -1308,8 +1308,10 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(std::string const &fullPath)
     {
     case Access::CREATE:
         return adios2::Mode::Write;
-    case Access::READ_ONLY:
+    case Access::READ_LINEAR:
         return adios2::Mode::Read;
+    case Access::READ_ONLY:
+        return adios2::Mode::Read; // @todo RandomAccess
     case Access::READ_WRITE:
         if (auxiliary::directory_exists(fullPath) ||
             auxiliary::file_exists(fullPath))
@@ -1703,7 +1705,7 @@ namespace detail
         const Parameter<Operation::WRITE_ATT> &parameters)
     {
         VERIFY_ALWAYS(
-            impl->m_handler->m_backendAccess != Access::READ_ONLY,
+            access::write(impl->m_handler->m_backendAccess),
             "[ADIOS2] Cannot write attribute in read-only mode.");
         auto pos = impl->setAndGetFilePosition(writable);
         auto file = impl->refreshFileFromParent(
@@ -1875,7 +1877,7 @@ namespace detail
         adios2::Engine &engine)
     {
         VERIFY_ALWAYS(
-            impl->m_handler->m_backendAccess != Access::READ_ONLY,
+            access::write(impl->m_handler->m_backendAccess),
             "[ADIOS2] Cannot write data in read-only mode.");
 
         auto ptr = std::static_pointer_cast<const T>(bp.param.data).get();
