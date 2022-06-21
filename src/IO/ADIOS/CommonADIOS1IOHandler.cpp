@@ -20,11 +20,10 @@
  */
 
 #include "openPMD/IO/ADIOS/CommonADIOS1IOHandler.hpp"
-#include "openPMD/Error.hpp"
+#include "openPMD/ThrowError.hpp"
 
 #if openPMD_HAVE_ADIOS1
 
-#include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS1IOHandlerImpl.hpp"
 #include "openPMD/IO/ADIOS/ParallelADIOS1IOHandlerImpl.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
@@ -425,7 +424,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::createFile(
         if (m_handler->m_backendAccess == Access::APPEND &&
             auxiliary::file_exists(name))
         {
-            throw error::OperationUnsupportedInBackend(
+            error::throwOperationUnsupportedInBackend(
                 "ADIOS1",
                 "Appending to existing file on disk (use Access::CREATE to "
                 "overwrite)");
@@ -515,7 +514,7 @@ static std::optional<std::string> datasetTransform(json::TracingJSON config)
     }
     else
     {
-        throw error::BackendConfigSchema(
+        error::throwBackendConfigSchema(
             {"adios1", "dataset", "transform"},
             "Key must convertible to type string.");
     }
@@ -1250,7 +1249,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
     status = adios_get_attr(f, attrname.c_str(), &datatype, &size, &data);
     if (status != 0)
     {
-        throw error::ReadError(
+        error::throwReadError(
             error::AffectedObject::Attribute,
             error::Reason::NotFound,
             "ADIOS1",
@@ -1258,7 +1257,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
     }
     if (datatype == adios_unknown)
     {
-        throw error::ReadError(
+        error::throwReadError(
             error::AffectedObject::Attribute,
             error::Reason::UnexpectedContent,
             "ADIOS1",
@@ -1314,7 +1313,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
         break;
 
     default:
-        throw error::ReadError(
+        error::throwReadError(
             error::AffectedObject::Attribute,
             error::Reason::UnexpectedContent,
             "ADIOS1",
@@ -1354,7 +1353,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1383,7 +1382,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1412,7 +1411,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1445,7 +1444,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<unsigned long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1475,7 +1474,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<unsigned long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1505,7 +1504,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                 a = Attribute(*reinterpret_cast<unsigned long long *>(data));
             }
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1557,7 +1556,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
             break;
         }
         default:
-            throw error::ReadError(
+            error::throwReadError(
                 error::AffectedObject::Attribute,
                 error::Reason::Other,
                 "ADIOS1",
@@ -1598,7 +1597,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<long long>(data, size),
                     DT::VEC_LONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1623,7 +1622,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<long long>(data, size),
                     DT::VEC_LONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1648,7 +1647,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<long long>(data, size),
                     DT::VEC_LONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1684,7 +1683,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<unsigned long long>(data, size),
                     DT::VEC_ULONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1711,7 +1710,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<unsigned long long>(data, size),
                     DT::VEC_ULONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1738,7 +1737,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
                     readVectorAttributeInternal<unsigned long long>(data, size),
                     DT::VEC_ULONGLONG);
             else
-                throw error::ReadError(
+                error::throwReadError(
                     error::AffectedObject::Attribute,
                     error::Reason::Other,
                     "ADIOS1",
@@ -1804,7 +1803,7 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::readAttribute(
         }
 
         default:
-            throw error::ReadError(
+            error::throwReadError(
                 error::AffectedObject::Attribute,
                 error::Reason::Other,
                 "ADIOS1",
