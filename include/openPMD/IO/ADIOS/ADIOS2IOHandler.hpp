@@ -1049,6 +1049,10 @@ namespace detail
          */
         bool optimizeAttributesStreaming = false;
 
+        using ParsePreference =
+            Parameter<Operation::OPEN_FILE>::ParsePreference;
+        ParsePreference parsePreference = ParsePreference::RandomAccess;
+
         using AttributeMap_t = std::map<std::string, adios2::Params>;
 
         BufferedActions(ADIOS2IOHandlerImpl &impl, InvalidatableFile file);
@@ -1257,13 +1261,6 @@ namespace detail
          */
         std::string m_engineType;
 
-        /**
-         * See documentation for StreamStatus::Parsing.
-         * Will be set true under the circumstance described there in order to
-         * indicate that the first step should only be opened after parsing.
-         */
-        bool delayOpeningTheFirstStep = false;
-
         /*
          * ADIOS2 does not give direct access to its internal attribute and
          * variable maps, but will instead give access to copies of them.
@@ -1290,6 +1287,10 @@ namespace detail
         }
 
         void configure_IO(ADIOS2IOHandlerImpl &impl);
+        void configure_IO_Read_Before_open(
+            std::optional<bool> userSpecifiedUsesteps);
+        void configure_IO_Read_After_open();
+        void configure_IO_Write(std::optional<bool> userSpecifiedUsesteps);
 
         using AttributeLayout = ADIOS2IOHandlerImpl::AttributeLayout;
         inline AttributeLayout attributeLayout() const
