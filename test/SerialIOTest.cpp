@@ -4812,7 +4812,8 @@ this = "should not warn"
 void bp4_steps(
     std::string const &file,
     std::string const &options_write,
-    std::string const &options_read)
+    std::string const &options_read,
+    Access access = Access::READ_ONLY)
 {
     {
         Series writeSeries(file, Access::CREATE, options_write);
@@ -4837,7 +4838,7 @@ void bp4_steps(
         return;
     }
 
-    Series readSeries(file, Access::READ_ONLY, options_read);
+    Series readSeries(file, access, options_read);
 
     size_t last_iteration_index = 0;
     for (auto iteration : readSeries.readIterations())
@@ -4890,6 +4891,7 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
         type = "bp4"
         UseSteps = false
     )";
+
     // sing the yes no song
     bp4_steps("../samples/bp4steps_yes_yes.bp", useSteps, useSteps);
     bp4_steps("../samples/bp4steps_no_yes.bp", dontUseSteps, useSteps);
@@ -4897,6 +4899,17 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     bp4_steps("../samples/bp4steps_no_no.bp", dontUseSteps, dontUseSteps);
     bp4_steps("../samples/nullcore.bp", nullcore, "");
     bp4_steps("../samples/bp4steps_default.bp", "{}", "{}");
+
+    // bp4_steps(
+    //     "../samples/newlayout_bp4steps_yes_yes.bp",
+    //     useSteps,
+    //     useSteps,
+    //     Access::READ_LINEAR);
+    // bp4_steps(
+    //     "../samples/newlayout_bp4steps_yes_no.bp",
+    //     useSteps,
+    //     dontUseSteps,
+    //     Access::READ_LINEAR);
 
     /*
      * Do this whole thing once more, but this time use the new attribute
@@ -4932,6 +4945,17 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
         "../samples/newlayout_bp4steps_no_yes.bp", dontUseSteps, useSteps);
     bp4_steps(
         "../samples/newlayout_bp4steps_no_no.bp", dontUseSteps, dontUseSteps);
+
+    bp4_steps(
+        "../samples/newlayout_bp4steps_yes_yes.bp",
+        useSteps,
+        useSteps,
+        Access::READ_LINEAR);
+    bp4_steps(
+        "../samples/newlayout_bp4steps_yes_no.bp",
+        useSteps,
+        dontUseSteps,
+        Access::READ_LINEAR);
 }
 #endif
 
@@ -5382,7 +5406,7 @@ void variableBasedSeries(std::string const &file)
     auto testRead = [&file, &extent, &selectADIOS2](
                         std::string const &jsonConfig) {
         Series readSeries(
-            file, Access::READ_ONLY, json::merge(selectADIOS2, jsonConfig));
+            file, Access::READ_LINEAR, json::merge(selectADIOS2, jsonConfig));
 
         size_t last_iteration_index = 0;
         for (auto iteration : readSeries.readIterations())
@@ -5785,42 +5809,46 @@ void iterate_nonstreaming_series(
         }
     }
 
-    Series readSeries(
-        file,
-        Access::READ_ONLY,
-        json::merge(jsonConfig, R"({"defer_iteration_parsing": true})"));
-
-    size_t last_iteration_index = 0;
-    // conventionally written Series must be readable with streaming-aware API!
-    for (auto iteration : readSeries.readIterations())
+    for (auto access : {Access::READ_LINEAR, Access::READ_ONLY})
     {
-        // ReadIterations takes care of Iteration::open()ing iterations
-        auto E_x = iteration.meshes["E"]["x"];
-        REQUIRE(E_x.getDimensionality() == 2);
-        REQUIRE(E_x.getExtent()[0] == 2);
-        REQUIRE(E_x.getExtent()[1] == extent);
-        auto chunk = E_x.loadChunk<int>({0, 0}, {1, extent});
-        auto chunk2 = E_x.loadChunk<int>({1, 0}, {1, extent});
-        // we encourage manually closing iterations, but it should not matter
-        // so let's do the switcharoo for this test
-        if (last_iteration_index % 2 == 0)
-        {
-            readSeries.flush();
-        }
-        else
-        {
-            iteration.close();
-        }
+        Series readSeries(
+            file,
+            access,
+            json::merge(jsonConfig, R"({"defer_iteration_parsing": true})"));
 
-        int value = variableBasedLayout ? 0 : iteration.iterationIndex;
-        for (size_t i = 0; i < extent; ++i)
+        size_t last_iteration_index = 0;
+        // conventionally written Series must be readable with streaming-aware
+        // API!
+        for (auto iteration : readSeries.readIterations())
         {
-            REQUIRE(chunk.get()[i] == value);
-            REQUIRE(chunk2.get()[i] == int(i));
+            // ReadIterations takes care of Iteration::open()ing iterations
+            auto E_x = iteration.meshes["E"]["x"];
+            REQUIRE(E_x.getDimensionality() == 2);
+            REQUIRE(E_x.getExtent()[0] == 2);
+            REQUIRE(E_x.getExtent()[1] == extent);
+            auto chunk = E_x.loadChunk<int>({0, 0}, {1, extent});
+            auto chunk2 = E_x.loadChunk<int>({1, 0}, {1, extent});
+            // we encourage manually closing iterations, but it should not
+            // matter so let's do the switcharoo for this test
+            if (last_iteration_index % 2 == 0)
+            {
+                readSeries.flush();
+            }
+            else
+            {
+                iteration.close();
+            }
+
+            int value = variableBasedLayout ? 0 : iteration.iterationIndex;
+            for (size_t i = 0; i < extent; ++i)
+            {
+                REQUIRE(chunk.get()[i] == value);
+                REQUIRE(chunk2.get()[i] == int(i));
+            }
+            last_iteration_index = iteration.iterationIndex;
         }
-        last_iteration_index = iteration.iterationIndex;
+        REQUIRE(last_iteration_index == 9);
     }
-    REQUIRE(last_iteration_index == 9);
 }
 
 TEST_CASE("iterate_nonstreaming_series", "[serial][adios2]")
@@ -5845,13 +5873,13 @@ TEST_CASE("iterate_nonstreaming_series", "[serial][adios2]")
                     backend.extension,
                 false,
                 json::merge(
-                    backend.jsonBaseConfig(), "adios2.engine = \"bp5\""));
+                    backend.jsonBaseConfig(), "adios2.engine.type = \"bp5\""));
             iterate_nonstreaming_series(
                 "../samples/iterate_nonstreaming_series_groupbased_bp5." +
                     backend.extension,
                 false,
                 json::merge(
-                    backend.jsonBaseConfig(), "adios2.engine = \"bp5\""));
+                    backend.jsonBaseConfig(), "adios2.engine.type = \"bp5\""));
         }
 #endif
     }
@@ -6281,7 +6309,7 @@ void chaotic_stream(std::string filename, bool variableBased)
     }
 
     {
-        Series series(filename, Access::READ_ONLY);
+        Series series(filename, Access::READ_LINEAR);
         size_t index = 0;
         for (const auto &iteration : series.readIterations())
         {
@@ -6311,11 +6339,13 @@ TEST_CASE("chaotic_stream", "[serial]")
 
 #ifdef openPMD_USE_INVASIVE_TESTS
 void unfinished_iteration_test(
-    std::string const &ext, bool filebased, std::string const &config = "{}")
+    std::string const &ext,
+    IterationEncoding encoding,
+    std::string const &config = "{}")
 {
     std::cout << "\n\nTESTING " << ext << "\n\n" << std::endl;
     std::string file = std::string("../samples/unfinished_iteration") +
-        (filebased ? "_%T." : ".") + ext;
+        (encoding == IterationEncoding::fileBased ? "_%T." : ".") + ext;
     {
         Series write(file, Access::CREATE, config);
         auto it0 = write.writeIterations()[0];
@@ -6332,11 +6362,11 @@ void unfinished_iteration_test(
         auto electron_mass =
             it10.particles["e"]["mass"][RecordComponent::SCALAR];
     }
-    auto tryReading = [&config, file, filebased](
+    auto tryReading = [&config, file, encoding](
+                          Access access,
                           std::string const &additionalConfig = "{}") {
         {
-            Series read(
-                file, Access::READ_ONLY, json::merge(config, additionalConfig));
+            Series read(file, access, json::merge(config, additionalConfig));
 
             std::vector<decltype(Series::iterations)::key_type> iterations;
             std::cout << "Going to list iterations in " << file << ":"
@@ -6364,10 +6394,10 @@ void unfinished_iteration_test(
                  std::vector<decltype(Series::iterations)::key_type>{0, 10}));
         }
 
-        if (filebased)
+        if (encoding == IterationEncoding::fileBased &&
+            access == Access::READ_ONLY)
         {
-            Series read(
-                file, Access::READ_ONLY, json::merge(config, additionalConfig));
+            Series read(file, access, json::merge(config, additionalConfig));
             if (additionalConfig == "{}")
             {
                 // Eager parsing, defective iteration has already been removed
@@ -6384,38 +6414,54 @@ void unfinished_iteration_test(
         }
     };
 
-    tryReading();
-    tryReading(R"({"defer_iteration_parsing": true})");
+    tryReading(Access::READ_LINEAR);
+    tryReading(Access::READ_LINEAR, R"({"defer_iteration_parsing": true})");
+    if (encoding != IterationEncoding::variableBased)
+    {
+        /*
+         * In variable-based iteration encoding, READ_ONLY mode will make
+         * iteration metadata leak into other iterations, causing iteration 0
+         * to fail being parsed.
+         * (See also the warning that occurs when trying to access a variable-
+         * based Series in READ_ONLY mode)
+         */
+        tryReading(Access::READ_ONLY);
+        tryReading(Access::READ_ONLY, R"({"defer_iteration_parsing": true})");
+    }
 }
 
 TEST_CASE("unfinished_iteration_test", "[serial]")
 {
 #if openPMD_HAVE_ADIOS2
-    unfinished_iteration_test("bp", false, R"({"backend": "adios2"})");
+    unfinished_iteration_test(
+        "bp", IterationEncoding::groupBased, R"({"backend": "adios2"})");
     unfinished_iteration_test(
         "bp",
-        false,
+        IterationEncoding::variableBased,
         R"(
-{
-  "backend": "adios2",
-  "iteration_encoding": "variable_based",
-  "adios2": {
-    "schema": 20210209
-  }
-}
-)");
-    unfinished_iteration_test("bp", true, R"({"backend": "adios2"})");
+    {
+      "backend": "adios2",
+      "iteration_encoding": "variable_based",
+      "adios2": {
+        "schema": 20210209
+      }
+    }
+    )");
+    unfinished_iteration_test(
+        "bp", IterationEncoding::fileBased, R"({"backend": "adios2"})");
 #endif
 #if openPMD_HAVE_ADIOS1
-    unfinished_iteration_test("adios1.bp", false, R"({"backend": "adios1"})");
-    unfinished_iteration_test("adios1.bp", true, R"({"backend": "adios1"})");
+    unfinished_iteration_test(
+        "adios1.bp", IterationEncoding::groupBased, R"({"backend": "adios1"})");
+    unfinished_iteration_test(
+        "adios1.bp", IterationEncoding::fileBased, R"({"backend": "adios1"})");
 #endif
 #if openPMD_HAVE_HDF5
-    unfinished_iteration_test("h5", false);
-    unfinished_iteration_test("h5", true);
+    unfinished_iteration_test("h5", IterationEncoding::groupBased);
+    unfinished_iteration_test("h5", IterationEncoding::fileBased);
 #endif
-    unfinished_iteration_test("json", false);
-    unfinished_iteration_test("json", true);
+    unfinished_iteration_test("json", IterationEncoding::groupBased);
+    unfinished_iteration_test("json", IterationEncoding::fileBased);
 }
 #endif
 
