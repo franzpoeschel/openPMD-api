@@ -204,6 +204,17 @@ public:
                     break;
                 }
             }
+            catch (std::exception const &e)
+            {
+                std::cerr << "[AbstractIOHandlerImpl] IO Task "
+                          << internal::operationAsString(i.operation)
+                          << " failed with exception. Removing task"
+                          << " from IO queue and passing on the exception. "
+                          << "Original exception was: \n"
+                          << e.what() << std::endl;
+                (*m_handler).m_work.pop();
+                throw;
+            }
             catch (...)
             {
                 std::cerr << "[AbstractIOHandlerImpl] IO Task "
