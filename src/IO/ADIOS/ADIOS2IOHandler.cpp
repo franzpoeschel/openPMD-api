@@ -2538,9 +2538,34 @@ namespace detail
     {
         if (!m_engine)
         {
+            auto tempMode = m_mode;
             switch (m_mode)
             {
             case adios2::Mode::Append:
+#ifdef _WIN32
+            /*
+             * On Windows, ADIOS2 Append mode only works with existing files.
+             * So, we first check for file existence and switch to create mode
+             * if it does not exist.
+             */
+            {
+                try
+                {
+                    adios2::Engine checkExists = m_IO.Open(m_file, adios2::Mode::Read);
+                    if(!checkExists)
+                    {
+                        tempMode = adios2::Mode::Write;
+                    } else
+                    {
+                        checkExists.Close();
+                    }
+                } catch(...)
+                {
+                    tempMode = adios2::Mode::Write;
+                }
+            }
+            [[fallthrough]];
+#endif
             case adios2::Mode::Write: {
                 // usesSteps attribute only written upon ::advance()
                 // this makes sure that the attribute is only put in case
@@ -2548,7 +2573,7 @@ namespace detail
                 m_IO.DefineAttribute<ADIOS2Schema::schema_t>(
                     ADIOS2Defaults::str_adios2Schema, m_impl->m_schema);
                 m_engine = std::make_optional(
-                    adios2::Engine(m_IO.Open(m_file, m_mode)));
+                    adios2::Engine(m_IO.Open(m_file, tempMode)));
                 break;
             }
             case adios2::Mode::Read: {
