@@ -2543,28 +2543,31 @@ namespace detail
             {
             case adios2::Mode::Append:
 #ifdef _WIN32
-            /*
-             * On Windows, ADIOS2 Append mode only works with existing files.
-             * So, we first check for file existence and switch to create mode
-             * if it does not exist.
-             */
-            {
-                try
+                /*
+                 * On Windows, ADIOS2 Append mode only works with existing
+                 * files. So, we first check for file existence and switch to
+                 * create mode if it does not exist.
+                 */
                 {
-                    adios2::Engine checkExists = m_IO.Open(m_file, adios2::Mode::Read);
-                    if(!checkExists)
+                    try
+                    {
+                        adios2::Engine checkExists =
+                            m_IO.Open(m_file, adios2::Mode::Read);
+                        if (!checkExists)
+                        {
+                            tempMode = adios2::Mode::Write;
+                        }
+                        else
+                        {
+                            checkExists.Close();
+                        }
+                    }
+                    catch (...)
                     {
                         tempMode = adios2::Mode::Write;
-                    } else
-                    {
-                        checkExists.Close();
                     }
-                } catch(...)
-                {
-                    tempMode = adios2::Mode::Write;
                 }
-            }
-            [[fallthrough]];
+                [[fallthrough]];
 #endif
             case adios2::Mode::Write: {
                 // usesSteps attribute only written upon ::advance()
