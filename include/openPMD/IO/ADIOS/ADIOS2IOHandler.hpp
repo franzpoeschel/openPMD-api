@@ -986,7 +986,7 @@ namespace detail
          * Hence, next to the actual file name, also store the name for the
          * IO.
          */
-        std::string const m_IOName;
+        std::string m_IOName;
         adios2::ADIOS &m_ADIOS;
         adios2::IO m_IO;
         /**
@@ -1285,6 +1285,8 @@ namespace detail
         {
             return m_impl->schema();
         }
+
+        void create_IO();
 
         void configure_IO(ADIOS2IOHandlerImpl &impl);
         void configure_IO_Read_Before_open(

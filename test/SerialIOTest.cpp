@@ -6698,10 +6698,10 @@ void append_mode(
         write.flush();
     }
     {
-        Series read(filename, Access::READ_ONLY);
         switch (parseMode)
         {
         case ParseMode::NoSteps: {
+            Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
             for (auto const &iteration : read.readIterations())
@@ -6713,6 +6713,7 @@ void append_mode(
         }
         break;
         case ParseMode::LinearWithoutSnapshot: {
+            Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 11};
             for (auto const &iteration : read.readIterations())
@@ -6726,6 +6727,7 @@ void append_mode(
         case ParseMode::WithSnapshot: {
             // in variable-based encodings, iterations are not parsed ahead of
             // time but as they go
+            Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 7, 11};
             for (auto const &iteration : read.readIterations())
@@ -6739,6 +6741,7 @@ void append_mode(
         }
         break;
         case ParseMode::AheadOfTimeWithoutSnapshot: {
+            Series read(filename, Access::READ_ONLY);
             REQUIRE(read.iterations.size() == 8);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
@@ -6799,9 +6802,25 @@ void append_mode(
             write.flush();
         }
         {
-            Series read(filename, Access::READ_ONLY);
+            Series read(filename, Access::READ_LINEAR);
             switch (parseMode)
             {
+            case ParseMode::AheadOfTimeWithoutSnapshot: {
+                uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 5, 7, 10};
+                unsigned counter = 0;
+                for (auto const &iteration : read.readIterations())
+                {
+                    REQUIRE(
+                        iteration.iterationIndex == iterationOrder[counter]);
+                    ++counter;
+                }
+                REQUIRE(counter == 8);
+                // // Cannot do listSeries here because the Series is already
+                // // drained
+                // REQUIRE_THROWS_AS(
+                //     helper::listSeries(read), error::WrongAPIUsage);
+            }
+            break;
             case ParseMode::LinearWithoutSnapshot: {
                 uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10};
                 unsigned counter = 0;
@@ -6837,10 +6856,24 @@ void append_mode(
             }
             break;
             case ParseMode::NoSteps:
-            case ParseMode::AheadOfTimeWithoutSnapshot:
                 throw std::runtime_error("Test configured wrong.");
                 break;
             }
+        }
+        if (!variableBased)
+        {
+            Series read(filename, Access::READ_ONLY);
+            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 5, 7, 10};
+            unsigned counter = 0;
+            for (auto const &iteration : read.readIterations())
+            {
+                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+                ++counter;
+            }
+            REQUIRE(counter == 8);
+            // Cannot do listSeries here because the Series is already
+            // drained
+            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
         }
     }
 #endif
@@ -6877,7 +6910,7 @@ TEST_CASE("append_mode", "[serial]")
             append_mode(
                 "../samples/append/groupbased." + t,
                 false,
-                ParseMode::LinearWithoutSnapshot,
+                ParseMode::AheadOfTimeWithoutSnapshot,
                 jsonConfigOld);
             append_mode(
                 "../samples/append/groupbased_newschema." + t,

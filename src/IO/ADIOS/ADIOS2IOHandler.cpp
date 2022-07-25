@@ -1325,7 +1325,11 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(std::string const &fullPath)
         if (auxiliary::directory_exists(fullPath) ||
             auxiliary::file_exists(fullPath))
         {
+#if HAS_ADIOS_2_8
+            return adios2::Mode::ReadRandomAccess;
+#else
             return adios2::Mode::Read;
+#endif
         }
         else
         {
@@ -2360,7 +2364,6 @@ namespace detail
     BufferedActions::BufferedActions(
         ADIOS2IOHandlerImpl &impl, InvalidatableFile file)
         : m_file(impl.fullPath(std::move(file)))
-        , m_IOName(std::to_string(impl.nameCounter++))
         , m_ADIOS(impl.m_ADIOS)
         , m_impl(&impl)
         , m_engineType(impl.m_engineType)
@@ -2368,8 +2371,8 @@ namespace detail
         // Declaring these members in the constructor body to avoid
         // initialization order hazards. Need the IO_ prefix since in some
         // situation there seems to be trouble with number-only IO names
-        m_IO = impl.m_ADIOS.DeclareIO("IO_" + m_IOName);
         m_mode = impl.adios2AccessMode(m_file);
+        create_IO();
         if (!m_IO)
         {
             throw std::runtime_error(
@@ -2381,6 +2384,12 @@ namespace detail
         {
             configure_IO(impl);
         }
+    }
+
+    void BufferedActions::create_IO()
+    {
+        m_IOName = std::to_string(m_impl->nameCounter++);
+        m_IO = m_impl->m_ADIOS.DeclareIO("IO_" + m_IOName);
     }
 
     BufferedActions::~BufferedActions()
@@ -2627,7 +2636,11 @@ namespace detail
                      */
                     parsePreference = ParsePreference::RandomAccess;
                     m_engine->Close();
+                    streamStatus = StreamStatus::NoStream;
                     m_mode = adios2::Mode::ReadRandomAccess;
+                    // Overwrite the old IO object since it is stained with the
+                    // objects of the now closed engine
+                    create_IO();
                     *m_engine = adios2::Engine(m_IO.Open(m_file, m_mode));
 #else
                     throw std::runtime_error(
@@ -2975,7 +2988,36 @@ namespace detail
                 // in streaming mode, this needs to be done after opening
                 // a step
                 // in file-based mode, we do it before
-                auto setLayoutVersion = [IO{m_IO}, this]() mutable {
+                bool layoutVersionHasBeenSet = false;
+                auto setLayoutVersion = [IO{m_IO},
+                                         engine{m_engine.value()},
+                                         this,
+                                         &layoutVersionHasBeenSet,
+                                         impl{m_impl},
+                                         engineType{m_engineType}]() mutable {
+                    if (layoutVersionHasBeenSet)
+                    {
+                        throw std::runtime_error(
+                            "[ADIOS2] Control flow error! Must set layout "
+                            "version exactly once.");
+                    }
+                    if (!supportsUpfrontParsing(
+                            impl->m_handler->m_backendAccess, engineType))
+                    {
+                        /*
+                         * In BP5 with Linear read mode, we now need to
+                         * tentatively open the first IO step.
+                         * Otherwise we don't see the schema attribute.
+                         * This branch is also taken by Streaming engines.
+                         */
+                        if (engine.BeginStep() != adios2::StepStatus::OK)
+                        {
+                            throw std::runtime_error(
+                                "[ADIOS2] Unexpected step status when "
+                                "opening file/stream.");
+                        }
+                        streamStatus = StreamStatus::DuringStep;
+                    }
                     auto attr = IO.InquireAttribute<ADIOS2Schema::schema_t>(
                         ADIOS2Defaults::str_adios2Schema);
                     if (!attr)
@@ -2987,12 +3029,24 @@ namespace detail
                         m_impl->m_schema = attr.Data()[0];
                     }
                     configure_IO_Read_After_open();
+                    layoutVersionHasBeenSet = true;
                 };
-                // decide streaming mode
+                /*
+                 * First round: call setLayoutVersion() unless the engine is a
+                 * streaming engine, i.e. the stream status is OutsideOfStep.
+                 * In streaming engines, this can only happen after opening the
+                 * first step.
+                 * This MUST occur before the `switch(streamStatus)` construct
+                 * since setLayoutVersion() might change the streamStatus after
+                 * taking a look at the used schema.
+                 */
+                setLayoutVersion();
+                /*
+                 * Second round: Decide the streamStatus.
+                 */
                 switch (streamStatus)
                 {
                 case StreamStatus::Undecided: {
-                    setLayoutVersion();
                     auto attr = m_IO.InquireAttribute<bool_representation>(
                         ADIOS2Defaults::str_usesstepsAttribute);
                     if (attr && attr.Data()[0] == 1)
@@ -3019,32 +3073,25 @@ namespace detail
                     }
                     break;
                 }
-                case StreamStatus::OutsideOfStep:
-                    if (m_engine.value().BeginStep() != adios2::StepStatus::OK)
-                    {
-                        throw std::runtime_error(
-                            "[ADIOS2] Unexpected step status when "
-                            "opening file/stream.");
-                    }
-                    setLayoutVersion();
-                    streamStatus = StreamStatus::DuringStep;
-                    break;
                 case StreamStatus::NoStream:
                     // using random-access mode
-                    setLayoutVersion();
+                case StreamStatus::DuringStep:
+                    // IO step might have sneakily been opened
+                    // by setLayoutVersion(), because otherwise we don't see
+                    // the schema attribute
                     break;
+                // case StreamStatus::OutsideOfStep:
+                //   is resolved by setLayoutVersion() into DuringStep
                 default:
                     throw std::runtime_error("[ADIOS2] Control flow error!");
                 }
 
-                // if (m_impl->m_handler->m_backendAccess ==
-                //         Access::READ_LINEAR &&
-                //     streamStatus == StreamStatus::NoStream)
-                // {
-                //     throw std::runtime_error(
-                //         "Unimplemented! Must coerce to READ_ONLY in this "
-                //         "case.");
-                // }
+                if (!layoutVersionHasBeenSet)
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Control flow error! Must set layout version "
+                        "exactly once.");
+                }
 
                 if (attributeLayout() == AttributeLayout::ByAdiosVariables)
                 {

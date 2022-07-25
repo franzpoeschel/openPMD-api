@@ -49,6 +49,7 @@ void SeriesIterator::initSeriesInLinearReadMode()
             fOpen.name = series.get().m_name;
             fOpen.encoding = series.iterationEncoding();
             series.IOHandler()->enqueue(IOTask(&series, fOpen));
+            series.IOHandler()->flush(internal::defaultFlushParams);
             switch (*fOpen.out_parsePreference)
             {
                 using PP = Parameter<Operation::OPEN_FILE>::ParsePreference;
