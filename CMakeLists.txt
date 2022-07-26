@@ -477,7 +477,6 @@ set(IO_SOURCE
         src/IO/JSON/JSONFilePosition.cpp
         src/IO/ADIOS/ADIOS2IOHandler.cpp
         src/IO/ADIOS/ADIOS2Auxiliary.cpp
-        src/IO/ADIOS/ADIOS2PreloadAttributes.cpp
         src/IO/InvalidatableFile.cpp)
 set(IO_ADIOS1_SEQUENTIAL_SOURCE
         src/IO/ADIOS/CommonADIOS1IOHandler.cpp
