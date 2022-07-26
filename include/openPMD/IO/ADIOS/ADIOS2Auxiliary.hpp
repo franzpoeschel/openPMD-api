@@ -36,6 +36,12 @@
 
 namespace openPMD
 {
+enum class GroupOrDataset
+{
+    GROUP,
+    DATASET
+};
+
 namespace detail
 {
     // ADIOS2 does not natively support boolean values
