@@ -6881,7 +6881,7 @@ void append_mode(
                     helper::listSeries(read), error::WrongAPIUsage);
             }
             break;
-            case ParseMode::NoSteps:
+            default:
                 throw std::runtime_error("Test configured wrong.");
                 break;
             }
