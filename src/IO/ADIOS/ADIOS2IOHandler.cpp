@@ -2822,7 +2822,14 @@ namespace detail
             configure_IO_Read_Before_open(userSpecifiedUsesteps);
             break;
         case Access::READ_WRITE:
-            if (m_mode == adios2::Mode::Read)
+            if (
+#if HAS_ADIOS_2_8
+                m_mode == adios2::Mode::Read ||
+                m_mode == adios2::Mode::ReadRandomAccess
+#else
+                m_mode == adios2::Mode::Read
+#endif
+            )
             {
                 configure_IO_Read_Before_open(userSpecifiedUsesteps);
             }
