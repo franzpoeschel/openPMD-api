@@ -6605,7 +6605,7 @@ void append_mode(
     {
         auxiliary::remove_directory("../samples/append");
     }
-    std::vector<int> data(10, 0);
+    std::vector<int> data(10, 999);
     auto writeSomeIterations = [&data](
                                    WriteIterations &&writeIterations,
                                    std::vector<uint64_t> indices) {
@@ -6699,6 +6699,17 @@ void append_mode(
             write.writeIterations(), std::vector<uint64_t>{7, 1, 11});
         write.flush();
     }
+
+    auto verifyIteration = [](auto &&iteration) {
+        auto chunk =
+            iteration.meshes["E"]["x"].template loadChunk<int>({0}, {10});
+        iteration.seriesFlush();
+        for (size_t i = 0; i < 10; ++i)
+        {
+            REQUIRE(chunk.get()[i] == 999);
+        }
+    };
+
     {
         switch (parseMode)
         {
@@ -6706,9 +6717,10 @@ void append_mode(
             Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
-            for (auto const &iteration : read.readIterations())
+            for (auto iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+                verifyIteration(iteration);
                 ++counter;
             }
             REQUIRE(counter == 8);
@@ -6718,9 +6730,10 @@ void append_mode(
             Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 3, 4, 10, 11};
-            for (auto const &iteration : read.readIterations())
+            for (auto iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+                verifyIteration(iteration);
                 ++counter;
             }
             REQUIRE(counter == 6);
@@ -6732,9 +6745,10 @@ void append_mode(
             Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 11};
-            for (auto const &iteration : read.readIterations())
+            for (auto iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+                verifyIteration(iteration);
                 ++counter;
             }
             REQUIRE(counter == 8);
@@ -6775,7 +6789,7 @@ void append_mode(
              * should see both instances when reading.
              * Final goal: Read only the last instance.
              */
-            // helper::listSeries(read);
+            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
         }
         break;
         }
@@ -6786,9 +6800,10 @@ void append_mode(
         REQUIRE(read.iterations.size() == 8);
         unsigned counter = 0;
         uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
-        for (auto const &iteration : read.readIterations())
+        for (auto iteration : read.readIterations())
         {
             REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+            verifyIteration(iteration);
             ++counter;
         }
         REQUIRE(counter == 8);
@@ -6830,29 +6845,14 @@ void append_mode(
             Series read(filename, Access::READ_LINEAR);
             switch (parseMode)
             {
-            // case ParseMode::AheadOfTimeWithoutSnapshot: {
-            //     uint64_t iterationOrder[] = {0, 1, 3, 4, 10};
-            //     unsigned counter = 0;
-            //     for (auto const &iteration : read.readIterations())
-            //     {
-            //         REQUIRE(
-            //             iteration.iterationIndex == iterationOrder[counter]);
-            //         ++counter;
-            //     }
-            //     REQUIRE(counter == 5);
-            //     // // Cannot do listSeries here because the Series is already
-            //     // // drained
-            //     // REQUIRE_THROWS_AS(
-            //     //     helper::listSeries(read), error::WrongAPIUsage);
-            // }
-            // break;
             case ParseMode::LinearWithoutSnapshot: {
                 uint64_t iterationOrder[] = {0, 1, 3, 4, 10};
                 unsigned counter = 0;
-                for (auto const &iteration : read.readIterations())
+                for (auto iteration : read.readIterations())
                 {
                     REQUIRE(
                         iteration.iterationIndex == iterationOrder[counter]);
+                    verifyIteration(iteration);
                     ++counter;
                 }
                 REQUIRE(counter == 5);
@@ -6867,10 +6867,11 @@ void append_mode(
                 // of time but as they go
                 unsigned counter = 0;
                 uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 5};
-                for (auto const &iteration : read.readIterations())
+                for (auto iteration : read.readIterations())
                 {
                     REQUIRE(
                         iteration.iterationIndex == iterationOrder[counter]);
+                    verifyIteration(iteration);
                     ++counter;
                 }
                 REQUIRE(counter == 8);
