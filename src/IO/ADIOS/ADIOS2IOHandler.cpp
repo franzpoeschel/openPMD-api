@@ -2505,8 +2505,10 @@ namespace detail
                     return PerstepParsing::Required;
                 }
             }
-            // supported in file engines, if using a new schema
-            if (schema != SupportedSchema::s_0000_00_00)
+            // supported in file engines, if using a new schema or if it is BP5
+            // (BP5 correctly associates attributes with the step they were
+            //  created in)
+            if (schema != SupportedSchema::s_0000_00_00 || engineType == "bp5")
             {
                 return PerstepParsing::Supported;
             }

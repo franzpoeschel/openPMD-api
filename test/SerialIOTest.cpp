@@ -6576,14 +6576,16 @@ enum class ParseMode
      */
     AheadOfTimeWithoutSnapshot,
     /*
-     * A Series of the BP5 engine is not parsed ahead of time, but step-by-step,
-     * giving the openPMD-api a way to associate IO steps with iterations.
-     * No snapshot attribute exists, so the fallback mode is chosen:
+     * In Linear read mode, a Series is not parsed ahead of time, but
+     * step-by-step, giving the openPMD-api a way to associate IO steps with
+     * iterations. No snapshot attribute exists, so the fallback mode is chosen:
      * Iterations are returned in ascending order.
      * If an IO step returns an iteration whose index is lower than the
      * last one, it will be skipped.
-     * This mode of parsing will be generalized into the Linear read mode with
-     * PR #1291.
+     * This mode of parsing is not available for the BP4 engine with ADIOS2
+     * schema 0, since BP4 does not associate attributes with the step in
+     * which they were created, making it impossible to separate parsing into
+     * single steps.
      */
     LinearWithoutSnapshot,
     /*
@@ -6648,7 +6650,7 @@ void append_mode(
         }
 
         writeSomeIterations(
-            write.writeIterations(), std::vector<uint64_t>{2, 3});
+            write.writeIterations(), std::vector<uint64_t>{3, 2});
         write.flush();
     }
     {
@@ -6715,13 +6717,13 @@ void append_mode(
         case ParseMode::LinearWithoutSnapshot: {
             Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 11};
+            uint64_t iterationOrder[] = {0, 1, 3, 4, 10, 11};
             for (auto const &iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
                 ++counter;
             }
-            REQUIRE(counter == 7);
+            REQUIRE(counter == 6);
         }
         break;
         case ParseMode::WithSnapshot: {
@@ -6729,7 +6731,7 @@ void append_mode(
             // time but as they go
             Series read(filename, Access::READ_LINEAR);
             unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 7, 11};
+            uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 11};
             for (auto const &iteration : read.readIterations())
             {
                 REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
@@ -6741,18 +6743,28 @@ void append_mode(
         }
         break;
         case ParseMode::AheadOfTimeWithoutSnapshot: {
-            Series read(filename, Access::READ_ONLY);
-            REQUIRE(read.iterations.size() == 8);
+            Series read(filename, Access::READ_LINEAR);
+            // REQUIRE(read.iterations.size() == 8);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
             /*
-             * Use conventional read API since streaming API is not possible
-             * without Linear read mode.
-             * (See also comments inside ParseMode enum).
+             * This one is a bit tricky:
+             * The BP4 engine has no way of parsing a Series in the old
+             * ADIOS2 schema step-by-step, since attributes are not
+             * associated with the step in which they were created.
+             * As a result, when readIterations() is called, the whole thing
+             * is parsed immediately ahead-of-time.
+             * We can then iterate through the iterations and access metadata,
+             * but since the IO steps don't correspond with the order of
+             * iterations returned (there is no way to figure out that order),
+             * we cannot load data in here.
+             * BP4 in the old ADIOS2 schema only supports either of the
+             * following: 1) A Series in which the iterations are present in
+             * ascending order. 2) Or accessing the Series in READ_ONLY mode.
              */
-            for (auto const &iteration : read.iterations)
+            for (auto const &iteration : read.readIterations())
             {
-                REQUIRE(iteration.first == iterationOrder[counter]);
+                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
                 ++counter;
             }
             REQUIRE(counter == 8);
@@ -6763,10 +6775,23 @@ void append_mode(
              * should see both instances when reading.
              * Final goal: Read only the last instance.
              */
-            helper::listSeries(read);
+            // helper::listSeries(read);
         }
         break;
         }
+    }
+    if (!variableBased)
+    {
+        Series read(filename, Access::READ_ONLY);
+        REQUIRE(read.iterations.size() == 8);
+        unsigned counter = 0;
+        uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
+        for (auto const &iteration : read.readIterations())
+        {
+            REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
+            ++counter;
+        }
+        REQUIRE(counter == 8);
     }
     // AppendAfterSteps has a bug before that version
 #if 100000000 * ADIOS2_VERSION_MAJOR + 1000000 * ADIOS2_VERSION_MINOR +        \
@@ -6805,24 +6830,24 @@ void append_mode(
             Series read(filename, Access::READ_LINEAR);
             switch (parseMode)
             {
-            case ParseMode::AheadOfTimeWithoutSnapshot: {
-                uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 5, 7, 10};
-                unsigned counter = 0;
-                for (auto const &iteration : read.readIterations())
-                {
-                    REQUIRE(
-                        iteration.iterationIndex == iterationOrder[counter]);
-                    ++counter;
-                }
-                REQUIRE(counter == 8);
-                // // Cannot do listSeries here because the Series is already
-                // // drained
-                // REQUIRE_THROWS_AS(
-                //     helper::listSeries(read), error::WrongAPIUsage);
-            }
-            break;
+            // case ParseMode::AheadOfTimeWithoutSnapshot: {
+            //     uint64_t iterationOrder[] = {0, 1, 3, 4, 10};
+            //     unsigned counter = 0;
+            //     for (auto const &iteration : read.readIterations())
+            //     {
+            //         REQUIRE(
+            //             iteration.iterationIndex == iterationOrder[counter]);
+            //         ++counter;
+            //     }
+            //     REQUIRE(counter == 5);
+            //     // // Cannot do listSeries here because the Series is already
+            //     // // drained
+            //     // REQUIRE_THROWS_AS(
+            //     //     helper::listSeries(read), error::WrongAPIUsage);
+            // }
+            // break;
             case ParseMode::LinearWithoutSnapshot: {
-                uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10};
+                uint64_t iterationOrder[] = {0, 1, 3, 4, 10};
                 unsigned counter = 0;
                 for (auto const &iteration : read.readIterations())
                 {
@@ -6830,7 +6855,7 @@ void append_mode(
                         iteration.iterationIndex == iterationOrder[counter]);
                     ++counter;
                 }
-                REQUIRE(counter == 6);
+                REQUIRE(counter == 5);
                 // Cannot do listSeries here because the Series is already
                 // drained
                 REQUIRE_THROWS_AS(
@@ -6841,7 +6866,7 @@ void append_mode(
                 // in variable-based encodings, iterations are not parsed ahead
                 // of time but as they go
                 unsigned counter = 0;
-                uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 10, 7, 5};
+                uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 5};
                 for (auto const &iteration : read.readIterations())
                 {
                     REQUIRE(
@@ -6910,7 +6935,7 @@ TEST_CASE("append_mode", "[serial]")
             append_mode(
                 "../samples/append/groupbased." + t,
                 false,
-                ParseMode::AheadOfTimeWithoutSnapshot,
+                ParseMode::LinearWithoutSnapshot,
                 jsonConfigOld);
             append_mode(
                 "../samples/append/groupbased_newschema." + t,
