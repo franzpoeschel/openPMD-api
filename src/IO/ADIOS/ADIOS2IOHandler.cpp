@@ -568,7 +568,7 @@ void ADIOS2IOHandlerImpl::createPath(
     Writable *writable, const Parameter<Operation::CREATE_PATH> &parameters)
 {
     std::string path;
-    refreshFileFromParent(writable, /* preferParentFile = */ true);
+    auto file = refreshFileFromParent(writable, /* preferParentFile = */ true);
 
     /* Sanitize path */
     if (!auxiliary::starts_with(parameters.path, '/'))
@@ -587,6 +587,15 @@ void ADIOS2IOHandlerImpl::createPath(
     writable->written = true;
     writable->abstractFilePosition =
         std::make_shared<ADIOS2FilePosition>(path, GroupOrDataset::GROUP);
+
+    switch (schema())
+    {
+    case SupportedSchema::s_0000_00_00:
+        break;
+    case SupportedSchema::s_2022_07_26:
+        getFileData(file, IfFileNotOpen::ThrowError).markActive(writable);
+        break;
+    }
 }
 
 void ADIOS2IOHandlerImpl::createDataset(
@@ -744,7 +753,7 @@ void ADIOS2IOHandlerImpl::openPath(
     Writable *writable, const Parameter<Operation::OPEN_PATH> &parameters)
 {
     /* Sanitize path */
-    refreshFileFromParent(writable, /* preferParentFile = */ true);
+    auto file = refreshFileFromParent(writable, /* preferParentFile = */ true);
     std::string prefix =
         filePositionToString(setAndGetFilePosition(writable->parent));
     std::string suffix = auxiliary::removeSlashes(parameters.path);
@@ -757,6 +766,15 @@ void ADIOS2IOHandlerImpl::openPath(
     writable->abstractFilePosition = std::make_shared<ADIOS2FilePosition>(
         prefix + infix + suffix, GroupOrDataset::GROUP);
     writable->written = true;
+
+    switch (schema())
+    {
+    case SupportedSchema::s_0000_00_00:
+        break;
+    case SupportedSchema::s_2022_07_26:
+        getFileData(file, IfFileNotOpen::ThrowError).markActive(writable);
+        break;
+    }
 }
 
 void ADIOS2IOHandlerImpl::openDataset(
@@ -768,9 +786,9 @@ void ADIOS2IOHandlerImpl::openDataset(
     pos->gd = GroupOrDataset::DATASET;
     auto file = refreshFileFromParent(writable, /* preferParentFile = */ false);
     auto varName = nameOfVariable(writable);
+    auto &fileData = getFileData(file, IfFileNotOpen::ThrowError);
     *parameters.dtype =
-        detail::fromADIOS2Type(getFileData(file, IfFileNotOpen::ThrowError)
-                                   .m_IO.VariableType(varName));
+        detail::fromADIOS2Type(fileData.m_IO.VariableType(varName));
     switchAdios2VariableType<detail::DatasetOpener>(
         *parameters.dtype, this, file, varName, parameters);
     writable->written = true;
@@ -830,20 +848,16 @@ void ADIOS2IOHandlerImpl::writeAttribute(
             // cannot do this
             return;
         }
-        switchType<detail::OldAttributeWriter>(
-            parameters.dtype, this, writable, parameters);
+
         break;
     case SupportedSchema::s_2022_07_26: {
-        throw std::runtime_error("Unimplemented!");
-        /*
-         * Should be fairly similar to old implementation, merely ensure
-         * overwriting and changesOverSteps both work.
-         */
         break;
     }
     default:
         throw std::runtime_error("Unreachable!");
     }
+    switchType<detail::OldAttributeWriter>(
+        parameters.dtype, this, writable, parameters);
 }
 
 void ADIOS2IOHandlerImpl::readDataset(
@@ -999,11 +1013,21 @@ void ADIOS2IOHandlerImpl::readAttribute(
     auto pos = setAndGetFilePosition(writable);
     detail::BufferedActions &ba = getFileData(file, IfFileNotOpen::ThrowError);
     ba.requireActiveStep();
-    detail::OldBufferedAttributeRead bar;
-    bar.name = nameOfAttribute(writable, parameters.name);
-    bar.param = parameters;
-    ba.enqueue(std::move(bar));
-    m_dirty.emplace(std::move(file));
+    auto name = nameOfAttribute(writable, parameters.name);
+
+    auto type = detail::attributeInfo(ba.m_IO, name, /* verbose = */ true);
+    if (type == Datatype::UNDEFINED)
+    {
+        throw error::ReadError(
+            error::AffectedObject::Attribute,
+            error::Reason::NotFound,
+            "ADIOS2",
+            name);
+    }
+
+    Datatype ret = switchType<detail::OldAttributeReader>(
+        type, ba.m_IO, name, parameters.resource);
+    *parameters.dtype = ret;
 }
 
 void ADIOS2IOHandlerImpl::listPaths(
@@ -1075,7 +1099,53 @@ void ADIOS2IOHandlerImpl::listPaths(
         break;
     }
     case SupportedSchema::s_2022_07_26: {
-        throw std::runtime_error("Unimplemented!");
+        {
+            auto tablePrefix = ADIOS2Defaults::str_activeTablePrefix + myName;
+            std::vector attrs =
+                fileData.availableAttributesPrefixed(tablePrefix);
+            if (fileData.streamStatus ==
+                detail::BufferedActions::StreamStatus::DuringStep)
+            {
+                auto currentStep = fileData.getEngine().CurrentStep();
+                for (auto const &attrName : attrs)
+                {
+                    using table_t = unsigned long long;
+                    auto attr = fileData.m_IO.InquireAttribute<table_t>(
+                        tablePrefix + attrName);
+                    if (!attr)
+                    {
+                        std::cerr << "[ADIOS2 backend] Unable to inquire group "
+                                     "table value for group '"
+                                  << myName << attrName
+                                  << "', will pretend it does not exist."
+                                  << std::endl;
+                        continue;
+                    }
+                    if (attr.Data()[0] != currentStep)
+                    {
+                        // group wasn't defined in current step
+                        continue;
+                    }
+                    auto firstSlash = attrName.find_first_of('/');
+                    if (firstSlash == std::string::npos)
+                    {
+                        subdirs.emplace(attrName);
+                    }
+                    // else // should we maybe consider deeper groups too?
+                }
+            }
+            else
+            {
+                for (auto const &attrName : attrs)
+                {
+                    auto firstSlash = attrName.find_first_of('/');
+                    if (firstSlash == std::string::npos)
+                    {
+                        subdirs.emplace(attrName);
+                    }
+                }
+            }
+        }
         break;
     }
     }
@@ -1114,31 +1184,22 @@ void ADIOS2IOHandlerImpl::listDatasets(
     auto &fileData = getFileData(file, IfFileNotOpen::ThrowError);
     fileData.requireActiveStep();
 
-    switch (schema())
+    std::unordered_set<std::string> subdirs;
+    for (auto var : fileData.availableVariablesPrefixed(myName))
     {
-    case SupportedSchema::s_0000_00_00: {
-        std::unordered_set<std::string> subdirs;
-        for (auto var : fileData.availableVariablesPrefixed(myName))
+        // if string still contains a slash, variable is a dataset below the
+        // current group
+        // we only want datasets contained directly within the current group
+        // let's ensure that
+        auto firstSlash = var.find_first_of('/');
+        if (firstSlash == std::string::npos)
         {
-            // if string still contains a slash, variable is a dataset below the
-            // current group
-            // we only want datasets contained directly within the current group
-            // let's ensure that
-            auto firstSlash = var.find_first_of('/');
-            if (firstSlash == std::string::npos)
-            {
-                subdirs.emplace(std::move(var));
-            }
-        }
-        for (auto &dataset : subdirs)
-        {
-            parameters.datasets->emplace_back(std::move(dataset));
+            subdirs.emplace(std::move(var));
         }
     }
-    break;
-    case SupportedSchema::s_2022_07_26:
-        throw std::runtime_error("Unsupported!");
-        break;
+    for (auto &dataset : subdirs)
+    {
+        parameters.datasets->emplace_back(std::move(dataset));
     }
 }
 
@@ -1589,36 +1650,40 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace(std::move(file));
 
-        std::string t = IO.AttributeType(fullName);
-        if (!t.empty()) // an attribute is present <=> it has a type
+        if (!parameters.changesOverSteps)
         {
-            // don't overwrite attributes if they are equivalent
-            // overwriting is only legal within the same step
+            std::string t = IO.AttributeType(fullName);
+            if (!t.empty()) // an attribute is present <=> it has a type
+            {
+                // don't overwrite attributes if they are equivalent
+                // overwriting is only legal within the same step
 
-            auto attributeModifiable = [&filedata, &fullName]() {
-                auto it = filedata.uncommittedAttributes.find(fullName);
-                return it != filedata.uncommittedAttributes.end();
-            };
-            if (AttributeTypes<T>::attributeUnchanged(
-                    IO, fullName, std::get<T>(parameters.resource)))
-            {
-                return;
-            }
-            else if (attributeModifiable())
-            {
-                IO.RemoveAttribute(fullName);
+                auto attributeModifiable = [&filedata, &fullName]() {
+                    auto it = filedata.uncommittedAttributes.find(fullName);
+                    return it != filedata.uncommittedAttributes.end();
+                };
+                if (AttributeTypes<T>::attributeUnchanged(
+                        IO, fullName, std::get<T>(parameters.resource)))
+                {
+                    return;
+                }
+                else if (attributeModifiable())
+                {
+                    IO.RemoveAttribute(fullName);
+                }
+                else
+                {
+                    std::cerr
+                        << "[Warning][ADIOS2] Cannot modify attribute from "
+                           "previous step: "
+                        << fullName << std::endl;
+                    return;
+                }
             }
             else
             {
-                std::cerr << "[Warning][ADIOS2] Cannot modify attribute from "
-                             "previous step: "
-                          << fullName << std::endl;
-                return;
+                filedata.uncommittedAttributes.emplace(fullName);
             }
-        }
-        else
-        {
-            filedata.uncommittedAttributes.emplace(fullName);
         }
 
         auto &value = std::get<T>(parameters.resource);
@@ -1631,8 +1696,13 @@ namespace detail
         }
         else if constexpr (auxiliary::IsVector_v<T>)
         {
-            auto attr =
-                IO.DefineAttribute(fullName, value.data(), value.size());
+            auto attr = IO.DefineAttribute(
+                fullName,
+                value.data(),
+                value.size(),
+                /* variableName = */ "",
+                /* separator = */ "/",
+                /* allowModification = */ parameters.changesOverSteps);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1642,8 +1712,13 @@ namespace detail
         }
         else if constexpr (auxiliary::IsArray_v<T>)
         {
-            auto attr =
-                IO.DefineAttribute(fullName, value.data(), value.size());
+            auto attr = IO.DefineAttribute(
+                fullName,
+                value.data(),
+                value.size(),
+                /* variableName = */ "",
+                /* separator = */ "/",
+                /* allowModification = */ parameters.changesOverSteps);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1654,7 +1729,11 @@ namespace detail
         else if constexpr (std::is_same_v<T, bool>)
         {
             IO.DefineAttribute<bool_representation>(
-                ADIOS2Defaults::str_isBooleanOldLayout + fullName, 1);
+                ADIOS2Defaults::str_isBooleanOldLayout + fullName,
+                1,
+                /* variableName = */ "",
+                /* separator = */ "/",
+                /* allowModification = */ parameters.changesOverSteps);
             auto representation = bool_repr::toRep(value);
             auto attr = IO.DefineAttribute(fullName, representation);
             if (!attr)
@@ -1666,7 +1745,12 @@ namespace detail
         }
         else
         {
-            auto attr = IO.DefineAttribute(fullName, value);
+            auto attr = IO.DefineAttribute(
+                fullName,
+                value,
+                /* variableName = */ "",
+                /* separator = */ "/",
+                /* allowModification = */ parameters.changesOverSteps);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1857,24 +1941,6 @@ namespace detail
     {
         switchAdios2VariableType<detail::WriteDataset>(
             param.dtype, ba.m_impl, *this, ba.m_IO, ba.getEngine());
-    }
-
-    void OldBufferedAttributeRead::run(BufferedActions &ba)
-    {
-        auto type = attributeInfo(ba.m_IO, name, /* verbose = */ true);
-
-        if (type == Datatype::UNDEFINED)
-        {
-            throw error::ReadError(
-                error::AffectedObject::Attribute,
-                error::Reason::NotFound,
-                "ADIOS2",
-                name);
-        }
-
-        Datatype ret = switchType<detail::OldAttributeReader>(
-            type, ba.m_IO, name, param.resource);
-        *param.dtype = ret;
     }
 
     BufferedActions::BufferedActions(
@@ -2991,6 +3057,34 @@ namespace detail
         }
     }
 
+    void BufferedActions::markActive(Writable *writable)
+    {
+        switch (schema())
+        {
+        case SupportedSchema::s_0000_00_00:
+            break;
+        case SupportedSchema::s_2022_07_26: {
+            // @todo do this also for all parent paths?
+            if (m_mode != adios2::Mode::Read &&
+                m_mode != adios2::Mode::ReadRandomAccess)
+            {
+                auto filePos = m_impl->setAndGetFilePosition(
+                    writable, /* write = */ false);
+                using attr_t = unsigned long long;
+                requireActiveStep();
+                auto fullPath =
+                    ADIOS2Defaults::str_activeTablePrefix + filePos->location;
+                m_IO.DefineAttribute<attr_t>(
+                    fullPath,
+                    getEngine().CurrentStep(),
+                    /* variableName = */ "",
+                    /* separator = */ "/",
+                    /* allowModification = */ true);
+            }
+        }
+        break;
+        }
+    }
 } // namespace detail
 
 #if openPMD_HAVE_MPI

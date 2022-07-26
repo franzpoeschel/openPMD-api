@@ -435,6 +435,7 @@ namespace ADIOS2Defaults
     constexpr const_str str_isBooleanOldLayout = "__is_boolean__";
     constexpr const_str str_isBooleanNewLayout =
         "__openPMD_internal/is_boolean";
+    constexpr const_str str_activeTablePrefix = "__openPMD_groups";
 } // namespace ADIOS2Defaults
 
 namespace detail
@@ -773,14 +774,6 @@ namespace detail
         void run(BufferedActions &) override;
     };
 
-    struct OldBufferedAttributeRead : BufferedAction
-    {
-        Parameter<Operation::READ_ATT> param;
-        std::string name;
-
-        void run(BufferedActions &) override;
-    };
-
     struct I_UpdateSpan
     {
         virtual void *update() = 0;
@@ -991,6 +984,10 @@ namespace detail
          * See description below.
          */
         void invalidateVariablesMap();
+
+        void markActive(Writable *);
+
+        // bool isActive(std::string const & path);
 
         /*
          * streamStatus is NoStream for file-based ADIOS engines.

@@ -4785,7 +4785,6 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     //     dontUseSteps,
     //     Access::READ_LINEAR);
 
-    return; // @todo use Schema 2022
     /*
      * Do this whole thing once more, but this time use the new attribute
      * layout.
@@ -4793,7 +4792,7 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     useSteps = R"(
     {
         "adios2": {
-            "schema": 20210209,
+            "schema": 20220726,
             "engine": {
                 "type": "bp4",
                 "usesteps": true
@@ -4804,7 +4803,7 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     dontUseSteps = R"(
     {
         "adios2": {
-            "schema": 20210209,
+            "schema": 20220726,
             "engine": {
                 "type": "bp4",
                 "usesteps": false
@@ -4813,6 +4812,12 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     }
     )";
     // sing the yes no song
+    bp4_steps(
+        "../samples/newlayout_bp4steps_yes_yes.bp",
+        useSteps,
+        useSteps,
+        Access::READ_LINEAR);
+    return; // @todo use Schema 2022
     bp4_steps("../samples/newlayout_bp4steps_yes_yes.bp", useSteps, useSteps);
     bp4_steps(
         "../samples/newlayout_bp4steps_yes_no.bp", useSteps, dontUseSteps);
