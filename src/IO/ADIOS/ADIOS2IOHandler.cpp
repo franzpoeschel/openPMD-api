@@ -980,6 +980,8 @@ void ADIOS2IOHandlerImpl::getBufferView(
         break;
     }
 
+    ba.requireActiveStep();
+
     if (parameters.update)
     {
         detail::I_UpdateSpan &updater =
@@ -2998,12 +3000,14 @@ namespace detail
                 // a step
                 // in file-based mode, we do it before
                 bool layoutVersionHasBeenSet = false;
-                auto setLayoutVersion = [IO{m_IO},
-                                         engine{m_engine.value()},
-                                         this,
-                                         &layoutVersionHasBeenSet,
-                                         impl{m_impl},
-                                         engineType{m_engineType}]() mutable {
+                auto setLayoutVersion =
+                    [IO{m_IO},
+                     engine{m_engine.value()},
+                     this,
+                     &layoutVersionHasBeenSet,
+                     impl{m_impl},
+                     engineType{m_engineType}]() mutable -> bool {
+                    bool openedANewStep = false;
                     if (layoutVersionHasBeenSet)
                     {
                         throw std::runtime_error(
@@ -3025,7 +3029,7 @@ namespace detail
                                 "[ADIOS2] Unexpected step status when "
                                 "opening file/stream.");
                         }
-                        streamStatus = StreamStatus::DuringStep;
+                        openedANewStep = true;
                     }
                     auto attr = IO.InquireAttribute<ADIOS2Schema::schema_t>(
                         ADIOS2Defaults::str_adios2Schema);
@@ -3039,6 +3043,7 @@ namespace detail
                     }
                     configure_IO_Read_After_open();
                     layoutVersionHasBeenSet = true;
+                    return openedANewStep;
                 };
                 /*
                  * First round: call setLayoutVersion() unless the engine is a
@@ -3049,7 +3054,7 @@ namespace detail
                  * since setLayoutVersion() might change the streamStatus after
                  * taking a look at the used schema.
                  */
-                setLayoutVersion();
+                bool openedANewStep = setLayoutVersion();
                 /*
                  * Second round: Decide the streamStatus.
                  */
@@ -3062,12 +3067,21 @@ namespace detail
                     {
                         if (parsePreference == ParsePreference::UpFront)
                         {
+                            if (openedANewStep)
+                            {
+                                throw error::Internal(
+                                    "Logic error in ADIOS2 backend! No need to "
+                                    "indiscriminately open a step before doing "
+                                    "anything in an engine that supports "
+                                    "up-front parsing.");
+                            }
                             streamStatus = StreamStatus::Parsing;
                         }
                         else
                         {
-                            if (m_engine.value().BeginStep() !=
-                                adios2::StepStatus::OK)
+                            if (!openedANewStep &&
+                                m_engine.value().BeginStep() !=
+                                    adios2::StepStatus::OK)
                             {
                                 throw std::runtime_error(
                                     "[ADIOS2] Unexpected step status when "
@@ -3078,6 +3092,10 @@ namespace detail
                     }
                     else
                     {
+                        /*
+                         * If openedANewStep is true, then the file consists
+                         * of one large step, we just leave it open.
+                         */
                         streamStatus = StreamStatus::NoStream;
                     }
                     break;
@@ -3089,8 +3107,18 @@ namespace detail
                     // by setLayoutVersion(), because otherwise we don't see
                     // the schema attribute
                     break;
-                // case StreamStatus::OutsideOfStep:
-                //   is resolved by setLayoutVersion() into DuringStep
+                case StreamStatus::OutsideOfStep:
+                    if (openedANewStep)
+                    {
+                        streamStatus = StreamStatus::DuringStep;
+                    }
+                    else
+                    {
+                        throw error::Internal(
+                            "Control flow error: Step should have been opened "
+                            "before this point.");
+                    }
+                    break;
                 default:
                     throw std::runtime_error("[ADIOS2] Control flow error!");
                 }

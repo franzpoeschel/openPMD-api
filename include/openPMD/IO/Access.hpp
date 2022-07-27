@@ -29,6 +29,7 @@ namespace openPMD
 enum class Access
 {
     READ_ONLY, //!< open series as read-only, fails if series is not found
+    READ_RANDOM_ACCESS = READ_ONLY,
     READ_LINEAR,
     READ_WRITE, //!< open existing series as writable
     CREATE, //!< create new series and truncate existing (files)
