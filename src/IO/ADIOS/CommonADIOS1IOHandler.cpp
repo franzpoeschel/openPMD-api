@@ -1130,7 +1130,8 @@ template <typename ChildClass>
 void CommonADIOS1IOHandlerImpl<ChildClass>::writeAttribute(
     Writable *writable, Parameter<Operation::WRITE_ATT> const &parameters)
 {
-    if (parameters.changesOverSteps)
+    if (parameters.changesOverSteps ==
+        Parameter<Operation::WRITE_ATT>::ChangesOverSteps::Yes)
     {
         // cannot do this
         return;

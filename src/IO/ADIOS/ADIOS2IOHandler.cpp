@@ -843,7 +843,8 @@ void ADIOS2IOHandlerImpl::writeAttribute(
     switch (schema())
     {
     case SupportedSchema::s_0000_00_00:
-        if (parameters.changesOverSteps)
+        if (parameters.changesOverSteps ==
+            Parameter<Operation::WRITE_ATT>::ChangesOverSteps::Yes)
         {
             // cannot do this
             return;
@@ -1650,7 +1651,8 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace(std::move(file));
 
-        if (!parameters.changesOverSteps)
+        if (parameters.changesOverSteps ==
+            Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No)
         {
             std::string t = IO.AttributeType(fullName);
             if (!t.empty()) // an attribute is present <=> it has a type
@@ -1702,7 +1704,8 @@ namespace detail
                 value.size(),
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps);
+                /* allowModification = */ parameters.changesOverSteps !=
+                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1718,7 +1721,8 @@ namespace detail
                 value.size(),
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps);
+                /* allowModification = */ parameters.changesOverSteps !=
+                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1729,13 +1733,15 @@ namespace detail
         else if constexpr (std::is_same_v<T, bool>)
         {
             IO.DefineAttribute<bool_representation>(
-                ADIOS2Defaults::str_isBooleanOldLayout + fullName,
-                1,
+                ADIOS2Defaults::str_isBooleanOldLayout + fullName, 1);
+            auto representation = bool_repr::toRep(value);
+            auto attr = IO.DefineAttribute(
+                fullName,
+                representation,
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps);
-            auto representation = bool_repr::toRep(value);
-            auto attr = IO.DefineAttribute(fullName, representation);
+                /* allowModification = */ parameters.changesOverSteps !=
+                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1750,7 +1756,8 @@ namespace detail
                 value,
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps);
+                /* allowModification = */ parameters.changesOverSteps !=
+                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
             if (!attr)
             {
                 throw std::runtime_error(
