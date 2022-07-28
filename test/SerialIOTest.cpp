@@ -6700,10 +6700,9 @@ void append_mode(
         write.flush();
     }
 
-    auto verifyIteration = [](auto &&iteration) {
-        auto chunk =
-            iteration.meshes["E"]["x"].template loadChunk<int>({0}, {10});
-        iteration.seriesFlush();
+    auto verifyIteration = [](auto &&it) {
+        auto chunk = it.meshes["E"]["x"].template loadChunk<int>({0}, {10});
+        it.seriesFlush();
         for (size_t i = 0; i < 10; ++i)
         {
             REQUIRE(chunk.get()[i] == 999);
