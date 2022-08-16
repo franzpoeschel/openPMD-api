@@ -5332,7 +5332,7 @@ void variableBasedSeries(std::string const &file)
                 REQUIRE(
                     iteration.meshes["E"].containsAttribute(
                         "attr_" + std::to_string(otherIteration)) ==
-                    (otherIteration == iteration.iterationIndex));
+                    (otherIteration <= iteration.iterationIndex));
             }
             REQUIRE(
                 iteration.meshes["E"][std::to_string(iteration.iterationIndex)]
@@ -5356,7 +5356,8 @@ void variableBasedSeries(std::string const &file)
 #if openPMD_HAVE_ADIOS2
 TEST_CASE("variableBasedSeries", "[serial][adios2]")
 {
-    variableBasedSeries("../samples/variableBasedSeries.bp");
+    variableBasedSeries("../samples/variableBasedSeries.bp4");
+    variableBasedSeries("../samples/variableBasedSeries.bp5");
 }
 #endif
 
@@ -5398,7 +5399,7 @@ void variableBasedParticleData()
     {
         // open file for reading
         Series series =
-            Series("../samples/variableBasedParticles.bp", Access::READ_ONLY);
+            Series("../samples/variableBasedParticles.bp", Access::READ_LINEAR);
 
         for (IndexedIteration iteration : series.readIterations())
         {
@@ -6854,7 +6855,7 @@ void append_mode_filebased(std::string const &extension)
 {
     "adios2":
     {
-        "schema": 20210209,
+        "schema": 20220726,
         "engine":
         {
             "usesteps" : true
