@@ -2637,6 +2637,8 @@ namespace detail
                     /*
                      * Scenario: BP5 with old ADIOS2 schema and normal read
                      * mode. Need to close the engine and reopen.
+                     * (Once we add support for the StreamReader option of BP4,
+                     *  the BP4 engine will also be relevant in this branch.)
                      */
                     parsePreference = ParsePreference::RandomAccess;
                     m_engine->Close();
@@ -2645,6 +2647,14 @@ namespace detail
                     // Overwrite the old IO object since it is stained with the
                     // objects of the now closed engine
                     create_IO();
+                    for (auto &[key, val] : m_parameterReapplyLog)
+                    {
+                        m_IO.SetParameter(std::move(key), std::move(val));
+                    }
+                    /*
+                     * Log is cleared upon end of function.
+                     */
+                    m_IO.SetEngine(m_engineType);
                     *m_engine = adios2::Engine(m_IO.Open(m_file, m_mode));
 #else
                     throw std::runtime_error(
@@ -2671,6 +2681,10 @@ namespace detail
              */
             break;
         }
+        /*
+         * No need to store the log past this point.
+         */
+        m_parameterReapplyLog.clear();
     }
 
     void BufferedActions::configure_IO_Write(
@@ -2758,7 +2772,7 @@ namespace detail
                     auto maybeString = json::asStringDynamic(it.value());
                     if (maybeString.has_value())
                     {
-                        m_IO.SetParameter(
+                        setIOParameter(
                             it.key(), std::move(maybeString.value()));
                     }
                     else
@@ -2864,11 +2878,11 @@ namespace detail
             if (1 ==
                 auxiliary::getEnvNum("OPENPMD_ADIOS2_HAVE_METADATA_FILE", 1))
             {
-                m_IO.SetParameter("CollectiveMetadata", "On");
+                setIOParameter("CollectiveMetadata", "On");
             }
             else
             {
-                m_IO.SetParameter("CollectiveMetadata", "Off");
+                setIOParameter("CollectiveMetadata", "Off");
             }
         }
         if (notYetConfigured("Profile"))
@@ -2876,11 +2890,11 @@ namespace detail
             if (1 == auxiliary::getEnvNum("OPENPMD_ADIOS2_HAVE_PROFILING", 1) &&
                 notYetConfigured("Profile"))
             {
-                m_IO.SetParameter("Profile", "On");
+                setIOParameter("Profile", "On");
             }
             else
             {
-                m_IO.SetParameter("Profile", "Off");
+                setIOParameter("Profile", "Off");
             }
         }
 #if openPMD_HAVE_MPI
@@ -2889,7 +2903,7 @@ namespace detail
                 auxiliary::getEnvNum("OPENPMD_ADIOS2_NUM_SUBSTREAMS", 0);
             if (notYetConfigured("SubStreams") && 0 != num_substreams)
             {
-                m_IO.SetParameter("SubStreams", std::to_string(num_substreams));
+                setIOParameter("SubStreams", std::to_string(num_substreams));
             }
 
             // BP5 parameters
@@ -2904,18 +2918,18 @@ namespace detail
                 auxiliary::getEnvNum("OPENPMD_ADIOS2_BP5_BufferChunkMB", 0);
 
             if (notYetConfigured("NumAggregators") && (numAgg > 0))
-                m_IO.SetParameter("NumAggregators", std::to_string(numAgg));
+                setIOParameter("NumAggregators", std::to_string(numAgg));
             if (notYetConfigured("NumSubFiles") && (numSubFiles > 0))
-                m_IO.SetParameter("NumSubFiles", std::to_string(numSubFiles));
+                setIOParameter("NumSubFiles", std::to_string(numSubFiles));
             if (notYetConfigured("AggregationType") && (AggTypeStr.size() > 0))
-                m_IO.SetParameter("AggregationType", AggTypeStr);
+                setIOParameter("AggregationType", AggTypeStr);
             if (notYetConfigured("BufferChunkSize") && (BufferChunkMB > 0))
-                m_IO.SetParameter(
+                setIOParameter(
                     "BufferChunkSize",
                     std::to_string(
                         (uint64_t)BufferChunkMB * (uint64_t)1048576));
             if (notYetConfigured("MaxShmSize") && (MaxShmMB > 0))
-                m_IO.SetParameter(
+                setIOParameter(
                     "MaxShmSize",
                     std::to_string((uint64_t)MaxShmMB * (uint64_t)1048576));
         }
@@ -2930,7 +2944,7 @@ namespace detail
              */
             auto stats_level =
                 auxiliary::getEnvNum("OPENPMD_ADIOS2_STATS_LEVEL", 0);
-            m_IO.SetParameter("StatsLevel", std::to_string(stats_level));
+            setIOParameter("StatsLevel", std::to_string(stats_level));
         }
         if (m_engineType == "sst" && notYetConfigured("QueueLimit"))
         {
@@ -2951,7 +2965,7 @@ namespace detail
              * keeping pipeline parallelism a default without running the risk
              * of using unbound memory.
              */
-            m_IO.SetParameter("QueueLimit", "2");
+            setIOParameter("QueueLimit", "2");
         }
 
         // We need to open the engine now already to inquire configuration

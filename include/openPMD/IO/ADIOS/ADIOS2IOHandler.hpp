@@ -331,11 +331,11 @@ private:
      * @return first parameter: the operators, second parameters: whether
      * operators have been configured
      */
-    std::optional<std::vector<ParameterizedOperator> >
+    std::optional<std::vector<ParameterizedOperator>>
     getOperators(json::TracingJSON config);
 
     // use m_config
-    std::optional<std::vector<ParameterizedOperator> > getOperators();
+    std::optional<std::vector<ParameterizedOperator>> getOperators();
 
     std::string fileSuffix(bool verbose = true) const;
 
@@ -361,7 +361,7 @@ private:
      */
     std::unordered_map<
         InvalidatableFile,
-        std::unique_ptr<detail::BufferedActions> >
+        std::unique_ptr<detail::BufferedActions>>
         m_fileData;
 
     std::map<std::string, adios2::Operator> m_operators;
@@ -455,8 +455,8 @@ namespace detail
 
     template <typename T>
     inline constexpr bool IsUnsupportedComplex_v =
-        std::is_same_v<T, std::complex<long double> > ||
-        std::is_same_v<T, std::vector<std::complex<long double> > >;
+        std::is_same_v<T, std::complex<long double>> ||
+        std::is_same_v<T, std::vector<std::complex<long double>>>;
 
     struct DatasetReader
     {
@@ -630,7 +630,7 @@ namespace detail
     };
 
     template <>
-    struct AttributeTypes<std::complex<long double> >
+    struct AttributeTypes<std::complex<long double>>
     {
         static void createAttribute(
             adios2::IO &,
@@ -663,13 +663,13 @@ namespace detail
     };
 
     template <>
-    struct AttributeTypes<std::vector<std::complex<long double> > >
+    struct AttributeTypes<std::vector<std::complex<long double>>>
     {
         static void createAttribute(
             adios2::IO &,
             adios2::Engine &,
             detail::BufferedAttributeWrite &,
-            const std::vector<std::complex<long double> > &)
+            const std::vector<std::complex<long double>> &)
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: no support for long double complex "
@@ -687,7 +687,7 @@ namespace detail
         }
 
         static bool attributeUnchanged(
-            adios2::IO &, std::string, std::vector<std::complex<long double> >)
+            adios2::IO &, std::string, std::vector<std::complex<long double>>)
         {
             throw std::runtime_error(
                 "[ADIOS2] Internal error: no support for long double complex "
@@ -696,7 +696,7 @@ namespace detail
     };
 
     template <typename T>
-    struct AttributeTypes<std::vector<T> >
+    struct AttributeTypes<std::vector<T>>
     {
         static void createAttribute(
             adios2::IO &IO,
@@ -734,7 +734,7 @@ namespace detail
     };
 
     template <>
-    struct AttributeTypes<std::vector<std::string> >
+    struct AttributeTypes<std::vector<std::string>>
     {
         static void createAttribute(
             adios2::IO &IO,
@@ -772,7 +772,7 @@ namespace detail
     };
 
     template <typename T, size_t n>
-    struct AttributeTypes<std::array<T, n> >
+    struct AttributeTypes<std::array<T, n>>
     {
         static void createAttribute(
             adios2::IO &IO,
@@ -993,7 +993,7 @@ namespace detail
          * The default queue for deferred actions.
          * Drained upon BufferedActions::flush().
          */
-        std::vector<std::unique_ptr<BufferedAction> > m_buffer;
+        std::vector<std::unique_ptr<BufferedAction>> m_buffer;
         /**
          * Buffer for attributes to be written in the new (variable-based)
          * attribute layout.
@@ -1017,7 +1017,7 @@ namespace detail
          * We must store them somewhere until the next PerformPuts/Gets, EndStep
          * or Close in ADIOS2 to avoid use after free conditions.
          */
-        std::vector<std::unique_ptr<BufferedAction> > m_alreadyEnqueued;
+        std::vector<std::unique_ptr<BufferedAction>> m_alreadyEnqueued;
         adios2::Mode m_mode;
         /**
          * The base pointer of an ADIOS2 span might change after reallocations.
@@ -1027,7 +1027,7 @@ namespace detail
          * retrieval of the updated base pointer.
          * This map is cleared upon flush points.
          */
-        std::map<unsigned, std::unique_ptr<I_UpdateSpan> > m_updateSpans;
+        std::map<unsigned, std::unique_ptr<I_UpdateSpan>> m_updateSpans;
         PreloadAdiosAttributes preloadAttributes;
 
         /*
@@ -1275,6 +1275,21 @@ namespace detail
          */
         std::optional<AttributeMap_t> m_availableAttributes;
         std::optional<AttributeMap_t> m_availableVariables;
+
+        /*
+         * In some edge-cases, configure_IO_Read_After_open() will need to
+         * reopen the ADIOS2 Engine and IO objects, because they were opened
+         * with wrong access modes.
+         * In those cases, all configuration of the IO object gets lost.
+         * Save the configuration in this vector, so we can apply it again.
+         */
+        std::vector<std::pair<std::string, std::string>> m_parameterReapplyLog;
+
+        inline void setIOParameter(std::string key, std::string val)
+        {
+            m_IO.SetParameter(key, val);
+            m_parameterReapplyLog.emplace_back(std::move(key), std::move(val));
+        }
 
         /*
          * finalize() will set this true to avoid running twice.
