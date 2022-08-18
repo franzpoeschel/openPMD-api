@@ -865,7 +865,7 @@ void ADIOS2IOHandlerImpl::writeAttribute(
     default:
         throw std::runtime_error("Unreachable!");
     }
-    switchType<detail::OldAttributeWriter>(
+    switchType<detail::AttributeWriter>(
         parameters.dtype, this, writable, parameters);
 }
 
@@ -1034,8 +1034,8 @@ void ADIOS2IOHandlerImpl::readAttribute(
             name);
     }
 
-    Datatype ret = switchType<detail::OldAttributeReader>(
-        type, ba.m_IO, name, parameters.resource);
+    Datatype ret = switchType<detail::AttributeReader>(
+        type, *this, ba.m_IO, name, parameters.resource);
     *parameters.dtype = ret;
 }
 
@@ -1529,7 +1529,8 @@ namespace detail
     }
 
     template <typename T>
-    Datatype OldAttributeReader::call(
+    Datatype AttributeReader::call(
+        ADIOS2IOHandlerImpl &impl,
         adios2::IO &IO,
         std::string name,
         std::shared_ptr<Attribute::resource> resource)
@@ -1551,8 +1552,16 @@ namespace detail
                     name + "'.");
             }
 
-            std::string metaAttr =
-                ADIOS2Defaults::str_isBooleanOldLayout + name;
+            std::string metaAttr;
+            switch (impl.schema())
+            {
+            case SupportedSchema::s_0000_00_00:
+                metaAttr = ADIOS2Defaults::str_isBooleanOldLayout + name;
+                break;
+            case SupportedSchema::s_2022_07_26:
+                metaAttr = ADIOS2Defaults::str_isBooleanNewLayout + name;
+                break;
+            }
             /*
              * In verbose mode, attributeInfo will yield a warning if not
              * finding the requested attribute. Since we expect the attribute
@@ -1561,7 +1570,7 @@ namespace detail
              */
             auto type = attributeInfo(
                 IO,
-                ADIOS2Defaults::str_isBooleanOldLayout + name,
+                metaAttr,
                 /* verbose = */ false);
 
             if (type == determineDatatype<rep>())
@@ -1630,7 +1639,7 @@ namespace detail
     }
 
     template <int n, typename... Params>
-    Datatype OldAttributeReader::call(Params &&...)
+    Datatype AttributeReader::call(Params &&...)
     {
         throw std::runtime_error(
             "[ADIOS2] Internal error: Unknown datatype while "
@@ -1638,7 +1647,7 @@ namespace detail
     }
 
     template <typename T>
-    void OldAttributeWriter::call(
+    void AttributeWriter::call(
         ADIOS2IOHandlerImpl *impl,
         Writable *writable,
         const Parameter<Operation::WRITE_ATT> &parameters)
@@ -1744,8 +1753,17 @@ namespace detail
         }
         else if constexpr (std::is_same_v<T, bool>)
         {
-            IO.DefineAttribute<bool_representation>(
-                ADIOS2Defaults::str_isBooleanOldLayout + fullName, 1);
+            switch (impl->schema())
+            {
+            case SupportedSchema::s_0000_00_00:
+                IO.DefineAttribute<bool_representation>(
+                    ADIOS2Defaults::str_isBooleanOldLayout + fullName, 1);
+                break;
+            case SupportedSchema::s_2022_07_26:
+                IO.DefineAttribute<bool_representation>(
+                    ADIOS2Defaults::str_isBooleanNewLayout + fullName, 1);
+                break;
+            }
             auto representation = bool_repr::toRep(value);
             auto attr = IO.DefineAttribute(
                 fullName,
@@ -1778,7 +1796,7 @@ namespace detail
     }
 
     template <int n, typename... Params>
-    void OldAttributeWriter::call(Params &&...)
+    void AttributeWriter::call(Params &&...)
     {
         throw std::runtime_error(
             "[ADIOS2] Internal error: Unknown datatype while "

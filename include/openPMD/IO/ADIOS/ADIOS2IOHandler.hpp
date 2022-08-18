@@ -67,8 +67,8 @@ namespace detail
     struct DatasetReader;
     struct AttributeReader;
     struct AttributeWriter;
-    struct OldAttributeReader;
-    struct OldAttributeWriter;
+    struct AttributeReader;
+    struct AttributeWriter;
     template <typename>
     struct AttributeTypes;
     struct DatasetOpener;
@@ -112,8 +112,8 @@ class ADIOS2IOHandlerImpl
     friend struct detail::DatasetReader;
     friend struct detail::AttributeReader;
     friend struct detail::AttributeWriter;
-    friend struct detail::OldAttributeReader;
-    friend struct detail::OldAttributeWriter;
+    friend struct detail::AttributeReader;
+    friend struct detail::AttributeWriter;
     template <typename>
     friend struct detail::AttributeTypes;
     friend struct detail::DatasetOpener;
@@ -470,10 +470,11 @@ namespace detail
         static constexpr char const *errorMsg = "ADIOS2: readDataset()";
     };
 
-    struct OldAttributeReader
+    struct AttributeReader
     {
         template <typename T>
         static Datatype call(
+            ADIOS2IOHandlerImpl &,
             adios2::IO &IO,
             std::string name,
             std::shared_ptr<Attribute::resource> resource);
@@ -482,7 +483,7 @@ namespace detail
         static Datatype call(Params &&...);
     };
 
-    struct OldAttributeWriter
+    struct AttributeWriter
     {
         template <typename T>
         static void call(
