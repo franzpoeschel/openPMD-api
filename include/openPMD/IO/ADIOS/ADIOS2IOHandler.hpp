@@ -261,6 +261,16 @@ private:
 
     UseSpan m_useSpanBasedPutByDefault = UseSpan::Auto;
 
+    enum class ModifiableAttributes : char
+    {
+        Yes,
+        No,
+        Unspecified
+    };
+
+    ModifiableAttributes m_modifiableAttributes =
+        ModifiableAttributes::Unspecified;
+
     inline SupportedSchema schema() const
     {
         if (!m_schema.has_value())

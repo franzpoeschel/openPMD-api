@@ -5233,10 +5233,9 @@ TEST_CASE("git_adios2_sample_test", "[serial][adios2]")
 
 void variableBasedSeries(std::string const &file)
 {
-    std::string selectADIOS2 = R"({"backend": "adios2"})";
     constexpr Extent::value_type extent = 1000;
-    {
-        Series writeSeries(file, Access::CREATE, selectADIOS2);
+    auto testWrite = [&file](std::string const &jsonConfig) {
+        Series writeSeries(file, Access::CREATE, jsonConfig);
         writeSeries.setIterationEncoding(IterationEncoding::variableBased);
         REQUIRE(
             writeSeries.iterationEncoding() ==
@@ -5255,6 +5254,8 @@ void variableBasedSeries(std::string const &file)
                 iteration.setAttribute(
                     "iteration_is_larger_than_two", "it truly is");
             }
+
+            iteration.setAttribute("changing_value", i);
 
             // this tests changing extents and dimensionalities
             // across iterations
@@ -5290,14 +5291,16 @@ void variableBasedSeries(std::string const &file)
 
             iteration.close();
         }
-    }
+        REQUIRE(auxiliary::directory_exists(file));
+    };
 
-    REQUIRE(auxiliary::directory_exists(file));
-
-    auto testRead = [&file, &extent, &selectADIOS2](
-                        std::string const &jsonConfig) {
+    auto testRead = [&file, &extent](
+                        std::string const &parseMode,
+                        bool supportsModifiableAttributes) {
         Series readSeries(
-            file, Access::READ_LINEAR, json::merge(selectADIOS2, jsonConfig));
+            file,
+            Access::READ_LINEAR,
+            json::merge(R"(backend = "adios2")", parseMode));
 
         size_t last_iteration_index = 0;
         for (auto iteration : readSeries.readIterations())
@@ -5313,6 +5316,13 @@ void variableBasedSeries(std::string const &file)
                 REQUIRE_FALSE(iteration.containsAttribute(
                     "iteration_is_larger_than_two"));
             }
+
+            // If modifiable attributes are unsupported, the attribute is
+            // written once in step 0 and then never changed
+            // A warning is printed upon trying to write
+            REQUIRE(
+                iteration.getAttribute("changing_value").get<unsigned>() ==
+                (supportsModifiableAttributes ? iteration.iterationIndex : 0));
 
             auto E_x = iteration.meshes["E"]["x"];
             REQUIRE(E_x.getDimensionality() == 1);
@@ -5379,8 +5389,47 @@ void variableBasedSeries(std::string const &file)
         REQUIRE(last_iteration_index == 9);
     };
 
-    testRead("{\"defer_iteration_parsing\": true}");
-    testRead("{\"defer_iteration_parsing\": false}");
+    std::string jsonConfig = R"(
+{
+  "backend": "adios2",
+  "adios2": {
+    "modifiable_attributes": true
+  }
+})";
+    testWrite(jsonConfig);
+    testRead(
+        "{\"defer_iteration_parsing\": true}",
+        /*supportsModifiableAttributes = */ true);
+    testRead(
+        "{\"defer_iteration_parsing\": false}",
+        /*supportsModifiableAttributes = */ true);
+
+    jsonConfig = R"(
+{
+  "backend": "adios2"
+})";
+    testWrite(jsonConfig);
+    testRead(
+        "{\"defer_iteration_parsing\": true}",
+        /*supportsModifiableAttributes = */ true);
+    testRead(
+        "{\"defer_iteration_parsing\": false}",
+        /*supportsModifiableAttributes = */ true);
+
+    jsonConfig = R"(
+{
+  "backend": "adios2",
+  "adios2": {
+    "modifiable_attributes": false
+  }
+})";
+    testWrite(jsonConfig);
+    testRead(
+        "{\"defer_iteration_parsing\": true}",
+        /*supportsModifiableAttributes = */ false);
+    testRead(
+        "{\"defer_iteration_parsing\": false}",
+        /*supportsModifiableAttributes = */ false);
 }
 
 #if openPMD_HAVE_ADIOS2

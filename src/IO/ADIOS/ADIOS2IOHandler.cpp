@@ -160,6 +160,14 @@ void ADIOS2IOHandlerImpl::init(json::TracingJSON cfg)
                                                                   : UseSpan::No;
         }
 
+        if (m_config.json().contains("modifiable_attributes"))
+        {
+            m_modifiableAttributes =
+                m_config["modifiable_attributes"].json().get<bool>()
+                ? ModifiableAttributes::Yes
+                : ModifiableAttributes::No;
+        }
+
         auto engineConfig = config(ADIOS2Defaults::str_engine);
         if (!engineConfig.json().is_null())
         {
@@ -1651,8 +1659,10 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace(std::move(file));
 
-        if (parameters.changesOverSteps ==
-            Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No)
+        if (impl->m_modifiableAttributes ==
+                ADIOS2IOHandlerImpl::ModifiableAttributes::No &&
+            parameters.changesOverSteps ==
+                Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No)
         {
             std::string t = IO.AttributeType(fullName);
             if (!t.empty()) // an attribute is present <=> it has a type
@@ -1689,6 +1699,10 @@ namespace detail
         }
 
         auto &value = std::get<T>(parameters.resource);
+        bool modifiable = impl->m_modifiableAttributes ==
+                ADIOS2IOHandlerImpl::ModifiableAttributes::Yes ||
+            parameters.changesOverSteps !=
+                Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No;
 
         if constexpr (IsUnsupportedComplex_v<T>)
         {
@@ -1704,8 +1718,7 @@ namespace detail
                 value.size(),
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps !=
-                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
+                /* allowModification = */ modifiable);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1721,8 +1734,7 @@ namespace detail
                 value.size(),
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps !=
-                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
+                /* allowModification = */ modifiable);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1740,8 +1752,7 @@ namespace detail
                 representation,
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps !=
-                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
+                /* allowModification = */ modifiable);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -1756,8 +1767,7 @@ namespace detail
                 value,
                 /* variableName = */ "",
                 /* separator = */ "/",
-                /* allowModification = */ parameters.changesOverSteps !=
-                    Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No);
+                /* allowModification = */ modifiable);
             if (!attr)
             {
                 throw std::runtime_error(
@@ -2268,6 +2278,7 @@ namespace detail
         // step/variable-based iteration encoding requires the new schema
         // but new schema is available only in ADIOS2 >= v2.8
         // use old schema to support at least one single iteration otherwise
+#if HAS_ADIOS_2_8
         if (!m_impl->m_schema.has_value())
         {
             switch (m_impl->m_iterationEncoding)
@@ -2281,6 +2292,25 @@ namespace detail
                 break;
             }
         }
+
+        if (m_impl->m_modifiableAttributes ==
+            ADIOS2IOHandlerImpl::ModifiableAttributes::Unspecified)
+        {
+            m_impl->m_modifiableAttributes =
+                m_impl->m_iterationEncoding == IterationEncoding::variableBased
+                ? ADIOS2IOHandlerImpl::ModifiableAttributes::Yes
+                : ADIOS2IOHandlerImpl::ModifiableAttributes::No;
+        }
+
+#else
+        if (!m_impl->m_schema.has_value())
+        {
+            m_impl->m_schema = ADIOS2Schema::schema_0000_00_00;
+        }
+
+        m_impl->m_modifiableAttributes =
+            ADIOS2IOHandlerImpl::ModifiableAttributes::No;
+#endif
 
         // set engine type
         {
