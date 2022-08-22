@@ -22,6 +22,7 @@
 #pragma once
 
 #include "openPMD/config.hpp"
+
 #if openPMD_HAVE_ADIOS2
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
@@ -34,6 +35,8 @@
 #include <utility>
 #include <vector>
 
+#endif
+
 namespace openPMD
 {
 enum class GroupOrDataset
@@ -42,6 +45,7 @@ enum class GroupOrDataset
     DATASET
 };
 
+#if openPMD_HAVE_ADIOS2
 namespace detail
 {
     // ADIOS2 does not natively support boolean values
@@ -283,6 +287,5 @@ auto switchAdios2VariableType(Datatype dt, Args &&...args)
             std::to_string(static_cast<int>(dt)));
     }
 }
-} // namespace openPMD
-
 #endif // openPMD_HAVE_ADIOS2
+} // namespace openPMD
