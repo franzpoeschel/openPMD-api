@@ -197,6 +197,20 @@ void ADIOS2IOHandlerImpl::init(json::TracingJSON cfg)
             defaultOperators = std::move(operators.value());
         }
     }
+#if !HAS_ADIOS_2_8
+    if (m_modifiableAttributes == ModifiableAttributes::Yes)
+    {
+        throw error::OperationUnsupportedInBackend(
+            m_handler->backendName(),
+            "Modifiable attributes require ADIOS2 >= v2.8.");
+    }
+    if (m_schema != 0)
+    {
+        throw error::OperationUnsupportedInBackend(
+            m_handler->backendName(),
+            "ADIOS2 schema 2022_07_26 requires ADIOS2 >= v2.8.");
+    }
+#endif
 }
 
 std::optional<std::vector<ADIOS2IOHandlerImpl::ParameterizedOperator>>
@@ -848,6 +862,7 @@ void ADIOS2IOHandlerImpl::writeDataset(
 void ADIOS2IOHandlerImpl::writeAttribute(
     Writable *writable, const Parameter<Operation::WRITE_ATT> &parameters)
 {
+#if HAS_ADIOS_2_8
     switch (schema())
     {
     case SupportedSchema::s_0000_00_00:
@@ -865,6 +880,14 @@ void ADIOS2IOHandlerImpl::writeAttribute(
     default:
         throw std::runtime_error("Unreachable!");
     }
+#else
+    if (parameters.changesOverSteps ==
+        Parameter<Operation::WRITE_ATT>::ChangesOverSteps::Yes)
+    {
+        // cannot do this
+        return;
+    }
+#endif
     switchType<detail::AttributeWriter>(
         parameters.dtype, this, writable, parameters);
 }
@@ -1668,10 +1691,12 @@ namespace detail
         adios2::IO IO = filedata.m_IO;
         impl->m_dirty.emplace(std::move(file));
 
+#if HAS_ADIOS_2_8
         if (impl->m_modifiableAttributes ==
                 ADIOS2IOHandlerImpl::ModifiableAttributes::No &&
             parameters.changesOverSteps ==
                 Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No)
+#endif // modifiable attributes always unsupported in ADIOS v2.7, so no `if`
         {
             std::string t = IO.AttributeType(fullName);
             if (!t.empty()) // an attribute is present <=> it has a type
@@ -1708,10 +1733,47 @@ namespace detail
         }
 
         auto &value = std::get<T>(parameters.resource);
+#if HAS_ADIOS_2_8
         bool modifiable = impl->m_modifiableAttributes ==
                 ADIOS2IOHandlerImpl::ModifiableAttributes::Yes ||
             parameters.changesOverSteps !=
                 Parameter<Operation::WRITE_ATT>::ChangesOverSteps::No;
+#else
+        bool modifiable = impl->m_modifiableAttributes ==
+                ADIOS2IOHandlerImpl::ModifiableAttributes::Yes ||
+            parameters.changesOverSteps ==
+                Parameter<Operation::WRITE_ATT>::ChangesOverSteps::Yes;
+#endif
+
+        auto defineAttribute =
+            [&IO, &fullName, &modifiable, &impl](auto const &...args) {
+#if HAS_ADIOS_2_8
+                auto attr = IO.DefineAttribute(
+                    fullName,
+                    args...,
+                    /* variableName = */ "",
+                    /* separator = */ "/",
+                    /* allowModification = */ modifiable);
+#else
+                /*
+                 * Defensive coding, normally this condition should be checked
+                 * before getting this far.
+                 */
+                if (modifiable)
+                {
+                    throw error::OperationUnsupportedInBackend(
+                        impl->m_handler->backendName(),
+                        "Modifiable attributes require ADIOS2 >= v2.8.");
+                }
+                auto attr = IO.DefineAttribute(fullName, args...);
+#endif
+                if (!attr)
+                {
+                    throw std::runtime_error(
+                        "[ADIOS2] Internal error: Failed defining attribute '" +
+                        fullName + "'.");
+                }
+            };
 
         if constexpr (IsUnsupportedComplex_v<T>)
         {
@@ -1721,35 +1783,11 @@ namespace detail
         }
         else if constexpr (auxiliary::IsVector_v<T>)
         {
-            auto attr = IO.DefineAttribute(
-                fullName,
-                value.data(),
-                value.size(),
-                /* variableName = */ "",
-                /* separator = */ "/",
-                /* allowModification = */ modifiable);
-            if (!attr)
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Internal error: Failed defining attribute '" +
-                    fullName + "'.");
-            }
+            defineAttribute(value.data(), value.size());
         }
         else if constexpr (auxiliary::IsArray_v<T>)
         {
-            auto attr = IO.DefineAttribute(
-                fullName,
-                value.data(),
-                value.size(),
-                /* variableName = */ "",
-                /* separator = */ "/",
-                /* allowModification = */ modifiable);
-            if (!attr)
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Internal error: Failed defining attribute '" +
-                    fullName + "'.");
-            }
+            defineAttribute(value.data(), value.size());
         }
         else if constexpr (std::is_same_v<T, bool>)
         {
@@ -1765,33 +1803,11 @@ namespace detail
                 break;
             }
             auto representation = bool_repr::toRep(value);
-            auto attr = IO.DefineAttribute(
-                fullName,
-                representation,
-                /* variableName = */ "",
-                /* separator = */ "/",
-                /* allowModification = */ modifiable);
-            if (!attr)
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Internal error: Failed defining attribute '" +
-                    fullName + "'.");
-            }
+            defineAttribute(representation);
         }
         else
         {
-            auto attr = IO.DefineAttribute(
-                fullName,
-                value,
-                /* variableName = */ "",
-                /* separator = */ "/",
-                /* allowModification = */ modifiable);
-            if (!attr)
-            {
-                throw std::runtime_error(
-                    "[ADIOS2] Internal error: Failed defining attribute '" +
-                    fullName + "'.");
-            }
+            defineAttribute(value);
         }
     }
 
@@ -2319,7 +2335,6 @@ namespace detail
                 ? ADIOS2IOHandlerImpl::ModifiableAttributes::Yes
                 : ADIOS2IOHandlerImpl::ModifiableAttributes::No;
         }
-
 #else
         if (!m_impl->m_schema.has_value())
         {
@@ -3131,7 +3146,9 @@ namespace detail
         {
         case SupportedSchema::s_0000_00_00:
             break;
-        case SupportedSchema::s_2022_07_26: {
+        case SupportedSchema::s_2022_07_26:
+#if HAS_ADIOS_2_8
+        {
             // @todo do this also for all parent paths?
             if (m_mode != adios2::Mode::Read &&
                 m_mode != adios2::Mode::ReadRandomAccess)
@@ -3150,6 +3167,12 @@ namespace detail
                     /* allowModification = */ true);
             }
         }
+#else
+            (void)writable;
+            throw error::OperationUnsupportedInBackend(
+                m_impl->m_handler->backendName(),
+                "ADIOS2 schema 2022_07_26 requires ADIOS2 >= v2.8.");
+#endif
         break;
         }
     }

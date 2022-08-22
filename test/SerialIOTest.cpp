@@ -11,6 +11,7 @@
 
 #if openPMD_HAVE_ADIOS2
 #include <adios2.h>
+#define HAS_ADIOS_2_8 (ADIOS2_VERSION_MAJOR * 100 + ADIOS2_VERSION_MINOR >= 208)
 #endif
 #include <catch2/catch.hpp>
 
@@ -516,8 +517,6 @@ void close_iteration_interleaved_test(
 
 TEST_CASE("close_iteration_interleaved_test", "[serial]")
 {
-    bool const bp_prefer_adios1 =
-        (auxiliary::getEnvString("OPENPMD_BP_BACKEND", "NOT_SET") == "ADIOS1");
 
     for (auto const &t : testedFileExtensions())
     {
@@ -527,9 +526,14 @@ TEST_CASE("close_iteration_interleaved_test", "[serial]")
         // run this test for ADIOS2 & JSON only
         if (t == "h5")
             continue;
+#if HAS_ADIOS_2_8
+        bool const bp_prefer_adios1 =
+            (auxiliary::getEnvString("OPENPMD_BP_BACKEND", "NOT_SET") ==
+             "ADIOS1");
         if (t == "bp" && bp_prefer_adios1)
             continue;
         close_iteration_interleaved_test(t, IterationEncoding::variableBased);
+#endif // HAS_ADIOS_2_8
     }
 }
 
@@ -4785,6 +4789,7 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
     //     dontUseSteps,
     //     Access::READ_LINEAR);
 
+#if HAS_ADIOS_2_8
     /*
      * Do this whole thing once more, but this time use the new attribute
      * layout.
@@ -4817,7 +4822,6 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
         useSteps,
         useSteps,
         Access::READ_LINEAR);
-    return; // @todo use Schema 2022
     bp4_steps("../samples/newlayout_bp4steps_yes_yes.bp", useSteps, useSteps);
     bp4_steps(
         "../samples/newlayout_bp4steps_yes_no.bp", useSteps, dontUseSteps);
@@ -4836,6 +4840,7 @@ TEST_CASE("bp4_steps", "[serial][adios2]")
         useSteps,
         dontUseSteps,
         Access::READ_LINEAR);
+#endif
 }
 #endif
 
@@ -5231,6 +5236,7 @@ TEST_CASE("git_adios2_sample_test", "[serial][adios2]")
     }
 }
 
+#if HAS_ADIOS_2_8
 void variableBasedSeries(std::string const &file)
 {
     constexpr Extent::value_type extent = 1000;
@@ -5432,13 +5438,11 @@ void variableBasedSeries(std::string const &file)
         /*supportsModifiableAttributes = */ false);
 }
 
-#if openPMD_HAVE_ADIOS2
 TEST_CASE("variableBasedSeries", "[serial][adios2]")
 {
     variableBasedSeries("../samples/variableBasedSeries.bp4");
     variableBasedSeries("../samples/variableBasedSeries.bp5");
 }
-#endif
 
 void variableBasedParticleData()
 {
@@ -5518,7 +5522,8 @@ TEST_CASE("variableBasedParticleData", "[serial][adios2]")
 {
     variableBasedParticleData();
 }
-#endif
+#endif // HAS_ADIOS_2_8
+#endif // openPMD_HAS_ADIOS2
 
 #if openPMD_HAVE_ADIOS2
 #ifdef ADIOS2_HAVE_BZIP2
@@ -5843,7 +5848,7 @@ TEST_CASE("iterate_nonstreaming_series", "[serial][adios2]")
         }
 #endif
     }
-#if openPMD_HAVE_ADIOS2
+#if openPMD_HAVE_ADIOS2 && HAS_ADIOS_2_8
     iterate_nonstreaming_series(
         "../samples/iterate_nonstreaming_series_variablebased.bp",
         true,
@@ -5859,7 +5864,7 @@ void adios2_bp5_no_steps(bool usesteps)
     "adios2":
     {
         "new_attribute_layout": true,
-        "schema": 20210209
+        "schema": 20220726
     }
 })END";
     {
@@ -5939,7 +5944,6 @@ void adios2_bp5_no_steps(bool usesteps)
 
 TEST_CASE("adios2_bp5_no_steps", "[serial][adios2]")
 {
-    return; // @todo use Schema 2022
     adios2_bp5_no_steps(/* usesteps = */ false);
     adios2_bp5_no_steps(/* usesteps = */ true);
 }
@@ -6224,17 +6228,17 @@ TEST_CASE("deferred_parsing", "[serial]")
     }
 }
 
+#if HAS_ADIOS_2_8
 void chaotic_stream(std::string filename, bool variableBased)
 {
     /*
      * We will write iterations in the following order.
      */
     std::vector<uint64_t> iterations{5, 9, 1, 3, 4, 6, 7, 8, 2, 0};
-    return; // @todo use Schema 2022
     std::string jsonConfig = R"(
 {
     "adios2": {
-        "schema": 20210209,
+        "schema": 20220726,
         "engine": {
             "usesteps": true
         }
@@ -6298,6 +6302,7 @@ TEST_CASE("chaotic_stream", "[serial]")
         chaotic_stream("../samples/chaotic_stream_vbased." + t, true);
     }
 }
+#endif // HAS_ADIOS_2_8
 
 #ifdef openPMD_USE_INVASIVE_TESTS
 void unfinished_iteration_test(
@@ -6311,14 +6316,18 @@ void unfinished_iteration_test(
     {
         Series write(file, Access::CREATE, config);
         auto it0 = write.writeIterations()[0];
+        it0.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
         auto it5 = write.writeIterations()[5];
+        it5.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
+        ;
         /*
          * With enabled invasive tests, this attribute will let the Iteration
          * fail parsing.
          */
         it5.setAttribute("__openPMD_internal_fail", "asking for trouble");
         auto it10 = write.writeIterations()[10];
-        auto E_x = it10.meshes["E"]["x"];
+        it10.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
+        it10.setAttribute("__openPMD_internal_fail", "playing nice again");
         auto e_density = it10.meshes["e_density"][RecordComponent::SCALAR];
         auto electron_x = it10.particles["e"]["position"]["x"];
         auto electron_mass =
@@ -6397,20 +6406,20 @@ TEST_CASE("unfinished_iteration_test", "[serial]")
 #if openPMD_HAVE_ADIOS2
     unfinished_iteration_test(
         "bp", IterationEncoding::groupBased, R"({"backend": "adios2"})");
-#if 0 // @todo use schema 2022
+#if HAS_ADIOS_2_8
     unfinished_iteration_test(
-        "bp",
+        "bp5",
         IterationEncoding::variableBased,
         R"(
     {
       "backend": "adios2",
       "iteration_encoding": "variable_based",
       "adios2": {
-        "schema": 20210209
+        "schema": 20220726
       }
     }
     )");
-#endif
+#endif // HAS_ADIOS_2_8
     unfinished_iteration_test(
         "bp", IterationEncoding::fileBased, R"({"backend": "adios2"})");
 #endif
@@ -6887,7 +6896,7 @@ TEST_CASE("append_mode", "[serial]")
 {
     "adios2":
     {
-        "schema": 20210209,
+        "schema": 20220726,
         "engine":
         {
             "usesteps" : true
@@ -6901,22 +6910,24 @@ TEST_CASE("append_mode", "[serial]")
                 false,
                 ParseMode::LinearWithoutSnapshot,
                 jsonConfigOld);
-            // append_mode(
-            //     "../samples/append/append_groupbased." + t,
-            //     false,
-            //     ParseMode::WithSnapshot,
-            //     jsonConfigNew);
+#if HAS_ADIOS_2_8
+            append_mode(
+                "../samples/append/append_groupbased." + t,
+                false,
+                ParseMode::WithSnapshot,
+                jsonConfigNew);
             // This test config does not make sense
             // append_mode(
             //     "../samples/append/append_variablebased." + t,
             //     true,
             //     ParseMode::WithSnapshot,
             //     jsonConfigOld);
-            // append_mode(
-            //     "../samples/append/append_variablebased." + t,
-            //     true,
-            //     ParseMode::WithSnapshot,
-            //     jsonConfigNew);
+            append_mode(
+                "../samples/append/append_variablebased." + t,
+                true,
+                ParseMode::WithSnapshot,
+                jsonConfigNew);
+#endif
         }
         else
         {
@@ -6928,6 +6939,7 @@ TEST_CASE("append_mode", "[serial]")
     }
 }
 
+#if HAS_ADIOS_2_8
 void append_mode_filebased(std::string const &extension)
 {
     std::string jsonConfig = R"END(
@@ -7007,6 +7019,7 @@ TEST_CASE("append_mode_filebased", "[serial]")
         append_mode_filebased(t);
     }
 }
+#endif // HAS_ADIOS_2_8
 
 void groupbased_read_write(std::string const &ext)
 {

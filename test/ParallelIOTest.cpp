@@ -8,6 +8,10 @@
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
+#if openPMD_HAVE_ADIOS2
+#include <adios2.h>
+#define HAS_ADIOS_2_8 (ADIOS2_VERSION_MAJOR * 100 + ADIOS2_VERSION_MINOR >= 208)
+#endif
 
 #if openPMD_HAVE_ADIOS2
 #include <adios2.h>
@@ -1168,7 +1172,9 @@ void adios2_streaming(bool variableBasedLayout)
 
 TEST_CASE("adios2_streaming", "[pseudoserial][adios2]")
 {
+#if HAS_ADIOS_2_8
     adios2_streaming(true);
+#endif // HAS_ADIOS_2_8
     adios2_streaming(false);
 }
 
