@@ -1558,6 +1558,7 @@ namespace detail
         std::string name,
         std::shared_ptr<Attribute::resource> resource)
     {
+        (void)impl;
         /*
          * If we store an attribute of boolean type, we store an additional
          * attribute prefixed with '__is_boolean__' to indicate this information
