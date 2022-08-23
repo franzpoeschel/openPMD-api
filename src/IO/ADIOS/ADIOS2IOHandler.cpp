@@ -1781,11 +1781,7 @@ namespace detail
                 "[ADIOS2] Internal error: no support for long double complex "
                 "attribute types");
         }
-        else if constexpr (auxiliary::IsVector_v<T>)
-        {
-            defineAttribute(value.data(), value.size());
-        }
-        else if constexpr (auxiliary::IsArray_v<T>)
+        else if constexpr (auxiliary::IsVector_v<T> || auxiliary::IsArray_v<T>)
         {
             defineAttribute(value.data(), value.size());
         }
