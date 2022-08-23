@@ -1173,7 +1173,14 @@ void adios2_streaming(bool variableBasedLayout)
 TEST_CASE("adios2_streaming", "[pseudoserial][adios2]")
 {
 #if HAS_ADIOS_2_8
+#if 0
+    /*
+     * Test currently deactivated due to a bug in ADIOS2 SST
+     * https://github.com/ornladios/ADIOS2/issues/3298#issuecomment-1216566221
+     * The workaround mentioned therein makes this test succeed again.
+     */
     adios2_streaming(true);
+#endif
 #endif // HAS_ADIOS_2_8
     adios2_streaming(false);
 }
