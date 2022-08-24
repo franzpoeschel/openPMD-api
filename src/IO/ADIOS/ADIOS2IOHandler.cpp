@@ -2690,7 +2690,6 @@ namespace detail
         // step/variable-based iteration encoding requires the new schema
         // but new schema is available only in ADIOS2 >= v2.8
         // use old schema to support at least one single iteration otherwise
-#if HAS_ADIOS_2_8
         if (!m_impl->m_schema.has_value())
         {
             switch (m_impl->m_iterationEncoding)
@@ -2704,15 +2703,6 @@ namespace detail
                 break;
             }
         }
-
-#else
-        if (!m_impl->m_schema.has_value())
-        {
-            m_impl->m_schema = ADIOS2Schema::schema_0000_00_00;
-        }
-        m_impl->m_modifiableAttributes =
-            ADIOS2IOHandlerImpl::ModifiableAttributes::No;
-#endif
 
         // set engine type
         {
