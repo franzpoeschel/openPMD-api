@@ -6930,31 +6930,7 @@ TEST_CASE("append_mode", "[serial]")
         }
     }
 })END";
-        if (t == "bp5")
-        {
-            append_mode(
-                "../samples/append/groupbased." + t,
-                false,
-                ParseMode::LinearWithoutSnapshot,
-                jsonConfigOld);
-            append_mode(
-                "../samples/append/groupbased_newschema." + t,
-                false,
-                ParseMode::WithSnapshot,
-                jsonConfigNew);
-            // This test config does not make sense
-            // append_mode(
-            //     "../samples/append/variablebased." + t,
-            //     true,
-            //     ParseMode::WithSnapshot,
-            //     jsonConfigOld);
-            append_mode(
-                "../samples/append/variablebased_newschema." + t,
-                true,
-                ParseMode::WithSnapshot,
-                jsonConfigNew);
-        }
-        else if (t == "bp" || t == "bp4")
+        if (t == "bp" || t == "bp4" || t == "bp5")
         {
             append_mode(
                 "../samples/append/append_groupbased." + t,
