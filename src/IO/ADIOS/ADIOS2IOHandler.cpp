@@ -204,7 +204,7 @@ void ADIOS2IOHandlerImpl::init(json::TracingJSON cfg)
             m_handler->backendName(),
             "Modifiable attributes require ADIOS2 >= v2.8.");
     }
-    if (m_schema != 0)
+    if (m_schema.has_value() && m_schema.value() != 0)
     {
         throw error::OperationUnsupportedInBackend(
             m_handler->backendName(),
