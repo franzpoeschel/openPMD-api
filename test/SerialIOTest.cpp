@@ -6942,11 +6942,12 @@ TEST_CASE("append_mode", "[serial]")
                 false,
                 ParseMode::WithSnapshot,
                 jsonConfigNew);
-            append_mode(
-                "../samples/append/variablebased." + t,
-                true,
-                ParseMode::WithSnapshot,
-                jsonConfigOld);
+            // This test config does not make sense
+            // append_mode(
+            //     "../samples/append/variablebased." + t,
+            //     true,
+            //     ParseMode::WithSnapshot,
+            //     jsonConfigOld);
             append_mode(
                 "../samples/append/variablebased_newschema." + t,
                 true,
@@ -6965,11 +6966,12 @@ TEST_CASE("append_mode", "[serial]")
                 false,
                 ParseMode::WithSnapshot,
                 jsonConfigNew);
-            append_mode(
-                "../samples/append/append_variablebased." + t,
-                true,
-                ParseMode::WithSnapshot,
-                jsonConfigOld);
+            // This test config does not make sense
+            // append_mode(
+            //     "../samples/append/append_variablebased." + t,
+            //     true,
+            //     ParseMode::WithSnapshot,
+            //     jsonConfigOld);
             append_mode(
                 "../samples/append/append_variablebased." + t,
                 true,

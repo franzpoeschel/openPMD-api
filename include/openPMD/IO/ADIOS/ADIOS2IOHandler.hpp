@@ -248,7 +248,10 @@ private:
      */
     std::string m_userSpecifiedExtension;
 
-    ADIOS2Schema::schema_t m_schema = ADIOS2Schema::schema_0000_00_00;
+    /*
+     * Empty option: No schema has been explicitly selected, use default.
+     */
+    std::optional<ADIOS2Schema::schema_t> m_schema;
 
     enum class UseSpan : char
     {
@@ -267,7 +270,11 @@ private:
 
     inline SupportedSchema schema() const
     {
-        switch (m_schema)
+        if (!m_schema.has_value())
+        {
+            return SupportedSchema::s_0000_00_00;
+        }
+        switch (m_schema.value())
         {
         case ADIOS2Schema::schema_0000_00_00:
             return SupportedSchema::s_0000_00_00;
@@ -276,7 +283,7 @@ private:
         default:
             throw std::runtime_error(
                 "[ADIOS2] Encountered unsupported schema version: " +
-                std::to_string(m_schema));
+                std::to_string(m_schema.value()));
         }
     }
 
@@ -1277,21 +1284,6 @@ namespace detail
         std::optional<AttributeMap_t> m_availableVariables;
 
         /*
-         * In some edge-cases, configure_IO_Read_After_open() will need to
-         * reopen the ADIOS2 Engine and IO objects, because they were opened
-         * with wrong access modes.
-         * In those cases, all configuration of the IO object gets lost.
-         * Save the configuration in this vector, so we can apply it again.
-         */
-        std::vector<std::pair<std::string, std::string>> m_parameterReapplyLog;
-
-        inline void setIOParameter(std::string key, std::string val)
-        {
-            m_IO.SetParameter(key, val);
-            m_parameterReapplyLog.emplace_back(std::move(key), std::move(val));
-        }
-
-        /*
          * finalize() will set this true to avoid running twice.
          */
         bool finalized = false;
@@ -1304,9 +1296,7 @@ namespace detail
         void create_IO();
 
         void configure_IO(ADIOS2IOHandlerImpl &impl);
-        void configure_IO_Read_Before_open(
-            std::optional<bool> userSpecifiedUsesteps);
-        void configure_IO_Read_After_open();
+        void configure_IO_Read(std::optional<bool> userSpecifiedUsesteps);
         void configure_IO_Write(std::optional<bool> userSpecifiedUsesteps);
 
         using AttributeLayout = ADIOS2IOHandlerImpl::AttributeLayout;
