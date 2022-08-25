@@ -82,7 +82,7 @@ jobs:
         export OPENPMD_BP_BACKEND=ADIOS1
         ctest --test-dir build --output-on-failure
 
-  clang7_nopy_ompi_h5_ad1_ad2_newLayout:
+  clang7_nopy_ompi_h5_ad1_ad2:
     runs-on: ubuntu-20.04
     if: github.event.pull_request.draft == false
     steps:
@@ -96,7 +96,7 @@ jobs:
         sudo apt-get install clang-7 gfortran libopenmpi-dev python3
         sudo .github/workflows/dependencies/install_spack
     - name: Build
-      env: {CC: clang-7, CXX: clang++-7, CXXFLAGS: -Werror, OPENPMD2_ADIOS2_SCHEMA: 20210209}
+      env: {CC: clang-7, CXX: clang++-7, CXXFLAGS: -Werror}
       run: |
         eval $(spack env activate --sh .github/ci/spack-envs/clang7_nopy_ompi_h5_ad1_ad2/)
         spack install
@@ -152,7 +152,7 @@ jobs:
         ctest --test-dir build --output-on-failure
 
   # ADIOS2 v2.7.1
-  clang8_py38_mpich_h5_ad1_ad2_newLayout:
+  clang8_py38_mpich_h5_ad1_ad2:
     runs-on: ubuntu-20.04
     if: github.event.pull_request.draft == false
     steps:
@@ -166,7 +166,7 @@ jobs:
         sudo apt-get install clang-8 gfortran libmpich-dev python3
         sudo .github/workflows/dependencies/install_spack
     - name: Build
-      env: {CC: clang-8, CXX: clang++-8, CXXFLAGS: -Werror, OPENPMD2_ADIOS2_SCHEMA: 20210209}
+      env: {CC: clang-8, CXX: clang++-8, CXXFLAGS: -Werror}
       run: |
         cmake --version
         mpiexec --version
