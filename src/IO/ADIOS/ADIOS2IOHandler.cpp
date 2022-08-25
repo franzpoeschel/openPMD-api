@@ -1776,6 +1776,12 @@ namespace detail
                 }
             };
 
+        /*
+         * Some old compilers don't like that this is not used in every
+         * instantiation.
+         */
+        (void)defineAttribute;
+
         if constexpr (IsUnsupportedComplex_v<T>)
         {
             throw std::runtime_error(
