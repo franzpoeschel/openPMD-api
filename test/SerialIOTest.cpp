@@ -6314,11 +6314,14 @@ void unfinished_iteration_test(
     std::string file = std::string("../samples/unfinished_iteration") +
         (encoding == IterationEncoding::fileBased ? "_%T." : ".") + ext;
     {
+        std::vector<int> data{0, 1, 2, 3, 4};
         Series write(file, Access::CREATE, config);
         auto it0 = write.writeIterations()[0];
         it0.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
+        it0.meshes["E"]["x"].storeChunk(data, {0}, {5});
         auto it5 = write.writeIterations()[5];
         it5.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
+        it5.meshes["E"]["x"].storeChunk(data, {0}, {5});
         ;
         /*
          * With enabled invasive tests, this attribute will let the Iteration
@@ -6327,6 +6330,7 @@ void unfinished_iteration_test(
         it5.setAttribute("__openPMD_internal_fail", "asking for trouble");
         auto it10 = write.writeIterations()[10];
         it10.meshes["E"]["x"].resetDataset({Datatype::INT, {5}});
+        it10.meshes["E"]["x"].storeChunk(data, {0}, {5});
         it10.setAttribute("__openPMD_internal_fail", "playing nice again");
         auto e_density = it10.meshes["e_density"][RecordComponent::SCALAR];
         auto electron_x = it10.particles["e"]["position"]["x"];
