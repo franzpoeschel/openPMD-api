@@ -1791,7 +1791,7 @@ TEST_CASE("append_mode", "[serial]")
 {
     "adios2":
     {
-        "schema": 20210209,
+        "schema": 20220726,
         "engine":
         {
             "usesteps" : true
