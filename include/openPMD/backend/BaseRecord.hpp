@@ -93,15 +93,6 @@ class BaseRecord
 
     BaseRecord();
 
-protected:
-    BaseRecord(std::shared_ptr<internal::BaseRecordData<T_elem> >);
-
-    inline void setData(internal::BaseRecordData<T_elem> *data)
-    {
-        m_baseRecordData = std::move(data);
-        Container<T_elem>::setData(m_baseRecordData);
-    }
-
 public:
     using key_type = typename Container<T_elem>::key_type;
     using mapped_type = typename Container<T_elem>::mapped_type;
@@ -179,7 +170,8 @@ namespace internal
     template <typename T_elem>
     BaseRecordData<T_elem>::BaseRecordData()
     {
-        Attributable impl{{this, [](auto const *) {}}};
+        Attributable impl;
+        impl.setData({this, [](auto const *) {}});
         impl.setAttribute(
             "unitDimension",
             std::array<double, 7>{{0., 0., 0., 0., 0., 0., 0.}});
@@ -187,16 +179,10 @@ namespace internal
 } // namespace internal
 
 template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord() : Container<T_elem>{nullptr}
+BaseRecord<T_elem>::BaseRecord()
 {
     Container<T_elem>::setData(m_baseRecordData);
 }
-
-template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord(
-    std::shared_ptr<internal::BaseRecordData<T_elem> > data)
-    : Container<T_elem>{data}, m_baseRecordData{std::move(data)}
-{}
 
 template <typename T_elem>
 inline typename BaseRecord<T_elem>::mapped_type &

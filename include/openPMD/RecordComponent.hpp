@@ -441,8 +441,6 @@ private:
 OPENPMD_protected
     // clang-format on
 
-    RecordComponent(std::shared_ptr<internal::RecordComponentData>);
-
     inline internal::RecordComponentData const &get() const
     {
         return *m_recordComponentData;

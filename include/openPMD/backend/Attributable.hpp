@@ -115,7 +115,7 @@ protected:
         new internal::AttributableData()};
 
     // Should not be called publicly, only by implementing classes
-    Attributable(std::shared_ptr<internal::AttributableData>);
+    // Attributable(std::shared_ptr<internal::AttributableData>);
 
 public:
     Attributable();

@@ -428,10 +428,6 @@ public:
 OPENPMD_protected
     // clang-format on
 
-    Container(std::shared_ptr<ContainerData> containerData)
-        : Attributable{containerData}, m_containerData{std::move(containerData)}
-    {}
-
     void clear_unchecked()
     {
         if (written())
@@ -454,11 +450,7 @@ OPENPMD_protected
         flushAttributes(flushParams);
     }
 
-    // clang-format off
-OPENPMD_private
-    // clang-format on
-
-    Container() : Attributable{nullptr}
+    Container()
     {
         Attributable::setData(m_containerData);
     }

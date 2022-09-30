@@ -36,7 +36,7 @@ namespace openPMD
 using internal::CloseStatus;
 using internal::DeferredParseAccess;
 
-Iteration::Iteration() : Attributable{nullptr}
+Iteration::Iteration()
 {
     Attributable::setData(m_iterationData);
     setTime(static_cast<double>(0));

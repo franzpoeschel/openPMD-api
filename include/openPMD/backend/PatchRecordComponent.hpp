@@ -120,8 +120,6 @@ OPENPMD_private
 OPENPMD_protected
     // clang-format on
 
-    PatchRecordComponent(std::shared_ptr<internal::PatchRecordComponentData>);
-
     inline internal::PatchRecordComponentData const &get() const
     {
         return *m_patchRecordComponentData;

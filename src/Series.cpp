@@ -2265,7 +2265,8 @@ namespace internal
         if (this->m_lastFlushSuccessful && m_writable.IOHandler &&
             m_writable.IOHandler->has_value())
         {
-            Series impl{{this, [](auto const *) {}}};
+            Series impl;
+            impl.setData({this, [](auto const *) {}});
             impl.flush();
             impl.flushStep(/* doFlush = */ true);
         }
@@ -2280,14 +2281,8 @@ namespace internal
     }
 } // namespace internal
 
-Series::Series() : Attributable{nullptr}, iterations{}
+Series::Series() : iterations{}
 {}
-
-Series::Series(std::shared_ptr<internal::SeriesData> data)
-    : Attributable{data}, m_series{std::move(data)}
-{
-    iterations = m_series->iterations;
-}
 
 #if openPMD_HAVE_MPI
 Series::Series(
@@ -2295,7 +2290,7 @@ Series::Series(
     Access at,
     MPI_Comm comm,
     std::string const &options)
-    : Attributable{nullptr}, m_series{new internal::SeriesData}
+    : m_series{new internal::SeriesData}
 {
     Attributable::setData(m_series);
     iterations = m_series->iterations;
@@ -2317,7 +2312,7 @@ Series::Series(
 
 Series::Series(
     std::string const &filepath, Access at, std::string const &options)
-    : Attributable{nullptr}, m_series{new internal::SeriesData}
+    : m_series{new internal::SeriesData}
 {
     Attributable::setData(m_series);
     iterations = m_series->iterations;
@@ -2340,8 +2335,9 @@ ReadIterations Series::readIterations()
 {
     // Use private constructor instead of copy constructor to avoid
     // object slicing
-    return {
-        this->m_series, IOHandler()->m_frontendAccess, get().m_parsePreference};
+    Series res;
+    res.setData(this->m_series);
+    return {res, IOHandler()->m_frontendAccess, get().m_parsePreference};
 }
 
 WriteIterations Series::writeIterations()

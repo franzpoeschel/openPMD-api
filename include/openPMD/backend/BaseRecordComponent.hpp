@@ -119,9 +119,6 @@ protected:
         Attributable::setData(m_baseRecordComponentData);
     }
 
-    BaseRecordComponent(std::shared_ptr<internal::BaseRecordComponentData>);
-
-private:
     BaseRecordComponent();
 }; // BaseRecordComponent
 

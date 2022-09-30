@@ -192,10 +192,6 @@ class Series : public Attributable
     friend class internal::SeriesData;
     friend class WriteIterations;
 
-protected:
-    // Should not be called publicly, only by implementing classes
-    Series(std::shared_ptr<internal::SeriesData>);
-
 public:
     explicit Series();
 
@@ -559,6 +555,13 @@ OPENPMD_private
             throw std::runtime_error(
                 "[Series] Cannot use default-constructed Series.");
         }
+    }
+
+    inline void setData(std::shared_ptr<internal::SeriesData> series)
+    {
+        m_series = std::move(series);
+        iterations = m_series->iterations;
+        Attributable::setData(m_series);
     }
 
     std::unique_ptr<ParsedInput> parseInput(std::string);
