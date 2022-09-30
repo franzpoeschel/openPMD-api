@@ -120,4 +120,16 @@ namespace
     template <typename>
     inline constexpr bool dependent_false_v = false;
 } // namespace
+
+template <typename T, typename /* U */>
+struct OkOr
+{
+    using type = T;
+};
+
+template <typename U>
+struct OkOr<void, U>
+{
+    using type = U;
+};
 } // namespace openPMD::auxiliary
