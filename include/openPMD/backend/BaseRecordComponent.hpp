@@ -33,7 +33,7 @@ namespace openPMD
 {
 namespace internal
 {
-    class BaseRecordComponentData : public AttributableData
+    class BaseRecordComponentData : virtual public AttributableData
     {
     public:
         /**
@@ -59,7 +59,7 @@ namespace internal
     };
 } // namespace internal
 
-class BaseRecordComponent : public Attributable
+class BaseRecordComponent : virtual public Attributable
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;

@@ -65,7 +65,7 @@ namespace internal
         typename T,
         typename T_key = std::string,
         typename T_container = std::map<T_key, T> >
-    class ContainerData : public AttributableData
+    class ContainerData : virtual public AttributableData
     {
     public:
         using InternalContainer = T_container;
@@ -128,7 +128,7 @@ template <
     typename T,
     typename T_key = std::string,
     typename T_container = std::map<T_key, T> >
-class Container : public Attributable
+class Container : virtual public Attributable
 {
     static_assert(
         std::is_base_of<Attributable, T>::value,
