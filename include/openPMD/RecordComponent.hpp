@@ -103,7 +103,7 @@ class RecordComponent : public BaseRecordComponent
     friend class Container;
     friend class Iteration;
     friend class ParticleSpecies;
-    template <typename T_elem>
+    template <typename T_elem, typename T_RecordComponent>
     friend class BaseRecord;
     template <typename T_elem>
     friend class BaseRecordInterface;
@@ -435,11 +435,11 @@ private:
     std::shared_ptr<internal::RecordComponentData> m_recordComponentData{
         new internal::RecordComponentData()};
 
-    RecordComponent();
-
     // clang-format off
 OPENPMD_protected
     // clang-format on
+
+    RecordComponent();
 
     inline internal::RecordComponentData const &get() const
     {

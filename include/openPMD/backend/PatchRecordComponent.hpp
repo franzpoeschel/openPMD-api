@@ -64,7 +64,7 @@ class PatchRecordComponent : public BaseRecordComponent
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
-    template <typename>
+    template <typename, typename>
     friend class BaseRecord;
     friend class ParticlePatches;
     friend class PatchRecord;
