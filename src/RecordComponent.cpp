@@ -79,6 +79,8 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         throw error::WrongAPIUsage(
             "[RecordComponent] Must set specific datatype.");
     }
+
+    datasetDefined();
     // if( d.extent.empty() )
     //    throw std::runtime_error("Dataset extent must be at least 1D.");
     if (std::any_of(
@@ -167,6 +169,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     if (rc.m_dataset.extent.size() == 0)
         throw std::runtime_error("Dataset extent must be at least 1D.");
 
+    datasetDefined();
     rc.m_isEmpty = true;
     dirty() = true;
     if (!written())

@@ -71,7 +71,7 @@ namespace internal
  */
 template <
     typename T_elem_maybe_void,
-    typename T_RecordComponent = RecordComponent>
+    typename T_RecordComponent = T_elem_maybe_void>
 class BaseRecord
     : public Container<
           typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type>
@@ -91,16 +91,23 @@ class BaseRecord
     std::shared_ptr<internal::BaseRecordData<T_elem, T_RecordComponentData> >
         m_baseRecordData{
             new internal::BaseRecordData<T_elem, T_RecordComponentData>()};
+    using Data_t = internal::BaseRecordData<T_elem, T_RecordComponentData>;
 
-    inline internal::BaseRecordData<T_elem, T_RecordComponentData> &get()
+    inline Data_t &get()
     {
         return *m_baseRecordData;
     }
 
-    inline internal::BaseRecordData<T_elem, T_RecordComponentData> const &
-    get() const
+    inline Data_t const &get() const
     {
         return *m_baseRecordData;
+    }
+
+    inline void setData(std::shared_ptr<Data_t> data)
+    {
+        m_baseRecordData = std::move(data);
+        T_Container::setData(m_baseRecordData);
+        T_RecordComponent::setData(m_baseRecordData);
     }
 
     BaseRecord();
@@ -118,6 +125,14 @@ public:
     using const_pointer = typename Container<T_elem>::const_pointer;
     using iterator = typename Container<T_elem>::iterator;
     using const_iterator = typename Container<T_elem>::const_iterator;
+
+    // this avoids object slicing
+    operator T_RecordComponent() const
+    {
+        T_RecordComponent res;
+        res.setData(m_baseRecordData);
+        return res;
+    }
 
     virtual ~BaseRecord() = default;
 
@@ -160,11 +175,13 @@ protected:
     // BaseRecord(internal::BaseRecordData<T_elem> *);
     void readBase();
 
+    void datasetDefined() override;
+
 private:
     void flush(std::string const &, internal::FlushParams const &) final;
     virtual void
     flush_impl(std::string const &, internal::FlushParams const &) = 0;
-    virtual void read() = 0;
+    // virtual void read() = 0;
 
     /**
      * @brief Check recursively whether this BaseRecord is dirty.
@@ -195,7 +212,8 @@ namespace internal
 template <typename T_elem, typename T_RecordComponent>
 BaseRecord<T_elem, T_RecordComponent>::BaseRecord()
 {
-    Container<T_elem>::setData(m_baseRecordData);
+    T_Container::setData(m_baseRecordData);
+    T_RecordComponent::setData(m_baseRecordData);
 }
 
 template <typename T_elem, typename T_RecordComponent>
@@ -214,12 +232,12 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type const &key)
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = Container<T_elem>::operator[](key);
         if (keyScalar)
         {
-            get().m_containsScalar = true;
-            ret.parent() = this->parent();
+            datasetDefined();
         }
+        mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
+                                     : T_Container::operator[](key);
         return ret;
     }
 }
@@ -240,12 +258,15 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
                 "A scalar component can not be contained at "
                 "the same time as one or more regular components.");
 
-        mapped_type &ret = Container<T_elem>::operator[](std::move(key));
         if (keyScalar)
         {
-            get().m_containsScalar = true;
-            ret.parent() = this->parent();
+            datasetDefined();
         }
+        /*
+         * datasetDefined() inits the container entry
+         */
+        mapped_type &ret = keyScalar ? T_Container::at(std::move(key))
+                                     : T_Container::operator[](std::move(key));
         return ret;
     }
 }
@@ -395,5 +416,17 @@ inline bool BaseRecord<T_elem, T_RecordComponent>::dirtyRecursive() const
         }
     }
     return false;
+}
+
+template <typename T_elem, typename T_RecordComponent>
+void BaseRecord<T_elem, T_RecordComponent>::datasetDefined()
+{
+    // If the RecordComponent API of this object has been used, then the record
+    // is a scalar one
+    T_RecordComponent copy;
+    copy.setData(m_baseRecordData);
+    T_Container::emplace(RecordComponent::SCALAR, std::move(copy));
+    get().m_containsScalar = true;
+    T_RecordComponent::datasetDefined();
 }
 } // namespace openPMD

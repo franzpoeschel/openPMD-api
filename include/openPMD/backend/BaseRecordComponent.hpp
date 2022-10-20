@@ -119,6 +119,8 @@ protected:
         Attributable::setData(m_baseRecordComponentData);
     }
 
+    virtual void datasetDefined();
+
     BaseRecordComponent();
 }; // BaseRecordComponent
 

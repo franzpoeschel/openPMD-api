@@ -99,7 +99,7 @@ OPENPMD_private
     // clang-format on
 
     void flush(std::string const &, internal::FlushParams const &);
-    void read();
+    virtual void read();
 
     /**
      * @brief Check recursively whether this RecordComponent is dirty.
@@ -111,8 +111,8 @@ OPENPMD_private
      */
     bool dirtyRecursive() const;
 
-    std::shared_ptr<internal::PatchRecordComponentData>
-        m_patchRecordComponentData{new internal::PatchRecordComponentData()};
+    std::shared_ptr<internal::PatchRecordComponentData> m_recordComponentData{
+        new internal::PatchRecordComponentData()};
 
     PatchRecordComponent();
 
@@ -122,19 +122,19 @@ OPENPMD_protected
 
     inline internal::PatchRecordComponentData const &get() const
     {
-        return *m_patchRecordComponentData;
+        return *m_recordComponentData;
     }
 
     inline internal::PatchRecordComponentData &get()
     {
-        return *m_patchRecordComponentData;
+        return *m_recordComponentData;
     }
 
     inline void
     setData(std::shared_ptr<internal::PatchRecordComponentData> data)
     {
-        m_patchRecordComponentData = std::move(data);
-        BaseRecordComponent::setData(m_patchRecordComponentData);
+        m_recordComponentData = std::move(data);
+        BaseRecordComponent::setData(m_recordComponentData);
     }
 }; // PatchRecordComponent
 

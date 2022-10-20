@@ -30,6 +30,8 @@ class MeshRecordComponent : public RecordComponent
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
+    template <typename, typename>
+    friend class BaseRecord;
 
     friend class Mesh;
 
@@ -70,6 +72,9 @@ public:
      */
     template <typename T>
     MeshRecordComponent &makeConstant(T);
+
+protected:
+    void datasetDefined() override;
 };
 
 template <typename T>

@@ -1010,6 +1010,8 @@ TEST_CASE("empty_record_test", "[core]")
                       "RecordComponents: E"));
     o.iterations[1].meshes["E"][RecordComponent::SCALAR].resetDataset(
         Dataset(Datatype::DOUBLE, {1}));
+    auto B = o.iterations[1].meshes["B"];
+    B.resetDataset(Dataset(Datatype::DOUBLE, {1}));
     o.flush();
 }
 

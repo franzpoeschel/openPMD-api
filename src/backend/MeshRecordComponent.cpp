@@ -23,9 +23,7 @@
 namespace openPMD
 {
 MeshRecordComponent::MeshRecordComponent() : RecordComponent()
-{
-    setPosition(std::vector<double>{0});
-}
+{}
 
 void MeshRecordComponent::read()
 {
@@ -67,6 +65,16 @@ MeshRecordComponent &MeshRecordComponent::setPosition(std::vector<T> pos)
 
     setAttribute("position", pos);
     return *this;
+}
+
+void MeshRecordComponent::datasetDefined()
+{
+    if (access::write(IOHandler()->m_frontendAccess) &&
+        !containsAttribute("position"))
+    {
+        setPosition(std::vector<double>{0});
+    }
+    RecordComponent::datasetDefined();
 }
 
 template MeshRecordComponent &

@@ -51,6 +51,7 @@ PatchRecordComponent &PatchRecordComponent::resetDataset(Dataset d)
         throw std::runtime_error(
             "Dataset extent must not be zero in any dimension.");
 
+    datasetDefined();
     get().m_dataset = d;
     dirty() = true;
     return *this;
@@ -68,7 +69,7 @@ Extent PatchRecordComponent::getExtent() const
 
 PatchRecordComponent::PatchRecordComponent()
 {
-    BaseRecordComponent::setData(m_patchRecordComponentData);
+    BaseRecordComponent::setData(m_recordComponentData);
     setUnitSI(1);
 }
 

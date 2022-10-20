@@ -448,6 +448,7 @@ OPENPMD_protected
 
     inline internal::RecordComponentData &get()
     {
+        datasetDefined();
         return *m_recordComponentData;
     }
 
