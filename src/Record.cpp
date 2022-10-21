@@ -57,12 +57,8 @@ void Record::flush_impl(
         {
             if (scalar())
             {
-                RecordComponent &rc = at(RecordComponent::SCALAR);
-                rc.parent() = parent();
+                RecordComponent &rc = *this;
                 rc.flush(name, flushParams);
-                Parameter<Operation::KEEP_SYNCHRONOUS> pSynchronize;
-                pSynchronize.otherWritable = &rc.writable();
-                IOHandler()->enqueue(IOTask(this, pSynchronize));
             }
             else
             {
@@ -81,12 +77,7 @@ void Record::flush_impl(
 
             if (scalar())
             {
-                for (auto &comp : *this)
-                {
-                    comp.second.flush(name, flushParams);
-                    writable().abstractFilePosition =
-                        comp.second.writable().abstractFilePosition;
-                }
+                T_RecordComponent::flush(name, flushParams);
             }
             else
             {
@@ -104,17 +95,15 @@ void Record::read()
     if (scalar())
     {
         /* using operator[] will incorrectly update parent */
-        auto &scalarComponent = this->at(RecordComponent::SCALAR);
         try
         {
-            scalarComponent.read();
+            T_RecordComponent::read();
         }
         catch (error::ReadError const &err)
         {
             std::cerr << "Cannot read scalar record component and will skip it "
                          "due to read error:\n"
                       << err.what() << std::endl;
-            this->container().erase(RecordComponent::SCALAR);
         }
     }
     else

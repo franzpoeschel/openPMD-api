@@ -71,12 +71,17 @@ namespace internal
  */
 template <
     typename T_elem_maybe_void,
-    typename T_RecordComponent = T_elem_maybe_void>
+    typename T_RecordComponent_ = T_elem_maybe_void>
 class BaseRecord
     : public Container<
           typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type>
-    , public T_RecordComponent
+    , public T_RecordComponent_
 {
+protected:
+    // make it available for child classes
+
+private:
+    using T_RecordComponent = T_RecordComponent_;
     using T_elem =
         typename auxiliary::OkOr<T_elem_maybe_void, BaseRecord<void> >::type;
     using T_Container = Container<T_elem>;
@@ -138,9 +143,12 @@ public:
 
     mapped_type &operator[](key_type const &key) override;
     mapped_type &operator[](key_type &&key) override;
+    mapped_type &at(key_type const &key) override;
+    mapped_type const &at(key_type const &key) const override;
     size_type erase(key_type const &key) override;
     iterator erase(iterator res) override;
     bool empty() const noexcept;
+    size_type count(key_type const &key) const override;
 
     //! @todo add also, as soon as added in Container:
     // iterator erase(const_iterator first, const_iterator last) override;
@@ -264,10 +272,40 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
         }
         /*
          * datasetDefined() inits the container entry
+         * is this object slicing???? JA
          */
-        mapped_type &ret = keyScalar ? T_Container::at(std::move(key))
+        mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
                                      : T_Container::operator[](std::move(key));
         return ret;
+    }
+}
+
+template <typename T_elem, typename T_RecordComponent>
+inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key)
+    -> mapped_type &
+{
+    return const_cast<mapped_type &>(
+        static_cast<BaseRecord<T_elem, T_RecordComponent> const *>(this)->at(
+            key));
+}
+
+template <typename T_elem, typename T_RecordComponent>
+inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key) const
+    -> mapped_type const &
+{
+    bool const keyScalar = (key == RecordComponent::SCALAR);
+    if (keyScalar)
+    {
+        if (!get().m_containsScalar)
+        {
+            throw std::out_of_range(
+                "[at()] Requested scalar entry from non-scalar record.");
+        }
+        return static_cast<mapped_type const &>(*this);
+    }
+    else
+    {
+        return at(key);
     }
 }
 
@@ -338,6 +376,20 @@ bool BaseRecord<T_elem, T_RecordComponent>::empty() const noexcept
 }
 
 template <typename T_elem, typename T_RecordComponent>
+auto BaseRecord<T_elem, T_RecordComponent>::count(key_type const &key) const
+    -> size_type
+{
+    if (key == RecordComponent::SCALAR)
+    {
+        return get().m_containsScalar ? 1 : 0;
+    }
+    else
+    {
+        return T_Container::count(key);
+    }
+}
+
+template <typename T_elem, typename T_RecordComponent>
 inline std::array<double, 7>
 BaseRecord<T_elem, T_RecordComponent>::unitDimension() const
 {
@@ -390,7 +442,7 @@ template <typename T_elem, typename T_RecordComponent>
 inline void BaseRecord<T_elem, T_RecordComponent>::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
-    if (!this->written() && this->empty())
+    if (!this->written() && this->empty() && !get().m_containsScalar)
         throw std::runtime_error(
             "A Record can not be written without any contained "
             "RecordComponents: " +
@@ -423,9 +475,14 @@ void BaseRecord<T_elem, T_RecordComponent>::datasetDefined()
 {
     // If the RecordComponent API of this object has been used, then the record
     // is a scalar one
-    T_RecordComponent copy;
-    copy.setData(m_baseRecordData);
-    T_Container::emplace(RecordComponent::SCALAR, std::move(copy));
+    T_RecordComponent &rc = *this;
+    /*
+     * No need to do any of the hierarchy linking business,
+     * rc and *this are the same object, so everything is linked already.
+     * Just need to init the RC-specific stuff.
+     */
+    traits::GenerationPolicy<T_RecordComponent> gen;
+    gen(rc);
     get().m_containsScalar = true;
     T_RecordComponent::datasetDefined();
 }

@@ -458,6 +458,8 @@ OPENPMD_protected
         BaseRecordComponent::setData(m_recordComponentData);
     }
 
+    void datasetDefined() override;
+
     void readBase();
 }; // RecordComponent
 

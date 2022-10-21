@@ -37,14 +37,15 @@ namespace openPMD
 {
 namespace internal
 {
-    RecordComponentData::RecordComponentData() = default;
+    RecordComponentData::RecordComponentData()
+    {
+        m_dataset = Dataset(Datatype::CHAR, {1});
+    };
 } // namespace internal
 
 RecordComponent::RecordComponent()
 {
     BaseRecordComponent::setData(m_recordComponentData);
-    setUnitSI(1);
-    resetDataset(Dataset(Datatype::CHAR, {1}));
 }
 
 // We need to instantiate this somewhere otherwise there might be linker issues
@@ -270,6 +271,15 @@ void RecordComponent::flush(
 
         flushAttributes(flushParams);
     }
+}
+
+void RecordComponent::datasetDefined()
+{
+    if (!containsAttribute("unitSI"))
+    {
+        setUnitSI(1);
+    }
+    BaseRecordComponent::datasetDefined();
 }
 
 void RecordComponent::read()

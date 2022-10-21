@@ -228,12 +228,8 @@ void Mesh::flush_impl(
         {
             if (scalar())
             {
-                MeshRecordComponent &mrc = at(RecordComponent::SCALAR);
-                mrc.parent() = parent();
+                MeshRecordComponent &mrc = *this;
                 mrc.flush(name, flushParams);
-                Parameter<Operation::KEEP_SYNCHRONOUS> pSynchronize;
-                pSynchronize.otherWritable = &mrc.writable();
-                IOHandler()->enqueue(IOTask(this, pSynchronize));
             }
             else
             {
@@ -251,12 +247,7 @@ void Mesh::flush_impl(
         {
             if (scalar())
             {
-                for (auto &comp : *this)
-                {
-                    comp.second.flush(name, flushParams);
-                    writable().abstractFilePosition =
-                        comp.second.writable().abstractFilePosition;
-                }
+                T_RecordComponent::flush(name, flushParams);
             }
             else
             {
@@ -400,8 +391,7 @@ void Mesh::read()
 
     if (scalar())
     {
-        /* using operator[] will incorrectly update parent */
-        map.at(MeshRecordComponent::SCALAR).read();
+        T_RecordComponent::read();
     }
     else
     {

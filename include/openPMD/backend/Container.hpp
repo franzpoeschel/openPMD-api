@@ -263,11 +263,11 @@ public:
         container().swap(other.m_container);
     }
 
-    mapped_type &at(key_type const &key)
+    virtual mapped_type &at(key_type const &key)
     {
         return container().at(key);
     }
-    mapped_type const &at(key_type const &key) const
+    virtual mapped_type const &at(key_type const &key) const
     {
         return container().at(key);
     }
@@ -357,7 +357,7 @@ public:
      * @param key key value of the element to count
      * @return since keys are unique in this container, returns 0 or 1
      */
-    size_type count(key_type const &key) const
+    virtual size_type count(key_type const &key) const
     {
         return container().count(key);
     }

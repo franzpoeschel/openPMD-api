@@ -615,8 +615,7 @@ void Iteration::readMeshes(std::string const &meshesPath)
         dOpen.name = mesh_name;
         IOHandler()->enqueue(IOTask(&m, dOpen));
         IOHandler()->flush(internal::defaultFlushParams);
-        MeshRecordComponent &mrc = m[MeshRecordComponent::SCALAR];
-        mrc.parent() = m.parent();
+        MeshRecordComponent &mrc = m;
         IOHandler()->enqueue(IOTask(&mrc, dOpen));
         IOHandler()->flush(internal::defaultFlushParams);
         mrc.written() = false;
