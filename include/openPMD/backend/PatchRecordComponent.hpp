@@ -55,6 +55,9 @@ namespace internal
 
         PatchRecordComponentData();
     };
+
+    template <typename, typename>
+    class BaseRecordData;
 } // namespace internal
 
 /**
@@ -66,6 +69,8 @@ class PatchRecordComponent : public BaseRecordComponent
     friend class Container;
     template <typename, typename>
     friend class BaseRecord;
+    template <typename, typename>
+    friend class internal::BaseRecordData;
     friend class ParticlePatches;
     friend class PatchRecord;
     friend class ParticleSpecies;
@@ -111,27 +116,27 @@ OPENPMD_private
      */
     bool dirtyRecursive() const;
 
-    std::shared_ptr<internal::PatchRecordComponentData> m_recordComponentData{
-        new internal::PatchRecordComponentData()};
-
-    PatchRecordComponent();
-
     // clang-format off
 OPENPMD_protected
     // clang-format on
 
-    inline internal::PatchRecordComponentData const &get() const
+    using Data_t = internal::PatchRecordComponentData;
+
+    std::shared_ptr<Data_t> m_recordComponentData{new Data_t()};
+
+    PatchRecordComponent();
+
+    inline Data_t const &get() const
     {
         return *m_recordComponentData;
     }
 
-    inline internal::PatchRecordComponentData &get()
+    inline Data_t &get()
     {
         return *m_recordComponentData;
     }
 
-    inline void
-    setData(std::shared_ptr<internal::PatchRecordComponentData> data)
+    inline void setData(std::shared_ptr<Data_t> data)
     {
         m_recordComponentData = std::move(data);
         BaseRecordComponent::setData(m_recordComponentData);

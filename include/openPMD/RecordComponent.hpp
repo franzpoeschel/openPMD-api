@@ -95,6 +95,9 @@ namespace internal
          */
         bool m_hasBeenExtended = false;
     };
+
+    template <typename, typename>
+    class BaseRecordData;
 } // namespace internal
 
 class RecordComponent : public BaseRecordComponent
@@ -105,6 +108,8 @@ class RecordComponent : public BaseRecordComponent
     friend class ParticleSpecies;
     template <typename T_elem, typename T_RecordComponent>
     friend class BaseRecord;
+    template <typename, typename>
+    friend class internal::BaseRecordData;
     template <typename T_elem>
     friend class BaseRecordInterface;
     friend class Record;
@@ -432,27 +437,28 @@ private:
      */
     bool dirtyRecursive() const;
 
-    std::shared_ptr<internal::RecordComponentData> m_recordComponentData{
-        new internal::RecordComponentData()};
-
     // clang-format off
 OPENPMD_protected
     // clang-format on
 
+    using Data_t = internal::RecordComponentData;
+
+    std::shared_ptr<Data_t> m_recordComponentData{new Data_t()};
+
     RecordComponent();
 
-    inline internal::RecordComponentData const &get() const
+    inline Data_t const &get() const
     {
         return *m_recordComponentData;
     }
 
-    inline internal::RecordComponentData &get()
+    inline Data_t &get()
     {
         datasetDefined();
         return *m_recordComponentData;
     }
 
-    inline void setData(std::shared_ptr<internal::RecordComponentData> data)
+    inline void setData(std::shared_ptr<Data_t> data)
     {
         m_recordComponentData = std::move(data);
         BaseRecordComponent::setData(m_recordComponentData);

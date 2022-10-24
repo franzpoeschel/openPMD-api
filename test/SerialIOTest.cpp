@@ -2393,9 +2393,8 @@ inline void deletion_test(const std::string &backend)
     e["deletion_scalar_two"][RecordComponent::SCALAR].resetDataset(dset);
     o.flush();
 
-    // tmp, todo: reactivate this line
-    // e["deletion_scalar_two"].erase(
-    //     e["deletion_scalar_two"].find(RecordComponent::SCALAR));
+    e["deletion_scalar_two"].erase(
+        e["deletion_scalar_two"].find(RecordComponent::SCALAR));
     e.erase(e.find("deletion_scalar_two"));
     o.flush();
 
