@@ -399,7 +399,7 @@ public:
     }
 
     //! @todo why does const_iterator not work compile with pybind11?
-    virtual iterator erase(iterator res)
+    iterator erase(iterator res)
     {
         if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
             throw std::runtime_error(
@@ -524,7 +524,8 @@ namespace internal
         ~EraseStaleEntries()
         {
             auto &map = m_originalContainer.container();
-            using iterator_t = typename BareContainer_t::const_iterator;
+            using iterator_t =
+                typename BareContainer_t::InternalContainer::const_iterator;
             std::vector<iterator_t> deleteMe;
             deleteMe.reserve(map.size() - m_accessedKeys.size());
             for (iterator_t it = map.begin(); it != map.end(); ++it)
