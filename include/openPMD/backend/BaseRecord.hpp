@@ -305,7 +305,7 @@ inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key) const
     }
     else
     {
-        return at(key);
+        return T_Container::at(key);
     }
 }
 
@@ -319,15 +319,14 @@ BaseRecord<T_elem, T_RecordComponent>::erase(key_type const &key)
         res = Container<T_elem>::erase(key);
     else
     {
-        mapped_type &rc = this->find(RecordComponent::SCALAR)->second;
-        if (rc.written())
+        if (this->written())
         {
             Parameter<Operation::DELETE_DATASET> dDelete;
             dDelete.name = ".";
-            this->IOHandler()->enqueue(IOTask(&rc, dDelete));
+            this->IOHandler()->enqueue(IOTask(this, dDelete));
             this->IOHandler()->flush(internal::defaultFlushParams);
         }
-        res = Container<T_elem>::erase(key);
+        res = get().m_containsScalar ? 1 : 0;
     }
 
     if (keyScalar)
@@ -349,15 +348,14 @@ BaseRecord<T_elem, T_RecordComponent>::erase(iterator res)
         ret = Container<T_elem>::erase(res);
     else
     {
-        mapped_type &rc = this->find(RecordComponent::SCALAR)->second;
-        if (rc.written())
+        if (this->written())
         {
             Parameter<Operation::DELETE_DATASET> dDelete;
             dDelete.name = ".";
-            this->IOHandler()->enqueue(IOTask(&rc, dDelete));
+            this->IOHandler()->enqueue(IOTask(this, dDelete));
             this->IOHandler()->flush(internal::defaultFlushParams);
         }
-        ret = Container<T_elem>::erase(res);
+        ret = this->end();
     }
 
     if (keyScalar)

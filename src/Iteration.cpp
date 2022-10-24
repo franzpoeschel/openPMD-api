@@ -583,8 +583,7 @@ void Iteration::readMeshes(std::string const &meshesPath)
         auto shape = std::find(att_begin, att_end, "shape");
         if (value != att_end && shape != att_end)
         {
-            MeshRecordComponent &mrc = m[MeshRecordComponent::SCALAR];
-            mrc.parent() = m.parent();
+            MeshRecordComponent &mrc = m;
             IOHandler()->enqueue(IOTask(&mrc, pOpen));
             IOHandler()->flush(internal::defaultFlushParams);
             mrc.get().m_isConstant = true;

@@ -48,8 +48,16 @@ void Record::flush_impl(
 {
     if (access::readOnly(IOHandler()->m_frontendAccess))
     {
-        for (auto &comp : *this)
-            comp.second.flush(comp.first, flushParams);
+        auto &m = get();
+        if (m.m_containsScalar)
+        {
+            T_RecordComponent::flush(SCALAR, flushParams);
+        }
+        else
+        {
+            for (auto &comp : *this)
+                comp.second.flush(comp.first, flushParams);
+        }
     }
     else
     {

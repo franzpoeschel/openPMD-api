@@ -136,6 +136,8 @@ OPENPMD_protected
         m_recordComponentData = std::move(data);
         BaseRecordComponent::setData(m_recordComponentData);
     }
+
+    void datasetDefined() override;
 }; // PatchRecordComponent
 
 template <typename T>
