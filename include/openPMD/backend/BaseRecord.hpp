@@ -268,6 +268,7 @@ public:
     {
         return makeIterator(T_Container::end());
     }
+
     const_iterator end() const
     {
         return makeIterator(T_Container::end());
@@ -275,13 +276,169 @@ public:
 
     virtual ~BaseRecord() = default;
 
-    mapped_type &operator[](key_type const &key) override;
-    mapped_type &operator[](key_type &&key) override;
-    mapped_type &at(key_type const &key) override;
-    mapped_type const &at(key_type const &key) const override;
-    size_type erase(key_type const &key) override;
-    iterator erase(iterator res);
-    bool empty() const noexcept;
+    mapped_type &operator[](key_type const &key)
+    {
+        auto it = this->find(key);
+        if (it != this->end())
+        {
+            return std::visit(
+                auxiliary::overloaded{
+                    [](typename iterator::Left &l) -> mapped_type & {
+                        return l->second;
+                    },
+                    [this](typename iterator::Right &) -> mapped_type & {
+                        /*
+                         * Do not use the iterator result, as it is a non-owning
+                         * handle
+                         */
+                        return static_cast<mapped_type &>(*this);
+                    }},
+                it.m_iterator);
+        }
+        else
+        {
+            bool const keyScalar = (key == RecordComponent::SCALAR);
+            if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
+                (scalar() && !keyScalar))
+                throw std::runtime_error(
+                    "A scalar component can not be contained at "
+                    "the same time as one or more regular components.");
+
+            if (keyScalar)
+            {
+                /*
+                 * This activates the RecordComponent API of this object.
+                 */
+                T_RecordComponent::get();
+            }
+            mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
+                                         : T_Container::operator[](key);
+            return ret;
+        }
+    }
+
+    mapped_type &operator[](key_type &&key)
+    {
+        auto it = this->find(key);
+        if (it != this->end())
+        {
+            return std::visit(
+                auxiliary::overloaded{
+                    [](typename iterator::Left &l) -> mapped_type & {
+                        return l->second;
+                    },
+                    [this](typename iterator::Right &) -> mapped_type & {
+                        /*
+                         * Do not use the iterator result, as it is a non-owning
+                         * handle
+                         */
+                        return static_cast<mapped_type &>(*this);
+                    }},
+                it.m_iterator);
+        }
+        else
+        {
+            bool const keyScalar = (key == RecordComponent::SCALAR);
+            if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
+                (scalar() && !keyScalar))
+                throw std::runtime_error(
+                    "A scalar component can not be contained at "
+                    "the same time as one or more regular components.");
+
+            if (keyScalar)
+            {
+                /*
+                 * This activates the RecordComponent API of this object.
+                 */
+                T_RecordComponent::get();
+            }
+            mapped_type &ret = keyScalar
+                ? static_cast<mapped_type &>(*this)
+                : T_Container::operator[](std::move(key));
+            return ret;
+        }
+    }
+
+    mapped_type &at(key_type const &key)
+    {
+        return const_cast<mapped_type &>(
+            static_cast<BaseRecord<T_elem, T_RecordComponent> const *>(this)
+                ->at(key));
+    }
+
+    mapped_type const &at(key_type const &key) const
+    {
+        bool const keyScalar = (key == RecordComponent::SCALAR);
+        if (keyScalar)
+        {
+            if (!get().m_datasetDefined)
+            {
+                throw std::out_of_range(
+                    "[at()] Requested scalar entry from non-scalar record.");
+            }
+            return static_cast<mapped_type const &>(*this);
+        }
+        else
+        {
+            return T_Container::at(key);
+        }
+    }
+
+    size_type erase(key_type const &key)
+    {
+        bool const keyScalar = (key == RecordComponent::SCALAR);
+        size_type res;
+        if (!keyScalar || (keyScalar && this->at(key).constant()))
+            res = Container<T_elem>::erase(key);
+        else
+        {
+            if (this->written())
+            {
+                Parameter<Operation::DELETE_DATASET> dDelete;
+                dDelete.name = ".";
+                this->IOHandler()->enqueue(IOTask(this, dDelete));
+                this->IOHandler()->flush(internal::defaultFlushParams);
+            }
+            res = get().m_datasetDefined ? 1 : 0;
+        }
+
+        if (keyScalar)
+        {
+            this->written() = false;
+            this->writable().abstractFilePosition.reset();
+            this->get().m_datasetDefined = false;
+        }
+        return res;
+    }
+
+    iterator erase(iterator it)
+    {
+        return std::visit(
+            auxiliary::overloaded{
+                [this](typename iterator::Left &left) {
+                    return makeIterator(T_Container::erase(left));
+                },
+                [this](typename iterator::Right &) {
+                    if (this->written())
+                    {
+                        Parameter<Operation::DELETE_DATASET> dDelete;
+                        dDelete.name = ".";
+                        this->IOHandler()->enqueue(IOTask(this, dDelete));
+                        this->IOHandler()->flush(internal::defaultFlushParams);
+                        this->written() = false;
+                    }
+                    this->writable().abstractFilePosition.reset();
+                    this->get().m_datasetDefined = false;
+                    return end();
+                }},
+            it.m_iterator);
+    }
+
+    bool empty() const noexcept
+    {
+        return !scalar() && T_Container::empty();
+    }
+
     iterator find(key_type const &key)
     {
         auto &r = get();
@@ -301,6 +458,7 @@ public:
             return makeIterator(r.m_container.find(key));
         }
     }
+
     const_iterator find(key_type const &key) const
     {
         auto &r = get();
@@ -320,7 +478,30 @@ public:
             return makeIterator(r.m_container.find(key));
         }
     }
-    size_type count(key_type const &key) const override;
+
+    size_type count(key_type const &key) const
+    {
+        if (key == RecordComponent::SCALAR)
+        {
+            return get().m_datasetDefined ? 1 : 0;
+        }
+        else
+        {
+            return T_Container::count(key);
+        }
+    }
+
+    size_type size() const
+    {
+        if (scalar())
+        {
+            return 1;
+        }
+        else
+        {
+            return T_Container::size();
+        }
+    }
 
     //! @todo add also, as soon as added in Container:
     // iterator erase(const_iterator first, const_iterator last) override;
@@ -398,196 +579,6 @@ BaseRecord<T_elem, T_RecordComponent>::BaseRecord()
         rawRCData, [](auto const *) {}});
     m_baseRecordData->m_iterator.emplace(
         std::make_pair(RecordComponent::SCALAR, std::move(rc)));
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline typename BaseRecord<T_elem, T_RecordComponent>::mapped_type &
-BaseRecord<T_elem, T_RecordComponent>::operator[](key_type const &key)
-{
-    auto it = this->find(key);
-    if (it != this->end())
-    {
-        return std::visit(
-            auxiliary::overloaded{
-                [](typename iterator::Left &l) -> mapped_type & {
-                    return l->second;
-                },
-                [this](typename iterator::Right &) -> mapped_type & {
-                    /*
-                     * Do not use the iterator result, as it is a non-owning
-                     * handle
-                     */
-                    return static_cast<mapped_type &>(*this);
-                }},
-            it.m_iterator);
-    }
-    else
-    {
-        bool const keyScalar = (key == RecordComponent::SCALAR);
-        if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
-            (scalar() && !keyScalar))
-            throw std::runtime_error(
-                "A scalar component can not be contained at "
-                "the same time as one or more regular components.");
-
-        if (keyScalar)
-        {
-            /*
-             * This activates the RecordComponent API of this object.
-             */
-            T_RecordComponent::get();
-        }
-        mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
-                                     : T_Container::operator[](key);
-        return ret;
-    }
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline typename BaseRecord<T_elem, T_RecordComponent>::mapped_type &
-BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
-{
-    auto it = this->find(key);
-    if (it != this->end())
-    {
-        return std::visit(
-            auxiliary::overloaded{
-                [](typename iterator::Left &l) -> mapped_type & {
-                    return l->second;
-                },
-                [this](typename iterator::Right &) -> mapped_type & {
-                    /*
-                     * Do not use the iterator result, as it is a non-owning
-                     * handle
-                     */
-                    return static_cast<mapped_type &>(*this);
-                }},
-            it.m_iterator);
-    }
-    else
-    {
-        bool const keyScalar = (key == RecordComponent::SCALAR);
-        if ((keyScalar && !Container<T_elem>::empty() && !scalar()) ||
-            (scalar() && !keyScalar))
-            throw std::runtime_error(
-                "A scalar component can not be contained at "
-                "the same time as one or more regular components.");
-
-        if (keyScalar)
-        {
-            /*
-             * This activates the RecordComponent API of this object.
-             */
-            T_RecordComponent::get();
-        }
-        mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
-                                     : T_Container::operator[](std::move(key));
-        return ret;
-    }
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key)
-    -> mapped_type &
-{
-    return const_cast<mapped_type &>(
-        static_cast<BaseRecord<T_elem, T_RecordComponent> const *>(this)->at(
-            key));
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key) const
-    -> mapped_type const &
-{
-    bool const keyScalar = (key == RecordComponent::SCALAR);
-    if (keyScalar)
-    {
-        if (!get().m_datasetDefined)
-        {
-            throw std::out_of_range(
-                "[at()] Requested scalar entry from non-scalar record.");
-        }
-        return static_cast<mapped_type const &>(*this);
-    }
-    else
-    {
-        return T_Container::at(key);
-    }
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline typename BaseRecord<T_elem, T_RecordComponent>::size_type
-BaseRecord<T_elem, T_RecordComponent>::erase(key_type const &key)
-{
-    bool const keyScalar = (key == RecordComponent::SCALAR);
-    size_type res;
-    if (!keyScalar || (keyScalar && this->at(key).constant()))
-        res = Container<T_elem>::erase(key);
-    else
-    {
-        if (this->written())
-        {
-            Parameter<Operation::DELETE_DATASET> dDelete;
-            dDelete.name = ".";
-            this->IOHandler()->enqueue(IOTask(this, dDelete));
-            this->IOHandler()->flush(internal::defaultFlushParams);
-        }
-        res = get().m_datasetDefined ? 1 : 0;
-    }
-
-    if (keyScalar)
-    {
-        this->written() = false;
-        this->writable().abstractFilePosition.reset();
-        this->get().m_datasetDefined = false;
-    }
-    return res;
-}
-
-template <typename T_elem, typename T_RecordComponent>
-inline typename BaseRecord<T_elem, T_RecordComponent>::iterator
-BaseRecord<T_elem, T_RecordComponent>::erase(iterator it)
-{
-
-    return std::visit(
-        auxiliary::overloaded{
-            [this](typename iterator::Left &left) {
-                return makeIterator(T_Container::erase(left));
-            },
-            [this](typename iterator::Right &) {
-                if (this->written())
-                {
-                    Parameter<Operation::DELETE_DATASET> dDelete;
-                    dDelete.name = ".";
-                    this->IOHandler()->enqueue(IOTask(this, dDelete));
-                    this->IOHandler()->flush(internal::defaultFlushParams);
-                    this->written() = false;
-                }
-                this->writable().abstractFilePosition.reset();
-                this->get().m_datasetDefined = false;
-                return end();
-            }},
-        it.m_iterator);
-}
-
-template <typename T_elem, typename T_RecordComponent>
-bool BaseRecord<T_elem, T_RecordComponent>::empty() const noexcept
-{
-    return T_Container::empty();
-}
-
-template <typename T_elem, typename T_RecordComponent>
-auto BaseRecord<T_elem, T_RecordComponent>::count(key_type const &key) const
-    -> size_type
-{
-    if (key == RecordComponent::SCALAR)
-    {
-        return get().m_datasetDefined ? 1 : 0;
-    }
-    else
-    {
-        return T_Container::count(key);
-    }
 }
 
 template <typename T_elem, typename T_RecordComponent>
