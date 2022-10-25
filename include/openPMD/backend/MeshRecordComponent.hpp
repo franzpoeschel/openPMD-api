@@ -74,7 +74,7 @@ public:
     MeshRecordComponent &makeConstant(T);
 
 protected:
-    void datasetDefined() override;
+    void datasetDefined(internal::BaseRecordComponentData &) override;
 };
 
 template <typename T>

@@ -47,13 +47,6 @@ namespace internal
         using T_RecordComponentData = typename T_RecordComponent::Data_t;
 
     public:
-        /**
-         * True if this Record contains a scalar record component.
-         * If so, then that record component is the only component contained,
-         * and the last hierarchical layer is skipped (i.e. only one OPEN_PATH
-         * task for Record and RecordComponent).
-         */
-        bool m_containsScalar = false;
         /*
          * Non-owning iterator, so that we can mock the iterator for
          * the deprecated SCALAR keyword.
@@ -82,6 +75,14 @@ namespace internal
         using Left = T_BaseIterator;
         struct Right
         { /*Empty*/
+            constexpr bool operator==(Right const &) const noexcept
+            {
+                return true;
+            }
+            constexpr bool operator!=(Right const &) const noexcept
+            {
+                return false;
+            }
         };
 
         template <typename, typename>
@@ -116,10 +117,14 @@ namespace internal
         {
             return std::visit(
                 auxiliary::overloaded{
-                    [](Left &left) -> T_Value * { //
-                        return left.operator->();
-                    },
-                    [this](Right &) -> T_Value * { //
+                    [](Left &left) -> T_Value * { return left.operator->(); },
+                    [this](Right &) -> T_Value * {
+                        /*
+                         * We cannot create this value on the fly since we only
+                         * give out a pointer, so that would be use-after-free.
+                         * Instead, we just keep one value around inside
+                         * BaseRecordData and give it out when needed.
+                         */
                         return &m_baseRecord->get().m_iterator.value();
                     }},
                 m_iterator);
@@ -132,23 +137,7 @@ namespace internal
 
         bool operator==(ScalarIterator const &other) const
         {
-            return std::visit(
-                auxiliary::overloaded{
-                    [&other](Left const &l1) {
-                        return std::visit(
-                            auxiliary::overloaded{
-                                [&l1](Left const &l2) { return l1 == l2; },
-                                [](Right const &) { return false; }},
-                            other.m_iterator);
-                    },
-                    [&other](Right const &) {
-                        return std::visit(
-                            auxiliary::overloaded{
-                                [](Left const &) { return false; },
-                                [](Right const &) { return true; }},
-                            other.m_iterator);
-                    }},
-                m_iterator);
+            return this->m_iterator == other.m_iterator;
         }
 
         bool operator!=(ScalarIterator const &other) const
@@ -190,6 +179,10 @@ private:
     friend class Mesh;
     template <typename, typename>
     friend class internal::ScalarIterator;
+
+    static_assert(
+        traits::GenerationPolicy<T_RecordComponent>::is_noop,
+        "Internal error: Scalar components cannot have generation policies.");
 
     std::shared_ptr<internal::BaseRecordData<T_elem, T_RecordComponent>>
         m_baseRecordData{
@@ -249,7 +242,7 @@ private:
 public:
     iterator begin()
     {
-        if (get().m_containsScalar)
+        if (get().m_datasetDefined)
         {
             return makeIterator();
         }
@@ -261,7 +254,7 @@ public:
 
     const_iterator begin() const
     {
-        if (get().m_containsScalar)
+        if (get().m_datasetDefined)
         {
             return makeIterator();
         }
@@ -280,14 +273,6 @@ public:
         return makeIterator(T_Container::end());
     }
 
-    // this avoids object slicing
-    operator T_RecordComponent() const
-    {
-        T_RecordComponent res;
-        res.setData(m_baseRecordData);
-        return res;
-    }
-
     virtual ~BaseRecord() = default;
 
     mapped_type &operator[](key_type const &key) override;
@@ -300,9 +285,9 @@ public:
     iterator find(key_type const &key)
     {
         auto &r = get();
-        if (key == RecordComponent::SCALAR && get().m_containsScalar)
+        if (key == RecordComponent::SCALAR && get().m_datasetDefined)
         {
-            if (r.m_containsScalar)
+            if (r.m_datasetDefined)
             {
                 return begin();
             }
@@ -319,9 +304,9 @@ public:
     const_iterator find(key_type const &key) const
     {
         auto &r = get();
-        if (key == RecordComponent::SCALAR && get().m_containsScalar)
+        if (key == RecordComponent::SCALAR && get().m_datasetDefined)
         {
-            if (r.m_containsScalar)
+            if (r.m_datasetDefined)
             {
                 return begin();
             }
@@ -369,8 +354,6 @@ public:
 protected:
     // BaseRecord(internal::BaseRecordData<T_elem> *);
     void readBase();
-
-    void datasetDefined() override;
 
 private:
     void flush(std::string const &, internal::FlushParams const &) final;
@@ -449,7 +432,10 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type const &key)
 
         if (keyScalar)
         {
-            datasetDefined();
+            /*
+             * This activates the RecordComponent API of this object.
+             */
+            T_RecordComponent::get();
         }
         mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
                                      : T_Container::operator[](key);
@@ -489,12 +475,11 @@ BaseRecord<T_elem, T_RecordComponent>::operator[](key_type &&key)
 
         if (keyScalar)
         {
-            datasetDefined();
+            /*
+             * This activates the RecordComponent API of this object.
+             */
+            T_RecordComponent::get();
         }
-        /*
-         * datasetDefined() inits the container entry
-         * is this object slicing???? JA
-         */
         mapped_type &ret = keyScalar ? static_cast<mapped_type &>(*this)
                                      : T_Container::operator[](std::move(key));
         return ret;
@@ -517,7 +502,7 @@ inline auto BaseRecord<T_elem, T_RecordComponent>::at(key_type const &key) const
     bool const keyScalar = (key == RecordComponent::SCALAR);
     if (keyScalar)
     {
-        if (!get().m_containsScalar)
+        if (!get().m_datasetDefined)
         {
             throw std::out_of_range(
                 "[at()] Requested scalar entry from non-scalar record.");
@@ -547,14 +532,14 @@ BaseRecord<T_elem, T_RecordComponent>::erase(key_type const &key)
             this->IOHandler()->enqueue(IOTask(this, dDelete));
             this->IOHandler()->flush(internal::defaultFlushParams);
         }
-        res = get().m_containsScalar ? 1 : 0;
+        res = get().m_datasetDefined ? 1 : 0;
     }
 
     if (keyScalar)
     {
         this->written() = false;
         this->writable().abstractFilePosition.reset();
-        this->get().m_containsScalar = false;
+        this->get().m_datasetDefined = false;
     }
     return res;
 }
@@ -579,7 +564,7 @@ BaseRecord<T_elem, T_RecordComponent>::erase(iterator it)
                     this->written() = false;
                 }
                 this->writable().abstractFilePosition.reset();
-                this->get().m_containsScalar = false;
+                this->get().m_datasetDefined = false;
                 return end();
             }},
         it.m_iterator);
@@ -597,7 +582,7 @@ auto BaseRecord<T_elem, T_RecordComponent>::count(key_type const &key) const
 {
     if (key == RecordComponent::SCALAR)
     {
-        return get().m_containsScalar ? 1 : 0;
+        return get().m_datasetDefined ? 1 : 0;
     }
     else
     {
@@ -616,7 +601,7 @@ BaseRecord<T_elem, T_RecordComponent>::unitDimension() const
 template <typename T_elem, typename T_RecordComponent>
 inline bool BaseRecord<T_elem, T_RecordComponent>::scalar() const
 {
-    return get().m_containsScalar;
+    return get().m_datasetDefined;
 }
 
 template <typename T_elem, typename T_RecordComponent>
@@ -658,7 +643,7 @@ template <typename T_elem, typename T_RecordComponent>
 inline void BaseRecord<T_elem, T_RecordComponent>::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
-    if (!this->written() && this->empty() && !get().m_containsScalar)
+    if (!this->written() && this->empty() && !get().m_datasetDefined)
         throw std::runtime_error(
             "A Record can not be written without any contained "
             "RecordComponents: " +
@@ -684,22 +669,5 @@ inline bool BaseRecord<T_elem, T_RecordComponent>::dirtyRecursive() const
         }
     }
     return false;
-}
-
-template <typename T_elem, typename T_RecordComponent>
-void BaseRecord<T_elem, T_RecordComponent>::datasetDefined()
-{
-    // If the RecordComponent API of this object has been used, then the record
-    // is a scalar one
-    T_RecordComponent &rc = *this;
-    /*
-     * No need to do any of the hierarchy linking business,
-     * rc and *this are the same object, so everything is linked already.
-     * Just need to init the RC-specific stuff.
-     */
-    traits::GenerationPolicy<T_RecordComponent> gen;
-    gen(rc);
-    get().m_containsScalar = true;
-    T_RecordComponent::datasetDefined();
 }
 } // namespace openPMD

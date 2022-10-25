@@ -220,7 +220,7 @@ void Mesh::flush_impl(
     if (access::readOnly(IOHandler()->m_frontendAccess))
     {
         auto &m = get();
-        if (m.m_containsScalar)
+        if (m.m_datasetDefined)
         {
             T_RecordComponent::flush(SCALAR, flushParams);
         }

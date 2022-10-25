@@ -35,7 +35,6 @@ BaseRecordComponent &BaseRecordComponent::resetDatatype(Datatype d)
             "A Records Datatype can not (yet) be changed after it has been "
             "written.");
 
-    datasetDefined();
     get().m_dataset.dtype = d;
     return *this;
 }
@@ -71,6 +70,9 @@ BaseRecordComponent::BaseRecordComponent()
     Attributable::setData(m_baseRecordComponentData);
 }
 
-void BaseRecordComponent::datasetDefined()
-{}
+void BaseRecordComponent::datasetDefined(
+    internal::BaseRecordComponentData &data)
+{
+    data.m_datasetDefined = true;
+}
 } // namespace openPMD

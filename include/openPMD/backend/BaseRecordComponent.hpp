@@ -47,6 +47,10 @@ namespace internal
          * instead defined via light-weight attributes.
          */
         bool m_isConstant = false;
+        /*
+         * ... document this ...
+         */
+        bool m_datasetDefined = false;
 
         BaseRecordComponentData(BaseRecordComponentData const &) = delete;
         BaseRecordComponentData(BaseRecordComponentData &&) = delete;
@@ -119,7 +123,7 @@ protected:
         Attributable::setData(m_baseRecordComponentData);
     }
 
-    virtual void datasetDefined();
+    virtual void datasetDefined(internal::BaseRecordComponentData &);
 
     BaseRecordComponent();
 }; // BaseRecordComponent

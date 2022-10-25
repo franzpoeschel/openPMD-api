@@ -128,11 +128,14 @@ OPENPMD_protected
 
     inline Data_t const &get() const
     {
+        // cannot call this in the const overload
+        // datasetDefined(*m_recordComponentData);
         return *m_recordComponentData;
     }
 
     inline Data_t &get()
     {
+        datasetDefined(*m_recordComponentData);
         return *m_recordComponentData;
     }
 
@@ -142,7 +145,7 @@ OPENPMD_protected
         BaseRecordComponent::setData(m_recordComponentData);
     }
 
-    void datasetDefined() override;
+    void datasetDefined(internal::BaseRecordComponentData &) override;
 }; // PatchRecordComponent
 
 template <typename T>

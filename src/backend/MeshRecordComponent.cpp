@@ -67,14 +67,15 @@ MeshRecordComponent &MeshRecordComponent::setPosition(std::vector<T> pos)
     return *this;
 }
 
-void MeshRecordComponent::datasetDefined()
+void MeshRecordComponent::datasetDefined(
+    internal::BaseRecordComponentData &data)
 {
     if (access::write(IOHandler()->m_frontendAccess) &&
         !containsAttribute("position"))
     {
         setPosition(std::vector<double>{0});
     }
-    RecordComponent::datasetDefined();
+    RecordComponent::datasetDefined(data);
 }
 
 template MeshRecordComponent &

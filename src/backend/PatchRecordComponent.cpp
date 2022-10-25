@@ -51,7 +51,6 @@ PatchRecordComponent &PatchRecordComponent::resetDataset(Dataset d)
         throw std::runtime_error(
             "Dataset extent must not be zero in any dimension.");
 
-    datasetDefined();
     get().m_dataset = d;
     dirty() = true;
     return *this;
@@ -137,5 +136,16 @@ bool PatchRecordComponent::dirtyRecursive() const
     }
     auto &rc = get();
     return !rc.m_chunks.empty();
+}
+
+void PatchRecordComponent::datasetDefined(
+    internal::BaseRecordComponentData &data)
+{
+    if (access::write(IOHandler()->m_frontendAccess) &&
+        !containsAttribute("unitSI"))
+    {
+        setUnitSI(1);
+    }
+    BaseRecordComponent::datasetDefined(data);
 }
 } // namespace openPMD

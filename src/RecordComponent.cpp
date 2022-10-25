@@ -81,7 +81,6 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
             "[RecordComponent] Must set specific datatype.");
     }
 
-    datasetDefined();
     // if( d.extent.empty() )
     //    throw std::runtime_error("Dataset extent must be at least 1D.");
     if (std::any_of(
@@ -170,7 +169,6 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     if (rc.m_dataset.extent.size() == 0)
         throw std::runtime_error("Dataset extent must be at least 1D.");
 
-    datasetDefined();
     rc.m_isEmpty = true;
     dirty() = true;
     if (!written())
@@ -273,13 +271,14 @@ void RecordComponent::flush(
     }
 }
 
-void RecordComponent::datasetDefined()
+void RecordComponent::datasetDefined(internal::BaseRecordComponentData &data)
 {
-    if (!containsAttribute("unitSI"))
+    if (access::write(IOHandler()->m_frontendAccess) &&
+        !containsAttribute("unitSI"))
     {
         setUnitSI(1);
     }
-    BaseRecordComponent::datasetDefined();
+    BaseRecordComponent::datasetDefined(data);
 }
 
 void RecordComponent::read()

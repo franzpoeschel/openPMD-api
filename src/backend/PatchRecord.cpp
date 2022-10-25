@@ -41,7 +41,7 @@ PatchRecord::setUnitDimension(std::map<UnitDimension, double> const &udim)
 void PatchRecord::flush_impl(
     std::string const &path, internal::FlushParams const &flushParams)
 {
-    if (!get().m_containsScalar)
+    if (!get().m_datasetDefined)
     {
         if (IOHandler()->m_frontendAccess != Access::READ_ONLY)
             Container<PatchRecordComponent>::flush(
@@ -107,14 +107,5 @@ void PatchRecord::read()
         }
     }
     dirty() = false;
-}
-
-void PatchRecordComponent::datasetDefined()
-{
-    if (!containsAttribute("unitSI"))
-    {
-        setUnitSI(1);
-    }
-    BaseRecordComponent::datasetDefined();
 }
 } // namespace openPMD
