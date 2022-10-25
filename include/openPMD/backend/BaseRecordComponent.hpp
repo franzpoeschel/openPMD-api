@@ -123,7 +123,7 @@ protected:
         Attributable::setData(m_baseRecordComponentData);
     }
 
-    virtual void datasetDefined(internal::BaseRecordComponentData &);
+    void datasetDefined(internal::BaseRecordComponentData &);
 
     BaseRecordComponent();
 }; // BaseRecordComponent

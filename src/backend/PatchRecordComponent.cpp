@@ -86,6 +86,10 @@ void PatchRecordComponent::flush(
     }
     else
     {
+        if (!containsAttribute("unitSI"))
+        {
+            setUnitSI(1);
+        }
         if (!written())
         {
             Parameter<Operation::CREATE_DATASET> dCreate;
@@ -136,16 +140,5 @@ bool PatchRecordComponent::dirtyRecursive() const
     }
     auto &rc = get();
     return !rc.m_chunks.empty();
-}
-
-void PatchRecordComponent::datasetDefined(
-    internal::BaseRecordComponentData &data)
-{
-    if (access::write(IOHandler()->m_frontendAccess) &&
-        !containsAttribute("unitSI"))
-    {
-        setUnitSI(1);
-    }
-    BaseRecordComponent::datasetDefined(data);
 }
 } // namespace openPMD

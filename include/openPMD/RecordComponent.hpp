@@ -466,8 +466,6 @@ OPENPMD_protected
         BaseRecordComponent::setData(m_recordComponentData);
     }
 
-    void datasetDefined(internal::BaseRecordComponentData &) override;
-
     void readBase();
 }; // RecordComponent
 

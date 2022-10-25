@@ -212,6 +212,10 @@ void RecordComponent::flush(
                 "[RecordComponent] Must set specific datatype (Use "
                 "resetDataset call).");
         }
+        if (!containsAttribute("unitSI"))
+        {
+            setUnitSI(1);
+        }
         if (!written())
         {
             if (constant())
@@ -269,16 +273,6 @@ void RecordComponent::flush(
 
         flushAttributes(flushParams);
     }
-}
-
-void RecordComponent::datasetDefined(internal::BaseRecordComponentData &data)
-{
-    if (access::write(IOHandler()->m_frontendAccess) &&
-        !containsAttribute("unitSI"))
-    {
-        setUnitSI(1);
-    }
-    BaseRecordComponent::datasetDefined(data);
 }
 
 void RecordComponent::read()

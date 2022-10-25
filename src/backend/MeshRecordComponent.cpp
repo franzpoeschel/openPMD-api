@@ -56,6 +56,17 @@ void MeshRecordComponent::read()
     readBase();
 }
 
+void MeshRecordComponent::flush(
+    std::string const &name, internal::FlushParams const &params)
+{
+    if (access::write(IOHandler()->m_frontendAccess) &&
+        !containsAttribute("position"))
+    {
+        setPosition(std::vector<double>{0});
+    }
+    RecordComponent::flush(name, params);
+}
+
 template <typename T>
 MeshRecordComponent &MeshRecordComponent::setPosition(std::vector<T> pos)
 {
@@ -65,17 +76,6 @@ MeshRecordComponent &MeshRecordComponent::setPosition(std::vector<T> pos)
 
     setAttribute("position", pos);
     return *this;
-}
-
-void MeshRecordComponent::datasetDefined(
-    internal::BaseRecordComponentData &data)
-{
-    if (access::write(IOHandler()->m_frontendAccess) &&
-        !containsAttribute("position"))
-    {
-        setPosition(std::vector<double>{0});
-    }
-    RecordComponent::datasetDefined(data);
 }
 
 template MeshRecordComponent &

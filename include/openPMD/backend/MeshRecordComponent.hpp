@@ -38,6 +38,7 @@ class MeshRecordComponent : public RecordComponent
 private:
     MeshRecordComponent();
     void read() override;
+    void flush(std::string const &, internal::FlushParams const &);
 
 public:
     ~MeshRecordComponent() override = default;
@@ -72,9 +73,6 @@ public:
      */
     template <typename T>
     MeshRecordComponent &makeConstant(T);
-
-protected:
-    void datasetDefined(internal::BaseRecordComponentData &) override;
 };
 
 template <typename T>
