@@ -37,15 +37,15 @@ void init_BaseRecord(py::module &m)
 Returns true if this record only contains a single component.
 )docstr";
 
-    py::class_<
-        BaseRecord<BaseRecordComponent>,
-        Container<BaseRecordComponent> >(m, "Base_Record_Base_Record_Component")
-        .def_property_readonly(
-            "unit_dimension",
-            &BaseRecord<BaseRecordComponent>::unitDimension,
-            python::doc_unit_dimension)
-        .def_property_readonly(
-            "scalar", &BaseRecord<BaseRecordComponent>::scalar, doc_scalar);
+    // py::class_<
+    //     BaseRecord<BaseRecordComponent>,
+    //     Container<BaseRecordComponent> >(m,
+    //     "Base_Record_Base_Record_Component") .def_property_readonly(
+    //         "unit_dimension",
+    //         &BaseRecord<BaseRecordComponent>::unitDimension,
+    //         python::doc_unit_dimension)
+    //     .def_property_readonly(
+    //         "scalar", &BaseRecord<BaseRecordComponent>::scalar, doc_scalar);
 
     py::class_<BaseRecord<RecordComponent>, Container<RecordComponent> >(
         m, "Base_Record_Record_Component")
