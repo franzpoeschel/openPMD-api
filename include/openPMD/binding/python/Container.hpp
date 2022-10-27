@@ -129,6 +129,7 @@ py::class_<Map, holder_type, Attributable> create_and_bind_container(
         scope,
         name.c_str(),
         py::module_local(local),
+        py::multiple_inheritance(),
         std::forward<Args>(args)...);
 
     // maybe move this to bind_container
