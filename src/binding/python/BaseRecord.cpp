@@ -47,19 +47,22 @@ Returns true if this record only contains a single component.
     //     .def_property_readonly(
     //         "scalar", &BaseRecord<BaseRecordComponent>::scalar, doc_scalar);
 
-    py::class_<BaseRecord<RecordComponent>, Container<RecordComponent> >(
-        m, "Base_Record_Record_Component")
+    py::class_<
+        BaseRecord<RecordComponent>,
+        Container<RecordComponent>,
+        RecordComponent>(m, "Base_Record_Record_Component")
         .def_property_readonly(
             "scalar", &BaseRecord<RecordComponent>::scalar, doc_scalar);
     py::class_<
         BaseRecord<MeshRecordComponent>,
-        Container<MeshRecordComponent> >(m, "Base_Record_Mesh_Record_Component")
+        Container<MeshRecordComponent>,
+        MeshRecordComponent>(m, "Base_Record_Mesh_Record_Component")
         .def_property_readonly(
             "scalar", &BaseRecord<MeshRecordComponent>::scalar, doc_scalar);
     py::class_<
         BaseRecord<PatchRecordComponent>,
-        Container<PatchRecordComponent> >(
-        m, "Base_Record_Patch_Record_Component")
+        Container<PatchRecordComponent>,
+        PatchRecordComponent>(m, "Base_Record_Patch_Record_Component")
         .def_property_readonly(
             "scalar", &BaseRecord<PatchRecordComponent>::scalar, doc_scalar);
 }
