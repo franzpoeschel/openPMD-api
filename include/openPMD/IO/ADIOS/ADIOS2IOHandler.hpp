@@ -588,7 +588,8 @@ namespace detail
             Parameter<Operation::AVAILABLE_CHUNKS> &params,
             adios2::IO &IO,
             adios2::Engine &engine,
-            std::string const &varName);
+            std::string const &varName,
+            bool allSteps);
 
         template <int n, typename... Params>
         static void call(Params &&...);

@@ -1307,8 +1307,15 @@ void ADIOS2IOHandlerImpl::availableChunks(
     std::string varName = nameOfVariable(writable);
     auto engine = ba.getEngine(); // make sure that data are present
     auto datatype = detail::fromADIOS2Type(ba.m_IO.VariableType(varName));
+    bool allSteps = m_handler->m_frontendAccess != Access::READ_LINEAR &&
+        ba.streamStatus == detail::BufferedActions::StreamStatus::NoStream;
     switchAdios2VariableType<detail::RetrieveBlocksInfo>(
-        datatype, parameters, ba.m_IO, engine, varName);
+        datatype,
+        parameters,
+        ba.m_IO,
+        engine,
+        varName,
+        /* allSteps = */ allSteps);
 }
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(std::string const &fullPath)
@@ -1965,26 +1972,48 @@ namespace detail
         Parameter<Operation::AVAILABLE_CHUNKS> &params,
         adios2::IO &IO,
         adios2::Engine &engine,
-        std::string const &varName)
+        std::string const &varName,
+        bool allSteps)
     {
         auto var = IO.InquireVariable<T>(varName);
-        auto blocksInfo = engine.BlocksInfo<T>(var, engine.CurrentStep());
         auto &table = *params.chunks;
-        table.reserve(blocksInfo.size());
-        for (auto const &info : blocksInfo)
-        {
-            Offset offset;
-            Extent extent;
-            auto size = info.Start.size();
-            offset.reserve(size);
-            extent.reserve(size);
-            for (unsigned i = 0; i < size; ++i)
+        auto addBlocksInfo = [&table](auto const &blocksInfo_) {
+            for (auto const &info : blocksInfo_)
             {
-                offset.push_back(info.Start[i]);
-                extent.push_back(info.Count[i]);
+                Offset offset;
+                Extent extent;
+                auto size = info.Start.size();
+                offset.reserve(size);
+                extent.reserve(size);
+                for (unsigned i = 0; i < size; ++i)
+                {
+                    offset.push_back(info.Start[i]);
+                    extent.push_back(info.Count[i]);
+                }
+                table.emplace_back(
+                    std::move(offset), std::move(extent), info.WriterID);
             }
-            table.emplace_back(
-                std::move(offset), std::move(extent), info.WriterID);
+        };
+        if (allSteps)
+        {
+            auto allBlocks = var.AllStepsBlocksInfo();
+            table.reserve(std::accumulate(
+                allBlocks.begin(),
+                allBlocks.end(),
+                size_t(0),
+                [](size_t acc, auto const &block) {
+                    return acc + block.size();
+                }));
+            for (auto const &blocksInfo : allBlocks)
+            {
+                addBlocksInfo(blocksInfo);
+            }
+        }
+        else
+        {
+            auto blocksInfo = engine.BlocksInfo<T>(var, engine.CurrentStep());
+            table.reserve(blocksInfo.size());
+            addBlocksInfo(blocksInfo);
         }
     }
 
