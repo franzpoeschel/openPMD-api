@@ -52,7 +52,7 @@ using PyPatchRecordContainer = Container<PatchRecord>;
 using PyRecordComponentContainer = Container<RecordComponent>;
 using PyMeshRecordComponentContainer = Container<MeshRecordComponent>;
 using PyPatchRecordComponentContainer = Container<PatchRecordComponent>;
-using PyBaseRecordComponentContainer = Container<BaseRecordComponent>;
+// using PyBaseRecordComponentContainer = Container<BaseRecordComponent>;
 PYBIND11_MAKE_OPAQUE(PyIterationContainer)
 PYBIND11_MAKE_OPAQUE(PyMeshContainer)
 PYBIND11_MAKE_OPAQUE(PyPartContainer)
@@ -62,27 +62,42 @@ PYBIND11_MAKE_OPAQUE(PyPatchRecordContainer)
 PYBIND11_MAKE_OPAQUE(PyRecordComponentContainer)
 PYBIND11_MAKE_OPAQUE(PyMeshRecordComponentContainer)
 PYBIND11_MAKE_OPAQUE(PyPatchRecordComponentContainer)
-PYBIND11_MAKE_OPAQUE(PyBaseRecordComponentContainer)
+// PYBIND11_MAKE_OPAQUE(PyBaseRecordComponentContainer)
+
+namespace openPMD::detail
+{
+template <typename Map>
+void wrap_bind_container(py::handle scope, std::string const &name)
+{
+    create_and_bind_container<Map, Attributable>(std::move(scope), name)
+        .def(py::init<Map const &>());
+}
+} // namespace openPMD::detail
 
 void init_Container(py::module &m)
 {
-    ::detail::create_and_bind_container<PyIterationContainer>(
+    ::detail::create_and_bind_container<PyIterationContainer, Attributable>(
         m, "Iteration_Container");
-    ::detail::create_and_bind_container<PyMeshContainer>(m, "Mesh_Container");
-    ::detail::create_and_bind_container<PyPartContainer>(
+    ::detail::create_and_bind_container<PyMeshContainer, Attributable>(
+        m, "Mesh_Container");
+    ::detail::create_and_bind_container<PyPartContainer, Attributable>(
         m, "Particle_Container");
-    ::detail::create_and_bind_container<PyPatchContainer>(
+    ::detail::create_and_bind_container<PyPatchContainer, Attributable>(
         m, "Particle_Patches_Container");
-    ::detail::create_and_bind_container<PyRecordContainer>(
+    ::detail::create_and_bind_container<PyRecordContainer, Attributable>(
         m, "Record_Container");
-    ::detail::create_and_bind_container<PyPatchRecordContainer>(
+    ::detail::create_and_bind_container<PyPatchRecordContainer, Attributable>(
         m, "Patch_Record_Container");
-    ::detail::create_and_bind_container<PyRecordComponentContainer>(
-        m, "Record_Component_Container");
-    ::detail::create_and_bind_container<PyMeshRecordComponentContainer>(
-        m, "Mesh_Record_Component_Container");
-    ::detail::create_and_bind_container<PyPatchRecordComponentContainer>(
-        m, "Patch_Record_Component_Container");
-    ::detail::create_and_bind_container<PyBaseRecordComponentContainer>(
-        m, "Base_Record_Component_Container");
+    ::detail::
+        create_and_bind_container<PyRecordComponentContainer, Attributable>(
+            m, "Record_Component_Container");
+    ::detail::
+        create_and_bind_container<PyMeshRecordComponentContainer, Attributable>(
+            m, "Mesh_Record_Component_Container");
+    ::detail::create_and_bind_container<
+        PyPatchRecordComponentContainer,
+        Attributable>(m, "Patch_Record_Component_Container");
+    // ::detail::create_and_bind_container<PyBaseRecordComponentContainer,
+    // Attributable>(
+    //     m, "Base_Record_Component_Container");
 }

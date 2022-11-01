@@ -103,16 +103,14 @@ Class_ bind_container(Class_ &cl, std::string const &name)
     return cl;
 }
 
-template <
-    typename Map,
-    typename holder_type = std::unique_ptr<Map>,
-    typename... Args>
-py::class_<Map, holder_type, Attributable> create_and_bind_container(
-    py::handle scope, std::string const &name, Args &&...args)
+template <typename Map, typename... Args>
+py::class_<Map, std::unique_ptr<Map>, Args...>
+create_and_bind_container(py::handle scope, std::string const &name)
 {
+    using holder_type = std::unique_ptr<Map>;
     using KeyType = typename Map::key_type;
     using MappedType = typename Map::mapped_type;
-    using Class_ = py::class_<Map, holder_type, Attributable>;
+    using Class_ = py::class_<Map, holder_type, Args...>;
 
     // If either type is a non-module-local bound type then make the map
     // binding non-local as well; otherwise (e.g. both types are either
@@ -129,11 +127,8 @@ py::class_<Map, holder_type, Attributable> create_and_bind_container(
         scope,
         name.c_str(),
         py::module_local(local),
-        py::multiple_inheritance(),
-        std::forward<Args>(args)...);
+        py::multiple_inheritance());
 
-    // maybe move this to bind_container
-    cl.def(py::init<Map const &>());
     return bind_container<Map>(cl, name);
 }
 } // namespace openPMD::detail
