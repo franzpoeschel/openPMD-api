@@ -550,7 +550,7 @@ void Attributable::readAttributes(ReadMode mode)
 
 void Attributable::linkHierarchy(Writable &w)
 {
-    auto handler = w.IOHandler;
+    auto handler = w.weakCopyOfIOHandler();
     writable().IOHandler = handler;
     writable().parent = &w;
 }

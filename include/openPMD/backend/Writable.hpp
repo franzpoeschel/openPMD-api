@@ -24,6 +24,7 @@
 
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 // expose private and protected members for invasive testing
@@ -129,8 +130,10 @@ OPENPMD_private
      * having to destroy every single Writable.
      * unique_ptr since AbstractIOHandler is an abstract class.
      */
-    std::shared_ptr<std::optional<std::unique_ptr<AbstractIOHandler>>>
-        IOHandler = nullptr;
+    using MaybeIOHandler = std::optional<std::unique_ptr<AbstractIOHandler>>;
+    using StoreIOHandler = std::
+        variant<std::shared_ptr<MaybeIOHandler>, std::weak_ptr<MaybeIOHandler>>;
+    StoreIOHandler IOHandler = std::make_shared<MaybeIOHandler>(std::nullopt);
     internal::AttributableData *attributable = nullptr;
     Writable *parent = nullptr;
     bool dirty = true;
@@ -157,5 +160,9 @@ OPENPMD_private
      *
      */
     bool written = false;
+
+    AbstractIOHandler const *maybeIOHandler() const;
+    AbstractIOHandler *maybeIOHandler();
+    std::weak_ptr<MaybeIOHandler> weakCopyOfIOHandler();
 };
 } // namespace openPMD

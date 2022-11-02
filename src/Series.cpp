@@ -1966,8 +1966,7 @@ namespace internal
          * `Series` is needlessly flushed a second time. Otherwise, error
          * messages can get very confusing.
          */
-        if (this->m_lastFlushSuccessful && m_writable.IOHandler &&
-            m_writable.IOHandler->has_value())
+        if (this->m_lastFlushSuccessful && m_writable.maybeIOHandler())
         {
             Series impl{{this, [](auto const *) {}}};
             impl.flush();
@@ -1981,9 +1980,9 @@ namespace internal
         // This releases the openPMD hierarchy
         iterations.container().clear();
         // Release the IO Handler
-        if (m_writable.IOHandler)
+        if (auto ptr = m_writable.weakCopyOfIOHandler().lock(); ptr)
         {
-            *m_writable.IOHandler = std::nullopt;
+            *ptr = std::nullopt;
         }
     }
 } // namespace internal

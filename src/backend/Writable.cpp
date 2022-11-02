@@ -21,6 +21,7 @@
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 
 namespace openPMD
 {
@@ -40,4 +41,37 @@ void Writable::seriesFlush(internal::FlushParams flushParams)
         series.iterations.begin(), series.iterations.end(), flushParams);
 }
 
+auto Writable::maybeIOHandler() const -> AbstractIOHandler const *
+{
+    auto handleOptional = [](std::shared_ptr<MaybeIOHandler> const &opt)
+        -> AbstractIOHandler const * {
+        if (!opt || !opt->has_value())
+        {
+            return nullptr;
+        }
+        return &*opt->value();
+    };
+    return std::visit(
+        auxiliary::overloaded{
+            [&handleOptional](std::shared_ptr<MaybeIOHandler> const &ptr) {
+                return handleOptional(ptr);
+            },
+            [&handleOptional](std::weak_ptr<MaybeIOHandler> const &ptr) {
+                return handleOptional(ptr.lock());
+            }},
+        IOHandler);
+}
+
+auto Writable::maybeIOHandler() -> AbstractIOHandler *
+{
+    return const_cast<AbstractIOHandler *>(
+        static_cast<Writable const *>(this)->maybeIOHandler());
+}
+
+auto Writable::weakCopyOfIOHandler() -> std::weak_ptr<MaybeIOHandler>
+{
+    return std::visit(
+        [](auto &ptr) -> std::weak_ptr<MaybeIOHandler> { return ptr; },
+        IOHandler);
+}
 } // namespace openPMD

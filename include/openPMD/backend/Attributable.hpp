@@ -22,6 +22,7 @@
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/auxiliary/OutOfRangeMsg.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Writable.hpp"
 
@@ -375,17 +376,11 @@ OPENPMD_protected
      * through m_writable-> */
     AbstractIOHandler *IOHandler()
     {
-        return const_cast<AbstractIOHandler *>(
-            static_cast<Attributable const *>(this)->IOHandler());
+        return m_attri->m_writable.maybeIOHandler();
     }
     AbstractIOHandler const *IOHandler() const
     {
-        auto &opt = m_attri->m_writable.IOHandler;
-        if (!opt || !opt->has_value())
-        {
-            return nullptr;
-        }
-        return &*opt->value();
+        return m_attri->m_writable.maybeIOHandler();
     }
     Writable *&parent()
     {
