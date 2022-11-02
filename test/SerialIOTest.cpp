@@ -6935,7 +6935,7 @@ TEST_CASE("append_mode", "[serial]")
             append_mode(
                 "../samples/append/append_groupbased." + t,
                 false,
-                ParseMode::AheadOfTimeWithoutSnapshot,
+                ParseMode::LinearWithoutSnapshot,
                 jsonConfigOld);
             append_mode(
                 "../samples/append/append_groupbased." + t,
