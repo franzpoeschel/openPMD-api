@@ -2858,11 +2858,32 @@ namespace detail
         catch (error::ReadError const &)
         {
             /*
-             * @todo Check exactly what state to reset this to
-             * Ideally every action from the current IOHandler->flush() call
-             * should be reset.
+             * We need to take actions out of the buffer, since an exception
+             * should reset everything from the current IOHandler->flush() call.
+             * However, we cannot simply clear the buffer, since tasks may have
+             * been enqueued to ADIOS2 already and we cannot undo that.
+             * So, we need to keep the memory alive for the benefit of ADIOS2.
+             * Luckily, we have m_alreadyEnqueued for exactly that purpose.
              */
+            for (auto &task : m_buffer)
+            {
+                m_alreadyEnqueued.emplace_back(std::move(task));
+            }
             m_buffer.clear();
+
+            // m_attributeWrites and m_attributeReads are for implementing the
+            // 2021 ADIOS2 schema which will go anyway.
+            // So, this ugliness here is temporary.
+            for (auto &task : m_attributeWrites)
+            {
+                m_alreadyEnqueued.emplace_back(std::unique_ptr<BufferedAction>{
+                    new BufferedAttributeWrite{std::move(task.second)}});
+            }
+            m_attributeWrites.clear();
+            /*
+             * An AttributeRead is not a deferred action, so we can clear it
+             * immediately.
+             */
             m_attributeReads.clear();
             throw;
         }
