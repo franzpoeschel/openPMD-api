@@ -989,7 +989,7 @@ void Series::readFileBased()
 
     if (!auxiliary::directory_exists(IOHandler()->directory))
         throw error::ReadError(
-            error::AffectedObject::Other,
+            error::AffectedObject::File,
             error::Reason::Inaccessible,
             {},
             "Supplied directory is not valid: " + IOHandler()->directory);
@@ -1020,7 +1020,7 @@ void Series::readFileBased()
          * lifetime of a Series. */
         if (IOHandler()->m_backendAccess == Access::READ_ONLY)
             throw error::ReadError(
-                error::AffectedObject::Other,
+                error::AffectedObject::File,
                 error::Reason::Inaccessible,
                 {},
                 "No matching iterations found: " + name());
