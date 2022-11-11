@@ -64,7 +64,7 @@ namespace internal
      * (Not movable or copyable)
      *
      */
-    class SeriesData : public AttributableData
+    class SeriesData final : public AttributableData
     {
     public:
         explicit SeriesData() = default;
@@ -529,13 +529,11 @@ OPENPMD_private
     using iterations_t = decltype(internal::SeriesData::iterations);
     using iterations_iterator = iterations_t::iterator;
 
-    std::shared_ptr<internal::SeriesData> m_series = nullptr;
-
     inline internal::SeriesData &get()
     {
-        if (m_series)
+        if (m_attri)
         {
-            return *m_series;
+            return dynamic_cast<internal::SeriesData &>(*m_attri);
         }
         else
         {
@@ -546,22 +544,15 @@ OPENPMD_private
 
     inline internal::SeriesData const &get() const
     {
-        if (m_series)
+        if (m_attri)
         {
-            return *m_series;
+            return dynamic_cast<internal::SeriesData const &>(*m_attri);
         }
         else
         {
             throw std::runtime_error(
                 "[Series] Cannot use default-constructed Series.");
         }
-    }
-
-    inline void setData(std::shared_ptr<internal::SeriesData> series)
-    {
-        m_series = std::move(series);
-        iterations = m_series->iterations;
-        Attributable::setData(m_series);
     }
 
     std::unique_ptr<ParsedInput> parseInput(std::string);

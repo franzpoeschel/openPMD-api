@@ -39,7 +39,7 @@ namespace internal
 {
     template <typename T_elem // = T_RecordComponent
               >
-    class BaseRecordData
+    class BaseRecordData final
         : public ContainerData<T_elem>
         , public T_elem::Data_t
     {
@@ -169,21 +169,14 @@ class BaseRecord
     using Data_t = internal::BaseRecordData<T_elem>;
     std::shared_ptr<Data_t> m_baseRecordData{new Data_t()};
 
-    inline Data_t &get()
-    {
-        return *m_baseRecordData;
-    }
-
     inline Data_t const &get() const
     {
-        return *m_baseRecordData;
+        return dynamic_cast<Data_t const &>(*this->m_attri);
     }
 
-    inline void setData(std::shared_ptr<Data_t> data)
+    inline Data_t &get()
     {
-        m_baseRecordData = std::move(data);
-        T_Container::setData(m_baseRecordData);
-        T_RecordComponent::setData(m_baseRecordData);
+        return dynamic_cast<Data_t &>(*this->m_attri);
     }
 
     BaseRecord();
@@ -551,14 +544,15 @@ namespace internal
 template <typename T_elem>
 BaseRecord<T_elem>::BaseRecord()
 {
-    T_Container::setData(m_baseRecordData);
-    T_RecordComponent::setData(m_baseRecordData);
+    using T_RecordComponentData = typename T_RecordComponent::Data_t;
+    auto baseRecordData = std::make_shared<Data_t>();
+    auto rawRCData = static_cast<T_RecordComponentData *>(baseRecordData.get());
     T_RecordComponent rc;
-    auto rawRCData = &*this->m_recordComponentData;
-    rc.setData(std::shared_ptr<typename T_RecordComponent::Data_t>{
-        rawRCData, [](auto const *) {}});
-    m_baseRecordData->m_iterator.emplace(
+    rc.setData(
+        std::shared_ptr<T_RecordComponentData>{rawRCData, [](auto const *) {}});
+    baseRecordData->m_iterator.emplace(
         std::make_pair(RecordComponent::SCALAR, std::move(rc)));
+    Attributable::setData(std::move(baseRecordData));
 }
 
 template <typename T_elem>

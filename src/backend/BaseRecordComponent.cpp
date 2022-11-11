@@ -67,7 +67,8 @@ ChunkTable BaseRecordComponent::availableChunks()
 
 BaseRecordComponent::BaseRecordComponent()
 {
-    Attributable::setData(m_baseRecordComponentData);
+    Attributable::setData(
+        std::make_shared<internal::BaseRecordComponentData>());
 }
 
 void BaseRecordComponent::datasetDefined(

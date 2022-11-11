@@ -106,22 +106,15 @@ public:
 protected:
     using Data_t = internal::BaseRecordComponentData;
 
-    std::shared_ptr<Data_t> m_baseRecordComponentData{new Data_t()};
-
     inline Data_t const &get() const
     {
-        return *m_baseRecordComponentData;
+        return dynamic_cast<Data_t const &>(
+            *m_attri);
     }
 
     inline Data_t &get()
     {
-        return *m_baseRecordComponentData;
-    }
-
-    inline void setData(std::shared_ptr<Data_t> data)
-    {
-        m_baseRecordComponentData = std::move(data);
-        Attributable::setData(m_baseRecordComponentData);
+        return dynamic_cast<Data_t&>(*m_attri);
     }
 
     void datasetDefined(Data_t &);

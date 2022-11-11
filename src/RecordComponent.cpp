@@ -45,7 +45,7 @@ namespace internal
 
 RecordComponent::RecordComponent()
 {
-    BaseRecordComponent::setData(m_recordComponentData);
+    Attributable::setData(std::make_shared<internal::RecordComponentData>());
 }
 
 // We need to instantiate this somewhere otherwise there might be linker issues

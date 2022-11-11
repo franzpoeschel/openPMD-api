@@ -244,17 +244,14 @@ public:
 private:
     Iteration();
 
-    std::shared_ptr<internal::IterationData> m_iterationData{
-        new internal::IterationData};
-
     inline internal::IterationData const &get() const
     {
-        return *m_iterationData;
+        return dynamic_cast<internal::IterationData const &>(*m_attri);
     }
 
     inline internal::IterationData &get()
     {
-        return *m_iterationData;
+        return dynamic_cast<internal::IterationData &>(*m_attri);
     }
 
     void flushFileBased(

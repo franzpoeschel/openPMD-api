@@ -2290,10 +2290,10 @@ Series::Series(
     Access at,
     MPI_Comm comm,
     std::string const &options)
-    : m_series{new internal::SeriesData}
 {
-    Attributable::setData(m_series);
-    iterations = m_series->iterations;
+    auto series = std::make_shared<internal::SeriesData>();
+    iterations = series->iterations;
+    Attributable::setData(std::move(series));
     json::TracingJSON optionsJson =
         json::parseOptions(options, comm, /* considerFiles = */ true);
     auto input = parseInput(filepath);
@@ -2312,10 +2312,10 @@ Series::Series(
 
 Series::Series(
     std::string const &filepath, Access at, std::string const &options)
-    : m_series{new internal::SeriesData}
 {
-    Attributable::setData(m_series);
-    iterations = m_series->iterations;
+    auto series = std::make_shared<internal::SeriesData>();
+    iterations = series->iterations;
+    Attributable::setData(std::move(series));
     json::TracingJSON optionsJson =
         json::parseOptions(options, /* considerFiles = */ true);
     auto input = parseInput(filepath);
@@ -2328,7 +2328,7 @@ Series::Series(
 
 Series::operator bool() const
 {
-    return m_series.operator bool();
+    return m_attri.operator bool();
 }
 
 ReadIterations Series::readIterations()
@@ -2336,7 +2336,7 @@ ReadIterations Series::readIterations()
     // Use private constructor instead of copy constructor to avoid
     // object slicing
     Series res;
-    res.setData(this->m_series);
+    res.setData(this->m_attri);
     return {res, IOHandler()->m_frontendAccess, get().m_parsePreference};
 }
 
@@ -2353,7 +2353,6 @@ WriteIterations Series::writeIterations()
 void Series::close()
 {
     get().close();
-    m_series.reset();
     m_attri.reset();
 }
 

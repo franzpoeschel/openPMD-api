@@ -356,9 +356,11 @@ OPENPMD_protected
         return m_attri->m_writable;
     }
 
-    inline void setData(std::shared_ptr<internal::AttributableData> attri)
+    template <typename T = internal::AttributableData>
+    inline void setData(std::shared_ptr<T> attri)
     {
-        m_attri = std::move(attri);
+        m_attri = std::static_pointer_cast<internal::AttributableData>(
+            std::move(attri));
     }
 
     inline internal::AttributableData &get()

@@ -441,27 +441,20 @@ OPENPMD_protected
 
     using Data_t = internal::RecordComponentData;
 
-    std::shared_ptr<Data_t> m_recordComponentData{new Data_t()};
-
     RecordComponent();
 
     inline Data_t const &get() const
     {
         // cannot call this in the const overload
         // datasetDefined(*m_recordComponentData);
-        return *m_recordComponentData;
+        return dynamic_cast<Data_t const &>(*m_attri);
     }
 
     inline Data_t &get()
     {
-        datasetDefined(*m_recordComponentData);
-        return *m_recordComponentData;
-    }
-
-    inline void setData(std::shared_ptr<Data_t> data)
-    {
-        m_recordComponentData = std::move(data);
-        BaseRecordComponent::setData(m_recordComponentData);
+        auto &res = dynamic_cast<Data_t &>(*m_attri);
+        datasetDefined(res);
+        return res;
     }
 
     void readBase();

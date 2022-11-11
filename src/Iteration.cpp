@@ -38,7 +38,7 @@ using internal::DeferredParseAccess;
 
 Iteration::Iteration()
 {
-    Attributable::setData(m_iterationData);
+    Attributable::setData(std::make_shared<internal::IterationData>());
     setTime(static_cast<double>(0));
     setDt(static_cast<double>(1));
     setTimeUnitSI(1);

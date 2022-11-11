@@ -118,22 +118,14 @@ protected:
     using ContainerData = internal::ContainerData<T, T_key, T_container>;
     using InternalContainer = T_container;
 
-    std::shared_ptr<ContainerData> m_containerData{new ContainerData()};
-
-    inline void setData(std::shared_ptr<ContainerData> containerData)
-    {
-        m_containerData = std::move(containerData);
-        Attributable::setData(m_containerData);
-    }
-
     inline InternalContainer const &container() const
     {
-        return m_containerData->m_container;
+        return dynamic_cast<ContainerData const &>(*m_attri).m_container;
     }
 
     inline InternalContainer &container()
     {
-        return m_containerData->m_container;
+        return dynamic_cast<ContainerData &>(*m_attri).m_container;
     }
 
 public:
@@ -436,7 +428,7 @@ OPENPMD_protected
 
     Container()
     {
-        Attributable::setData(m_containerData);
+        Attributable::setData(std::make_shared<ContainerData>());
     }
 };
 

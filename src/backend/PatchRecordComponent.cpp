@@ -68,7 +68,8 @@ Extent PatchRecordComponent::getExtent() const
 
 PatchRecordComponent::PatchRecordComponent()
 {
-    BaseRecordComponent::setData(m_recordComponentData);
+    Attributable::setData(
+        std::make_shared<internal::PatchRecordComponentData>());
     setUnitSI(1);
 }
 
