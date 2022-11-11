@@ -2064,6 +2064,8 @@ WriteIterations Series::writeIterations()
 void Series::close()
 {
     get().close();
+    m_series.reset();
+    m_attri.reset();
 }
 
 std::optional<std::vector<uint64_t>> Series::currentSnapshot() const
