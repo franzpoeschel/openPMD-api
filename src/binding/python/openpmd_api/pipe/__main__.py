@@ -262,6 +262,11 @@ class pipe:
             io.Mesh_Container, io.Particle_Container, io.ParticleSpecies,
             io.Record, io.Mesh, io.Particle_Patches, io.Patch_Record
         ]
+        is_container = any([
+            isinstance(src, container_type)
+            for container_type in container_types
+        ])
+
         if isinstance(src, io.Series):
             # main loop: read iterations of src, write to dest
             write_iterations = dest.write_iterations()
@@ -299,7 +304,8 @@ class pipe:
                 self.__particle_patches.clear()
                 self.loads.clear()
                 sys.stdout.flush()
-        elif isinstance(src, io.Record_Component):
+        elif isinstance(src, io.Record_Component) and (not is_container
+                                                       or src.scalar):
             shape = src.shape
             offset = [0 for _ in shape]
             dtype = src.dtype
@@ -324,7 +330,8 @@ class pipe:
                 self.loads.append(
                     deferred_load(src, span, local_chunk.offset,
                                   local_chunk.extent))
-        elif isinstance(src, io.Patch_Record_Component):
+        elif isinstance(src, io.Patch_Record_Component) and (not is_container
+                                                             or src.scalar):
             dest.reset_dataset(io.Dataset(src.dtype, src.shape))
             if self.comm.rank == 0:
                 self.__particle_patches.append(
@@ -333,10 +340,7 @@ class pipe:
             self.__copy(src.meshes, dest.meshes, current_path + "meshes/")
             self.__copy(src.particles, dest.particles,
                         current_path + "particles/")
-        elif any([
-                isinstance(src, container_type)
-                for container_type in container_types
-        ]):
+        elif is_container:
             for key in src:
                 self.__copy(src[key], dest[key], current_path + key + "/")
             if isinstance(src, io.ParticleSpecies):
