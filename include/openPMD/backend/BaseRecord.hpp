@@ -605,7 +605,7 @@ inline void BaseRecord<T_elem, T_RecordComponent>::readBase()
     this->IOHandler()->enqueue(IOTask(this, aRead));
     this->IOHandler()->flush(internal::defaultFlushParams);
     if (auto val =
-            Attribute(*aRead.resource).getOptional<std::array<double, 7> >();
+            Attribute(*aRead.resource).getOptional<std::array<double, 7>>();
         val.has_value())
         this->setAttribute("unitDimension", val.value());
     else
