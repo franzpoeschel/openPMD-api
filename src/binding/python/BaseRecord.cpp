@@ -27,6 +27,7 @@
 #include "openPMD/backend/MeshRecordComponent.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 #include "openPMD/binding/python/Container.hpp"
+#include "openPMD/binding/python/RecordComponent.hpp"
 #include "openPMD/binding/python/UnitDimension.hpp"
 
 namespace py = pybind11;
@@ -38,22 +39,25 @@ void init_BaseRecord(py::module &m)
 Returns true if this record only contains a single component.
 )docstr";
 
-    detail::create_and_bind_container<
-        BaseRecord<RecordComponent>,
-        Container<RecordComponent>,
-        RecordComponent>(m, "Base_Record_Record_Component")
+    addRecordComponentSetGet(
+        detail::create_and_bind_container<
+            BaseRecord<RecordComponent>,
+            Container<RecordComponent>,
+            RecordComponent>(m, "Base_Record_Record_Component"))
         .def_property_readonly(
             "scalar", &BaseRecord<RecordComponent>::scalar, doc_scalar);
-    detail::create_and_bind_container<
-        BaseRecord<MeshRecordComponent>,
-        Container<MeshRecordComponent>,
-        MeshRecordComponent>(m, "Base_Record_Mesh_Record_Component")
+    addRecordComponentSetGet(
+        detail::create_and_bind_container<
+            BaseRecord<MeshRecordComponent>,
+            Container<MeshRecordComponent>,
+            MeshRecordComponent>(m, "Base_Record_Mesh_Record_Component"))
         .def_property_readonly(
             "scalar", &BaseRecord<MeshRecordComponent>::scalar, doc_scalar);
-    detail::create_and_bind_container<
-        BaseRecord<PatchRecordComponent>,
-        Container<PatchRecordComponent>,
-        PatchRecordComponent>(m, "Base_Record_Patch_Record_Component")
+    addRecordComponentSetGet(
+        detail::create_and_bind_container<
+            BaseRecord<PatchRecordComponent>,
+            Container<PatchRecordComponent>,
+            PatchRecordComponent>(m, "Base_Record_Patch_Record_Component"))
         .def_property_readonly(
             "scalar", &BaseRecord<PatchRecordComponent>::scalar, doc_scalar);
 }
