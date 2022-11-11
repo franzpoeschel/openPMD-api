@@ -79,7 +79,8 @@ Class_ bind_container(Class_ &cl, std::string const &name)
         // copy + keepalive
         // All objects in the openPMD object model are handles, so using a copy
         // is safer and still performant.
-        py::return_value_policy::copy);
+        py::return_value_policy::copy,
+        py::keep_alive<0, 1>());
 
     // Assignment provided only if the type is copyable
     py::detail::map_assignment<Map, Class_>(cl);

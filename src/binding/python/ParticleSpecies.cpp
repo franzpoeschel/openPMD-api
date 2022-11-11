@@ -40,7 +40,12 @@ void init_ParticleSpecies(py::module &m)
           "__repr__",
           [](ParticleSpecies const &) { return "<openPMD.ParticleSpecies>"; })
 
-        .def_readwrite("particle_patches", &ParticleSpecies::particlePatches);
+        .def_readwrite(
+            "particle_patches",
+            &ParticleSpecies::particlePatches,
+            py::return_value_policy::copy,
+            // garbage collection: return value must be freed before Series
+            py::keep_alive<1, 0>());
     add_pickle(
         cl, [](openPMD::Series &series, std::vector<std::string> const &group) {
             uint64_t const n_it = std::stoull(group.at(1));
