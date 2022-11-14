@@ -555,6 +555,12 @@ OPENPMD_private
         }
     }
 
+    inline void setData(std::shared_ptr<internal::SeriesData> series)
+    {
+        iterations = series->iterations;
+        Attributable::setData(std::move(series));
+    }
+
     std::unique_ptr<ParsedInput> parseInput(std::string);
     /**
      * @brief Parse non-backend-specific configuration in JSON config.

@@ -2336,7 +2336,7 @@ ReadIterations Series::readIterations()
     // Use private constructor instead of copy constructor to avoid
     // object slicing
     Series res;
-    res.setData(this->m_attri);
+    res.setData(std::dynamic_pointer_cast<internal::SeriesData>(this->m_attri));
     return {res, IOHandler()->m_frontendAccess, get().m_parsePreference};
 }
 
