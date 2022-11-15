@@ -6907,6 +6907,12 @@ TEST_CASE("append_mode", "[serial]")
         }
     }
 })END";
+        append_mode(
+            "../samples/append/append_groupbased.bp5",
+            false,
+            ParseMode::WithSnapshot,
+            jsonConfigNew);
+        return;
         if (t == "bp" || t == "bp4" || t == "bp5")
         {
             append_mode(
