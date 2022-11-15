@@ -40,7 +40,7 @@ namespace internal
     RecordComponentData::RecordComponentData()
     {
         m_dataset = Dataset(Datatype::CHAR, {1});
-    };
+    }
 } // namespace internal
 
 RecordComponent::RecordComponent()

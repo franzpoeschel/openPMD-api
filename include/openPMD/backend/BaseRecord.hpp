@@ -38,14 +38,14 @@ template <typename, typename>
 class BaseRecord;
 namespace internal
 {
-    template <typename T_elem, typename T_RecordComponent>
+    template <
+        typename T_elem,
+        typename T_RecordComponentData,
+        typename T_RecordComponent>
     class BaseRecordData
         : public ContainerData<T_elem>
-        // line below means `public T_RecordComponentData`
-        , public T_RecordComponent::Data_t
+        , public T_RecordComponentData
     {
-        using T_RecordComponentData = typename T_RecordComponent::Data_t;
-
     public:
         /*
          * Non-owning iterator, so that we can mock the iterator for
@@ -184,10 +184,11 @@ private:
         traits::GenerationPolicy<T_RecordComponent>::is_noop,
         "Internal error: Scalar components cannot have generation policies.");
 
-    std::shared_ptr<internal::BaseRecordData<T_elem, T_RecordComponent>>
-        m_baseRecordData{
-            new internal::BaseRecordData<T_elem, T_RecordComponent>()};
-    using Data_t = internal::BaseRecordData<T_elem, T_RecordComponent>;
+    using Data_t = internal::BaseRecordData<
+        T_elem,
+        typename T_RecordComponent::Data_t,
+        T_RecordComponent>;
+    std::shared_ptr<Data_t> m_baseRecordData{new Data_t()};
 
     inline Data_t &get()
     {
@@ -557,8 +558,13 @@ private:
 
 namespace internal
 {
-    template <typename T_elem, typename T_RecordComponent>
-    BaseRecordData<T_elem, T_RecordComponent>::BaseRecordData()
+
+    template <
+        typename T_elem,
+        typename T_RecordComponentData,
+        typename T_RecordComponent>
+    BaseRecordData<T_elem, T_RecordComponentData, T_RecordComponent>::
+        BaseRecordData()
     {
         Attributable impl;
         impl.setData({this, [](auto const *) {}});

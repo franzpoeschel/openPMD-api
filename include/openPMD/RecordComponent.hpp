@@ -96,7 +96,7 @@ namespace internal
         bool m_hasBeenExtended = false;
     };
 
-    template <typename, typename>
+    template <typename, typename, typename>
     class BaseRecordData;
 } // namespace internal
 
@@ -108,10 +108,10 @@ class RecordComponent : public BaseRecordComponent
     friend class ParticleSpecies;
     template <typename T_elem, typename T_RecordComponent>
     friend class BaseRecord;
-    template <typename, typename>
+    template <typename, typename, typename>
     friend class internal::BaseRecordData;
-    template <typename T_elem>
-    friend class BaseRecordInterface;
+    template <typename, typename>
+    friend class BaseRecord;
     friend class Record;
     friend class Mesh;
     template <typename>

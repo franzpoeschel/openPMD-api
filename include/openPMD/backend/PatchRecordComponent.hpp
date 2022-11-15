@@ -56,7 +56,7 @@ namespace internal
         PatchRecordComponentData();
     };
 
-    template <typename, typename>
+    template <typename, typename, typename>
     class BaseRecordData;
 } // namespace internal
 
@@ -69,7 +69,7 @@ class PatchRecordComponent : public BaseRecordComponent
     friend class Container;
     template <typename, typename>
     friend class BaseRecord;
-    template <typename, typename>
+    template <typename, typename, typename>
     friend class internal::BaseRecordData;
     friend class ParticlePatches;
     friend class PatchRecord;
