@@ -6600,10 +6600,6 @@ void append_mode(
         Series write(filename, Access::APPEND, jsonConfig);
         if (variableBased)
         {
-            if (write.backend() != "ADIOS2")
-            {
-                return;
-            }
             write.setIterationEncoding(IterationEncoding::variableBased);
         }
         writeSomeIterations(
@@ -6614,16 +6610,6 @@ void append_mode(
         if (variableBased)
         {
             write.setIterationEncoding(IterationEncoding::variableBased);
-        }
-        if (write.backend() == "ADIOS1")
-        {
-            REQUIRE_THROWS_WITH(
-                write.flush(),
-                Catch::Equals(
-                    "Operation unsupported in ADIOS1: Appending to existing "
-                    "file on disk (use Access::CREATE to overwrite)"));
-            // destructor will be noisy now
-            return;
         }
 
         writeSomeIterations(
@@ -6643,16 +6629,6 @@ void append_mode(
         {
             write.setIterationEncoding(IterationEncoding::variableBased);
         }
-        if (write.backend() == "ADIOS1")
-        {
-            REQUIRE_THROWS_WITH(
-                write.flush(),
-                Catch::Equals(
-                    "Operation unsupported in ADIOS1: Appending to existing "
-                    "file on disk (use Access::CREATE to overwrite)"));
-            // destructor will be noisy now
-            return;
-        }
 
         writeSomeIterations(
             write.writeIterations(), std::vector<uint64_t>{4, 3, 10});
@@ -6664,130 +6640,12 @@ void append_mode(
         {
             write.setIterationEncoding(IterationEncoding::variableBased);
         }
-        if (write.backend() == "ADIOS1")
-        {
-            REQUIRE_THROWS_AS(
-                write.flush(), error::OperationUnsupportedInBackend);
-            // destructor will be noisy now
-            return;
-        }
 
         writeSomeIterations(
             write.writeIterations(), std::vector<uint64_t>{7, 1, 11});
         write.flush();
     }
 
-    auto verifyIteration = [](auto &&it) {
-        auto chunk = it.meshes["E"]["x"].template loadChunk<int>({0}, {10});
-        it.seriesFlush();
-        for (size_t i = 0; i < 10; ++i)
-        {
-            REQUIRE(chunk.get()[i] == 999);
-        }
-    };
-
-    {
-        switch (parseMode)
-        {
-        case ParseMode::NoSteps: {
-            Series read(filename, Access::READ_LINEAR);
-            unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
-            for (auto iteration : read.readIterations())
-            {
-                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-                verifyIteration(iteration);
-                ++counter;
-            }
-            REQUIRE(counter == 8);
-        }
-        break;
-        case ParseMode::LinearWithoutSnapshot: {
-            Series read(filename, Access::READ_LINEAR);
-            unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 3, 4, 10, 11};
-            for (auto iteration : read.readIterations())
-            {
-                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-                verifyIteration(iteration);
-                ++counter;
-            }
-            REQUIRE(counter == 6);
-        }
-        break;
-        case ParseMode::WithSnapshot: {
-            // in variable-based encodings, iterations are not parsed ahead of
-            // time but as they go
-            Series read(filename, Access::READ_LINEAR);
-            unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 11};
-            for (auto iteration : read.readIterations())
-            {
-                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-                verifyIteration(iteration);
-                ++counter;
-            }
-            REQUIRE(counter == 8);
-            // Cannot do listSeries here because the Series is already drained
-            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
-        }
-        break;
-        case ParseMode::AheadOfTimeWithoutSnapshot: {
-            Series read(filename, Access::READ_LINEAR);
-            // REQUIRE(read.iterations.size() == 8);
-            unsigned counter = 0;
-            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
-            /*
-             * This one is a bit tricky:
-             * The BP4 engine has no way of parsing a Series in the old
-             * ADIOS2 schema step-by-step, since attributes are not
-             * associated with the step in which they were created.
-             * As a result, when readIterations() is called, the whole thing
-             * is parsed immediately ahead-of-time.
-             * We can then iterate through the iterations and access metadata,
-             * but since the IO steps don't correspond with the order of
-             * iterations returned (there is no way to figure out that order),
-             * we cannot load data in here.
-             * BP4 in the old ADIOS2 schema only supports either of the
-             * following: 1) A Series in which the iterations are present in
-             * ascending order. 2) Or accessing the Series in READ_ONLY mode.
-             */
-            for (auto const &iteration : read.readIterations())
-            {
-                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-                ++counter;
-            }
-            REQUIRE(counter == 8);
-            /*
-             * Roadmap: for now, reading this should work by ignoring the last
-             * duplicate iteration.
-             * After merging https://github.com/openPMD/openPMD-api/pull/949, we
-             * should see both instances when reading.
-             * Final goal: Read only the last instance.
-             */
-            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
-        }
-        break;
-        }
-    }
-    if (!variableBased)
-    {
-        Series read(filename, Access::READ_ONLY);
-        REQUIRE(read.iterations.size() == 8);
-        unsigned counter = 0;
-        uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
-        for (auto iteration : read.readIterations())
-        {
-            REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-            verifyIteration(iteration);
-            ++counter;
-        }
-        REQUIRE(counter == 8);
-    }
-    // AppendAfterSteps has a bug before that version
-#if 100000000 * ADIOS2_VERSION_MAJOR + 1000000 * ADIOS2_VERSION_MINOR +        \
-        10000 * ADIOS2_VERSION_PATCH + 100 * ADIOS2_VERSION_TWEAK >=           \
-    208002700
     if (auxiliary::ends_with(filename, ".bp5"))
     {
         {
@@ -6796,21 +6654,10 @@ void append_mode(
                 Access::APPEND,
                 json::merge(
                     jsonConfig,
-                    R"({"adios2":{"engine":{"parameters":{"AppendAfterSteps":-3}}}})"));
+                    R"({"adios2":{"engine":{"parameters":{"AppendAfterSteps": -3}}}})"));
             if (variableBased)
             {
                 write.setIterationEncoding(IterationEncoding::variableBased);
-            }
-            if (write.backend() == "ADIOS1")
-            {
-                REQUIRE_THROWS_WITH(
-                    write.flush(),
-                    Catch::Equals(
-                        "Operation unsupported in ADIOS1: Appending to "
-                        "existing "
-                        "file on disk (use Access::CREATE to overwrite)"));
-                // destructor will be noisy now
-                return;
             }
 
             writeSomeIterations(
@@ -6819,73 +6666,27 @@ void append_mode(
         }
         {
             Series read(filename, Access::READ_LINEAR);
-            switch (parseMode)
+            for (auto iteration : read.readIterations())
             {
-            case ParseMode::LinearWithoutSnapshot: {
-                uint64_t iterationOrder[] = {0, 1, 3, 4, 10};
-                unsigned counter = 0;
-                for (auto iteration : read.readIterations())
-                {
-                    REQUIRE(
-                        iteration.iterationIndex == iterationOrder[counter]);
-                    verifyIteration(iteration);
-                    ++counter;
-                }
-                REQUIRE(counter == 5);
-                // Cannot do listSeries here because the Series is already
-                // drained
-                REQUIRE_THROWS_AS(
-                    helper::listSeries(read), error::WrongAPIUsage);
-            }
-            break;
-            case ParseMode::WithSnapshot: {
-                // in variable-based encodings, iterations are not parsed ahead
-                // of time but as they go
-                unsigned counter = 0;
-                uint64_t iterationOrder[] = {0, 1, 3, 2, 4, 10, 7, 5};
-                for (auto iteration : read.readIterations())
-                {
-                    REQUIRE(
-                        iteration.iterationIndex == iterationOrder[counter]);
-                    verifyIteration(iteration);
-                    ++counter;
-                }
-                REQUIRE(counter == 8);
-                // Cannot do listSeries here because the Series is already
-                // drained
-                REQUIRE_THROWS_AS(
-                    helper::listSeries(read), error::WrongAPIUsage);
-            }
-            break;
-            default:
-                throw std::runtime_error("Test configured wrong.");
-                break;
+                std::cout << "Seeing iteration " << iteration.iterationIndex
+                          << std::endl;
             }
         }
         if (!variableBased)
         {
             Series read(filename, Access::READ_ONLY);
-            uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 5, 7, 10};
-            unsigned counter = 0;
             for (auto const &iteration : read.readIterations())
             {
-                REQUIRE(iteration.iterationIndex == iterationOrder[counter]);
-                ++counter;
+                std::cout << "Seeing iteration " << iteration.iterationIndex
+                          << std::endl;
             }
-            REQUIRE(counter == 8);
-            // Cannot do listSeries here because the Series is already
-            // drained
-            REQUIRE_THROWS_AS(helper::listSeries(read), error::WrongAPIUsage);
         }
     }
-#endif
 }
 
 TEST_CASE("append_mode", "[serial]")
 {
-    for (auto const &t : testedFileExtensions())
-    {
-        std::string jsonConfigOld = R"END(
+    std::string jsonConfigOld = R"END(
 {
     "adios2":
     {
@@ -6896,7 +6697,7 @@ TEST_CASE("append_mode", "[serial]")
         }
     }
 })END";
-        std::string jsonConfigNew = R"END(
+    std::string jsonConfigNew = R"END(
 {
     "adios2":
     {
@@ -6907,46 +6708,11 @@ TEST_CASE("append_mode", "[serial]")
         }
     }
 })END";
-        append_mode(
-            "../samples/append/append_groupbased.bp5",
-            false,
-            ParseMode::WithSnapshot,
-            jsonConfigNew);
-        return;
-        if (t == "bp" || t == "bp4" || t == "bp5")
-        {
-            append_mode(
-                "../samples/append/append_groupbased." + t,
-                false,
-                ParseMode::LinearWithoutSnapshot,
-                jsonConfigOld);
-#if HAS_ADIOS_2_8
-            append_mode(
-                "../samples/append/append_groupbased." + t,
-                false,
-                ParseMode::WithSnapshot,
-                jsonConfigNew);
-            // This test config does not make sense
-            // append_mode(
-            //     "../samples/append/append_variablebased." + t,
-            //     true,
-            //     ParseMode::WithSnapshot,
-            //     jsonConfigOld);
-            append_mode(
-                "../samples/append/append_variablebased." + t,
-                true,
-                ParseMode::WithSnapshot,
-                jsonConfigNew);
-#endif
-        }
-        else
-        {
-            append_mode(
-                "../samples/append/append_groupbased." + t,
-                false,
-                ParseMode::NoSteps);
-        }
-    }
+    append_mode(
+        "../samples/append/append_groupbased.bp5",
+        true,
+        ParseMode::WithSnapshot,
+        jsonConfigNew);
 }
 
 #if HAS_ADIOS_2_8
