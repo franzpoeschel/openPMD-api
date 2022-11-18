@@ -1135,11 +1135,12 @@ void adios2_streaming(bool variableBasedLayout)
         std::this_thread::sleep_for(1s);
 
         /*
-         * Need to fix this, should still be possible READ_ONLY
+         * READ_LINEAR always works in Streaming, but READ_ONLY must stay
+         * working at least for groupbased iteration encoding
          */
         Series readSeries(
             "../samples/adios2_stream.sst",
-            Access::READ_LINEAR,
+            variableBasedLayout ? Access::READ_LINEAR : Access::READ_ONLY,
             // inline TOML
             R"(defer_iteration_parsing = true)");
 
