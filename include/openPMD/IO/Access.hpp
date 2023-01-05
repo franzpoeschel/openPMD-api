@@ -62,7 +62,7 @@ enum class Access
      *    If the dataset only has one single step, this is guaranteed to work
      *    as expected. Otherwise, it is undefined which step's data is returned.
      */
-    READ_ONLY, //!< open series as read-only, fails if series is not found
+    READ_ONLY,
     READ_RANDOM_ACCESS = READ_ONLY, //!< more explicit alias for READ_ONLY
     /*
      * Open Series as read-only, fails if Series is not found.
