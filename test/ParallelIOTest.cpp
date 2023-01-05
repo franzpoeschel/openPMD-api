@@ -1612,7 +1612,6 @@ void append_mode(
         break;
         case ParseMode::AheadOfTimeWithoutSnapshot: {
             Series read(filename, Access::READ_LINEAR, MPI_COMM_WORLD);
-            // REQUIRE(read.iterations.size() == 8);
             unsigned counter = 0;
             uint64_t iterationOrder[] = {0, 1, 2, 3, 4, 7, 10, 11};
             /*

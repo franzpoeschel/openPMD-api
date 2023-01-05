@@ -2886,12 +2886,6 @@ namespace detail
             break;
         }
 
-        // @todo
-        // throw std::runtime_error(
-        //     "[ADIOS2IOHandler] Unknown engine type. Please choose "
-        //     "one out of "
-        //     "[sst, staging, bp4, bp3, hdf5, file, null]");
-
         auto notYetConfigured = [&alreadyConfigured](std::string const &param) {
             auto it = alreadyConfigured.find(
                 auxiliary::lowerCase(std::string(param)));
