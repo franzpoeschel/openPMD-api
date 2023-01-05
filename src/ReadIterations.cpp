@@ -59,7 +59,6 @@ void SeriesIterator::initSeriesInLinearReadMode()
                     /* do_always_throw_errors = */ false, /* init = */ true);
                 break;
             case PP::UpFront:
-            case PP::RandomAccess:
                 series.readGorVBased(
                     /* do_always_throw_errors = */ false, /* init = */ true);
                 series.advance(AdvanceMode::BEGINSTEP);

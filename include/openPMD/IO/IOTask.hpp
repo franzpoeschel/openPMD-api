@@ -173,11 +173,10 @@ struct OPENPMDAPI_EXPORT Parameter<Operation::OPEN_FILE>
     enum class ParsePreference : char
     {
         UpFront,
-        PerStep,
-        RandomAccess
+        PerStep
     };
     std::shared_ptr<ParsePreference> out_parsePreference =
-        std::make_shared<ParsePreference>(ParsePreference::RandomAccess);
+        std::make_shared<ParsePreference>(ParsePreference::UpFront);
 };
 
 template <>

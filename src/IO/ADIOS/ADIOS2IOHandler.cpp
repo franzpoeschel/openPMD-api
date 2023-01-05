@@ -2640,27 +2640,17 @@ namespace detail
                 break;
             case PerstepParsing::Unsupported:
                 streamStatus = StreamStatus::NoStream;
-                if (upfrontParsing)
-                {
-                    /*
-                     * Note that in BP4 with linear access mode, we set the
-                     * StreamReader option, disabling upfrontParsing capability.
-                     * So, this branch is only taken by niche engines, such as
-                     * BP3 or HDF5.
-                     */
-                    parsePreference = ParsePreference::UpFront;
-                }
-                else
-                {
-                    /*
-                     * Scenario: BP5 with old ADIOS2 schema and normal read
-                     * mode. Need to fall back to random access parsing.
-                     */
+                parsePreference = ParsePreference::UpFront;
+                /*
+                 * Note that in BP4 with linear access mode, we set the
+                 * StreamReader option, disabling upfrontParsing capability.
+                 * So, this branch is only taken by niche engines, such as
+                 * BP3 or HDF5, or by BP5 with old ADIOS2 schema and normal read
+                 * mode. Need to fall back to random access parsing.
+                 */
 #if HAS_ADIOS_2_8
-                    m_mode = adios2::Mode::ReadRandomAccess;
+                m_mode = adios2::Mode::ReadRandomAccess;
 #endif
-                    parsePreference = ParsePreference::RandomAccess;
-                }
                 break;
             }
             break;

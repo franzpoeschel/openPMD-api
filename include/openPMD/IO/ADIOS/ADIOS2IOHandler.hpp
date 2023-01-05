@@ -1059,7 +1059,7 @@ namespace detail
 
         using ParsePreference =
             Parameter<Operation::OPEN_FILE>::ParsePreference;
-        ParsePreference parsePreference = ParsePreference::RandomAccess;
+        ParsePreference parsePreference = ParsePreference::UpFront;
 
         using AttributeMap_t = std::map<std::string, adios2::Params>;
 
