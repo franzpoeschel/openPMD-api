@@ -28,8 +28,7 @@
 namespace openPMD
 {
 
-SeriesIterator::SeriesIterator()
-{}
+SeriesIterator::SeriesIterator() = default;
 
 void SeriesIterator::initSeriesInLinearReadMode()
 {
@@ -77,14 +76,14 @@ void SeriesIterator::initSeriesInLinearReadMode()
     series.IOHandler()->m_seriesStatus = internal::SeriesStatus::Default;
 }
 
-SeriesIterator::SeriesIterator(Series series)
+SeriesIterator::SeriesIterator(Series series_in)
     : m_data{std::make_shared<SharedData>()}
 {
-
     auto &data = *m_data;
-    data.series = std::move(series);
-    if (data.series->IOHandler()->m_frontendAccess == Access::READ_LINEAR &&
-        data.series->iterations.empty())
+    data.series = std::move(series_in);
+    auto &series = data.series.value();
+    if (series.IOHandler()->m_frontendAccess == Access::READ_LINEAR &&
+        series.iterations.empty())
     {
         initSeriesInLinearReadMode();
     }
@@ -130,7 +129,7 @@ SeriesIterator::SeriesIterator(Series series)
 
             openIteration(series.iterations.begin()->second);
             status = it->second.beginStep(/* reread = */ true);
-            for (auto const &pair : data.series.value().iterations)
+            for (auto const &pair : series.iterations)
             {
                 data.iterationsInCurrentStep.push_back(pair.first);
             }
