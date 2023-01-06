@@ -1813,7 +1813,6 @@ TEST_CASE("append_mode", "[serial]")
         }
     }
 }
-#endif // openPMD_HAVE_ADIOS2 && openPMD_HAVE_MPI
 
 TEST_CASE("unavailable_backend", "[core][parallel]")
 {
@@ -1874,3 +1873,4 @@ TEST_CASE("unavailable_backend", "[core][parallel]")
     }
 #endif
 }
+#endif // openPMD_HAVE_ADIOS2 && openPMD_HAVE_MPI
