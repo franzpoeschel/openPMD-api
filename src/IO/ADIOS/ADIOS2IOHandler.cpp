@@ -80,6 +80,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension{std::move(specifiedExtension)}
 {
+    std::cout << "adios2::ADIOS adios{comm};" << std::endl;
     init(std::move(cfg));
 }
 
@@ -95,6 +96,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension(std::move(specifiedExtension))
 {
+    std::cout << "adios2::ADIOS adios{};" << std::endl;
     init(std::move(cfg));
 }
 
@@ -1798,6 +1800,7 @@ namespace detail
         }
         else if constexpr (auxiliary::IsVector_v<T>)
         {
+            std::cout << "Defining vector attribute " << fullName << std::endl;
             auto attr =
                 IO.DefineAttribute(fullName, value.data(), value.size());
             if (!attr)
@@ -1809,6 +1812,7 @@ namespace detail
         }
         else if constexpr (auxiliary::IsArray_v<T>)
         {
+            std::cout << "Defining array attribute " << fullName << std::endl;
             auto attr =
                 IO.DefineAttribute(fullName, value.data(), value.size());
             if (!attr)
@@ -1820,6 +1824,7 @@ namespace detail
         }
         else if constexpr (std::is_same_v<T, bool>)
         {
+            std::cout << "Defining bool attribute " << fullName << std::endl;
             IO.DefineAttribute<bool_representation>(
                 ADIOS2Defaults::str_isBooleanOldLayout + fullName, 1);
             auto representation = bool_repr::toRep(value);
@@ -1833,6 +1838,16 @@ namespace detail
         }
         else
         {
+            if constexpr (std::is_same_v<std::string, T>)
+            {
+                std::cout << "IO.DefineAttribute<std::string>(\"" << fullName
+                          << "\", \"" << value << "\");" << std::endl;
+            }
+            else
+            {
+                std::cout << "IO.DefineAttribute(\"" << fullName << "\", "
+                          << value << ");" << std::endl;
+            }
             auto attr = IO.DefineAttribute(fullName, value);
             if (!attr)
             {
@@ -2324,6 +2339,7 @@ namespace detail
         detail::BufferedAttributeWrite &params,
         const bool value)
     {
+        std::cout << "Defining bool attribute ??" << std::endl;
         IO.DefineAttribute<bool_representation>(
             ADIOS2Defaults::str_isBooleanNewLayout + params.name, 1);
         AttributeTypes<bool_representation>::createAttribute(
@@ -2434,6 +2450,7 @@ namespace detail
     void BufferedActions::create_IO()
     {
         m_IOName = std::to_string(m_impl->nameCounter++);
+        std::cout << "adios.DeclareIO(\"IO_" << m_IOName << "\");" << std::endl;
         m_IO = m_impl->m_ADIOS.DeclareIO("IO_" + m_IOName);
     }
 
@@ -2463,6 +2480,7 @@ namespace detail
                 {
                     pair.second.run(*this);
                 }
+                std::cout << "engine.PerformPuts();" << std::endl;
                 engine.PerformPuts();
             }
         }
@@ -2474,9 +2492,13 @@ namespace detail
             {
                 if (streamStatus == StreamStatus::DuringStep)
                 {
+                    std::cout << "IO.EndStep();" << std::endl;
                     engine.EndStep();
                 }
+                std::cout << "engine.Close();" << std::endl;
                 engine.Close();
+                std::cout << "adios.RemoveIO(\"" << m_IOName << "\");"
+                          << std::endl;
                 m_ADIOS.RemoveIO(m_IOName);
             }
         }
@@ -2636,6 +2658,8 @@ namespace detail
                     ? StreamStatus::OutsideOfStep
                     : StreamStatus::Undecided;
                 parsePreference = ParsePreference::PerStep;
+                std::cout << "IO.SetParameter(\"StreamReader\", \"On\");"
+                          << std::endl;
                 m_IO.SetParameter("StreamReader", "On");
                 break;
             case PerstepParsing::Unsupported:
@@ -2741,6 +2765,8 @@ namespace detail
 
         // set engine type
         {
+            std::cout << "m_IO.SetEngine(\"" << m_engineType << "\")"
+                      << std::endl;
             m_IO.SetEngine(m_engineType);
         }
 
@@ -2788,6 +2814,9 @@ namespace detail
                     auto maybeString = json::asStringDynamic(it.value());
                     if (maybeString.has_value())
                     {
+                        std::cout << "IO.SetParameter(\"" << it.key()
+                                  << "\", \"" << maybeString.value() << "\");"
+                                  << std::endl;
                         m_IO.SetParameter(
                             it.key(), std::move(maybeString.value()));
                     }
@@ -2882,6 +2911,7 @@ namespace detail
             return it == alreadyConfigured.end();
         };
 
+#if 0
         // read parameters from environment
         if (notYetConfigured("CollectiveMetadata"))
         {
@@ -2977,6 +3007,7 @@ namespace detail
              */
             m_IO.SetParameter("QueueLimit", "2");
         }
+#endif
 
         // We need to open the engine now already to inquire configuration
         // options stored in there
@@ -3034,6 +3065,7 @@ namespace detail
                          * Otherwise we don't see the schema attribute.
                          * This branch is also taken by Streaming engines.
                          */
+                        std::cout << "IO.BeginStep();" << std::endl;
                         if (m_engine->BeginStep() != adios2::StepStatus::OK)
                         {
                             throw std::runtime_error(
@@ -3078,6 +3110,10 @@ namespace detail
                         }
                         else
                         {
+                            if (!openedANewStep)
+                            {
+                                std::cout << "IO.BeginStep();" << std::endl;
+                            }
                             if (!openedANewStep &&
                                 m_engine.value().BeginStep() !=
                                     adios2::StepStatus::OK)
@@ -3364,15 +3400,19 @@ namespace detail
 
             if (performDataWrite)
             {
+                std::cout << "engine.PerformDataWrite();" << std::endl;
                 engine.PerformDataWrite();
             }
             else
             {
+                std::cout << "engine.PerformPuts();" << std::endl;
                 engine.PerformPuts();
             }
 #else
             (void)this;
             (void)flushTarget;
+
+            std::cout << "engine.PerformPuts();" << std::endl;
             engine.PerformPuts();
 #endif
         };
@@ -3391,6 +3431,7 @@ namespace detail
 #if HAS_ADIOS_2_8
                 case adios2::Mode::ReadRandomAccess:
 #endif
+                    std::cout << "engine.PerformGets();" << std::endl;
                     eng.PerformGets();
                     break;
                 default:
@@ -3418,6 +3459,9 @@ namespace detail
                 !m_IO.InquireAttribute<bool_representation>(
                     ADIOS2Defaults::str_usesstepsAttribute))
             {
+                std::cout << "IO.DefineAttribute(\""
+                          << ADIOS2Defaults::str_usesstepsAttribute << "\", "
+                          << 0 << ");" << std::endl;
                 m_IO.DefineAttribute<bool_representation>(
                     ADIOS2Defaults::str_usesstepsAttribute, 0);
             }
@@ -3440,6 +3484,9 @@ namespace detail
             !m_IO.InquireAttribute<bool_representation>(
                 ADIOS2Defaults::str_usesstepsAttribute))
         {
+            std::cout << "IO.DefineAttribute(\""
+                      << ADIOS2Defaults::str_usesstepsAttribute << "\", " << 1
+                      << ");" << std::endl;
             m_IO.DefineAttribute<bool_representation>(
                 ADIOS2Defaults::str_usesstepsAttribute, 1);
         }
@@ -3458,6 +3505,7 @@ namespace detail
              */
             if (streamStatus == StreamStatus::OutsideOfStep)
             {
+                std::cout << "IO.BeginStep();" << std::endl;
                 if (getEngine().BeginStep() != adios2::StepStatus::OK)
                 {
                     throw std::runtime_error(
@@ -3467,7 +3515,10 @@ namespace detail
             }
             flush(
                 ADIOS2FlushParams{FlushLevel::UserFlush},
-                [](BufferedActions &, adios2::Engine &eng) { eng.EndStep(); },
+                [](BufferedActions &, adios2::Engine &eng) {
+                    std::cout << "IO.EndStep();" << std::endl;
+                    eng.EndStep();
+                },
                 /* writeAttributes = */ true,
                 /* flushUnconditionally = */ true);
             uncommittedAttributes.clear();
@@ -3480,6 +3531,7 @@ namespace detail
 
             if (streamStatus != StreamStatus::DuringStep)
             {
+                std::cout << "IO.BeginStep();" << std::endl;
                 adiosStatus = getEngine().BeginStep();
                 if (adiosStatus == adios2::StepStatus::OK &&
                     m_mode == adios2::Mode::Read &&

@@ -53,150 +53,175 @@ public:
                 {
                     using O = Operation;
                 case O::CREATE_FILE:
+                    std::cout << "// CREATE_FILE" << std::endl;
                     createFile(
                         i.writable,
                         deref_dynamic_cast<Parameter<Operation::CREATE_FILE> >(
                             i.parameter.get()));
                     break;
                 case O::CHECK_FILE:
+                    std::cout << "// CHECK_FILE" << std::endl;
                     checkFile(
                         i.writable,
                         deref_dynamic_cast<Parameter<Operation::CHECK_FILE> >(
                             i.parameter.get()));
                     break;
                 case O::CREATE_PATH:
+                    std::cout << "// CREATE_PATH" << std::endl;
                     createPath(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::CREATE_PATH> >(
                             i.parameter.get()));
                     break;
                 case O::CREATE_DATASET:
+                    std::cout << "// CREATE_DATASET" << std::endl;
                     createDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::CREATE_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::EXTEND_DATASET:
+                    std::cout << "// EXTEND_DATASET" << std::endl;
                     extendDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::EXTEND_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::OPEN_FILE:
+                    std::cout << "// OPEN_FILE" << std::endl;
                     openFile(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::OPEN_FILE> >(
                             i.parameter.get()));
                     break;
                 case O::CLOSE_FILE:
+                    std::cout << "// CLOSE_FILE" << std::endl;
                     closeFile(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::CLOSE_FILE> >(
                             i.parameter.get()));
                     break;
                 case O::OPEN_PATH:
+                    std::cout << "// OPEN_PATH" << std::endl;
                     openPath(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::OPEN_PATH> >(
                             i.parameter.get()));
                     break;
                 case O::CLOSE_PATH:
+                    std::cout << "// CLOSE_PATH" << std::endl;
                     closePath(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::CLOSE_PATH> >(
                             i.parameter.get()));
                     break;
                 case O::OPEN_DATASET:
+                    std::cout << "// OPEN_DATASET" << std::endl;
                     openDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::OPEN_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::DELETE_FILE:
+                    std::cout << "// DELETE_FILE" << std::endl;
                     deleteFile(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::DELETE_FILE> >(
                             i.parameter.get()));
                     break;
                 case O::DELETE_PATH:
+                    std::cout << "// DELETE_PATH" << std::endl;
                     deletePath(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::DELETE_PATH> >(
                             i.parameter.get()));
                     break;
                 case O::DELETE_DATASET:
+                    std::cout << "// DELETE_DATASET" << std::endl;
                     deleteDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::DELETE_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::DELETE_ATT:
+                    std::cout << "// DELETE_ATT" << std::endl;
                     deleteAttribute(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::DELETE_ATT> >(
                             i.parameter.get()));
                     break;
                 case O::WRITE_DATASET:
+                    std::cout << "// WRITE_DATASET" << std::endl;
                     writeDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::WRITE_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::WRITE_ATT:
+                    std::cout << "// WRITE_ATT" << std::endl;
                     writeAttribute(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::WRITE_ATT> >(
                             i.parameter.get()));
                     break;
                 case O::READ_DATASET:
+                    std::cout << "// READ_DATASET" << std::endl;
                     readDataset(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::READ_DATASET> >(
                             i.parameter.get()));
                     break;
                 case O::GET_BUFFER_VIEW:
+                    std::cout << "// GET_BUFFER_VIEW" << std::endl;
                     getBufferView(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::GET_BUFFER_VIEW> >(
                             i.parameter.get()));
                     break;
                 case O::READ_ATT:
+                    std::cout << "// READ_ATT" << std::endl;
                     readAttribute(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::READ_ATT> >(
                             i.parameter.get()));
                     break;
                 case O::LIST_PATHS:
+                    std::cout << "// LIST_PATHS" << std::endl;
                     listPaths(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::LIST_PATHS> >(
                             i.parameter.get()));
                     break;
                 case O::LIST_DATASETS:
+                    std::cout << "// LIST_DATASETS" << std::endl;
                     listDatasets(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::LIST_DATASETS> >(
                             i.parameter.get()));
                     break;
                 case O::LIST_ATTS:
+                    std::cout << "// LIST_ATTS" << std::endl;
                     listAttributes(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::LIST_ATTS> >(
                             i.parameter.get()));
                     break;
                 case O::ADVANCE:
+                    std::cout << "// ADVANCE" << std::endl;
                     advance(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::ADVANCE> >(
                             i.parameter.get()));
                     break;
                 case O::AVAILABLE_CHUNKS:
+                    std::cout << "// AVAILABLE_CHUNKS" << std::endl;
                     availableChunks(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::AVAILABLE_CHUNKS> >(
                             i.parameter.get()));
                     break;
                 case O::KEEP_SYNCHRONOUS:
+                    std::cout << "// KEEP_SYNCHRONOUS" << std::endl;
                     keepSynchronous(
                         i.writable,
                         deref_dynamic_cast<Parameter<O::KEEP_SYNCHRONOUS> >(
