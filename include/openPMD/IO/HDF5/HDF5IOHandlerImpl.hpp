@@ -93,6 +93,7 @@ public:
     hid_t m_H5T_CDOUBLE;
     hid_t m_H5T_CLONG_DOUBLE;
     hid_t m_H5T_LONG_DOUBLE_80;
+    hid_t m_H5T_CLONG_DOUBLE_80;
 
 protected:
 #if openPMD_HAVE_MPI

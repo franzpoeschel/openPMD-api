@@ -75,6 +75,7 @@ HDF5IOHandlerImpl::HDF5IOHandlerImpl(
     , m_H5T_CDOUBLE{H5Tcreate(H5T_COMPOUND, sizeof(double) * 2)}
     , m_H5T_CLONG_DOUBLE{H5Tcreate(H5T_COMPOUND, sizeof(long double) * 2)}
     , m_H5T_LONG_DOUBLE_80{H5Tcopy(H5T_IEEE_F64BE)}
+    , m_H5T_CLONG_DOUBLE_80{H5Tcreate(H5T_COMPOUND, 16 * 2)}
 {
     // create a h5py compatible bool type
     VERIFY(
@@ -122,7 +123,14 @@ HDF5IOHandlerImpl::HDF5IOHandlerImpl(
 
     VERIFY(
         m_H5T_LONG_DOUBLE_80 >= 0,
-        "[HDF5] Internal error: Failed to create 128-bit long double BE");
+        "[HDF5] Internal error: Failed to create 128-bit long double");
+
+    H5Tinsert(m_H5T_CLONG_DOUBLE_80, "r", 0, m_H5T_LONG_DOUBLE_80);
+    H5Tinsert(m_H5T_CLONG_DOUBLE_80, "i", 16, m_H5T_LONG_DOUBLE_80);
+
+    VERIFY(
+        m_H5T_LONG_DOUBLE_80 >= 0,
+        "[HDF5] Internal error: Failed to create 128-bit complex long double");
 
     m_chunks = auxiliary::getEnvString("OPENPMD_HDF5_CHUNKS", "auto");
     // JSON option can overwrite env option:
@@ -212,6 +220,10 @@ HDF5IOHandlerImpl::~HDF5IOHandlerImpl()
     if (status < 0)
         std::cerr
             << "[HDF5] Internal error: Failed to close long double type\n";
+    status = H5Tclose(m_H5T_CLONG_DOUBLE_80);
+    if (status < 0)
+        std::cerr << "[HDF5] Internal error: Failed to close complex long "
+                     "double type\n";
 
     while (!m_openFileIDs.empty())
     {
@@ -610,7 +622,9 @@ void HDF5IOHandlerImpl::createDataset(
             {{typeid(bool).name(), m_H5T_BOOL_ENUM},
              {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
              {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-             {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+             {typeid(std::complex<long double>).name(),
+              sizeof(long double) == 16 ? m_H5T_CLONG_DOUBLE_80
+                                        : m_H5T_CLONG_DOUBLE},
              {typeid(long double).name(),
               sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
                                         : H5T_NATIVE_LDOUBLE}});
@@ -1023,7 +1037,9 @@ void HDF5IOHandlerImpl::openDataset(
             d = DT::CFLOAT;
         else if (H5Tequal(dataset_type, m_H5T_CDOUBLE))
             d = DT::CDOUBLE;
-        else if (H5Tequal(dataset_type, m_H5T_CLONG_DOUBLE))
+        else if (
+            H5Tequal(dataset_type, m_H5T_CLONG_DOUBLE) ||
+            H5Tequal(dataset_type, m_H5T_CLONG_DOUBLE_80))
             d = DT::CLONG_DOUBLE;
         else if (H5Tequal(dataset_type, H5T_NATIVE_USHORT))
             d = DT::USHORT;
@@ -1310,7 +1326,9 @@ void HDF5IOHandlerImpl::writeDataset(
         {{typeid(bool).name(), m_H5T_BOOL_ENUM},
          {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(std::complex<long double>).name(),
+          sizeof(long double) == 16 ? m_H5T_CLONG_DOUBLE_80
+                                    : m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
           sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
                                     : H5T_NATIVE_LDOUBLE}});
@@ -1423,7 +1441,9 @@ void HDF5IOHandlerImpl::writeAttribute(
         {{typeid(bool).name(), m_H5T_BOOL_ENUM},
          {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(std::complex<long double>).name(),
+          sizeof(long double) == 16 ? m_H5T_CLONG_DOUBLE_80
+                                    : m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
           sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
                                     : H5T_NATIVE_LDOUBLE}});
@@ -1772,7 +1792,9 @@ void HDF5IOHandlerImpl::readDataset(
         {{typeid(bool).name(), m_H5T_BOOL_ENUM},
          {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(std::complex<long double>).name(),
+          sizeof(long double) == 16 ? m_H5T_CLONG_DOUBLE_80
+                                    : m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
           sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
                                     : H5T_NATIVE_LDOUBLE}});
@@ -2214,6 +2236,25 @@ void HDF5IOHandlerImpl::readAttribute(
             std::vector<std::complex<long double> > vcld(dims[0], 0);
             status = H5Aread(attr_id, attr_type, vcld.data());
             a = Attribute(vcld);
+        }
+        else if (H5Tequal(attr_type, m_H5T_CLONG_DOUBLE_80))
+        {
+            // worst case, sizeof(long double) is only 8, so allocate enough
+            // memory to fit 16 bytes per member
+            auto *tmpBuffer =
+                static_cast<long double *>(malloc(16 * 2 * dims[0]));
+            status = H5Aread(attr_id, attr_type, tmpBuffer);
+            H5Tconvert(
+                attr_type,
+                m_H5T_CLONG_DOUBLE,
+                dims[0],
+                tmpBuffer,
+                nullptr,
+                H5P_DEFAULT);
+            std::vector<std::complex<long double> > vcld{
+                tmpBuffer, tmpBuffer + dims[0]};
+            free(tmpBuffer);
+            a = Attribute(std::move(vcld));
         }
         else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80))
         {
