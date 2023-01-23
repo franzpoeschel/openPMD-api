@@ -116,7 +116,7 @@ if io.variants['mpi'] and (args.mpi is None or args.mpi):
 else:
     HAVE_MPI = False
 
-debug = False
+debug = True
 
 
 class FallbackMPICommunicator:
