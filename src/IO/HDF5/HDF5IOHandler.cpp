@@ -2217,18 +2217,20 @@ void HDF5IOHandlerImpl::readAttribute(
         }
         else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80))
         {
-            // worst case, sizeof(long double) is only 8, so allocate enough
-            // memory to fit 16 bytes per member
-            std::vector<long double> vld80be(dims[0] * 2, 0);
-            status = H5Aread(attr_id, attr_type, vld80be.data());
+            // use malloc to allocate a buffer that is definitely aliased and
+            // big enough for 16-bit doubles
+            auto *tmpBuffer = static_cast<long double *>(malloc(16 * dims[0]));
+            status = H5Aread(attr_id, attr_type, tmpBuffer);
             H5Tconvert(
                 attr_type,
                 H5T_NATIVE_LDOUBLE,
                 dims[0],
-                vld80be.data(),
+                tmpBuffer,
                 nullptr,
                 H5P_DEFAULT);
-            a = Attribute(vld80be);
+            std::vector<long double> vld80{tmpBuffer, tmpBuffer + dims[0]};
+            free(tmpBuffer);
+            a = Attribute(std::move(vld80));
         }
         else if (H5Tget_class(attr_type) == H5T_STRING)
         {
