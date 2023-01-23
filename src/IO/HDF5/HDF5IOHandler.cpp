@@ -31,6 +31,7 @@
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Attribute.hpp"
 
 #include <hdf5.h>
@@ -73,8 +74,7 @@ HDF5IOHandlerImpl::HDF5IOHandlerImpl(
     , m_H5T_CFLOAT{H5Tcreate(H5T_COMPOUND, sizeof(float) * 2)}
     , m_H5T_CDOUBLE{H5Tcreate(H5T_COMPOUND, sizeof(double) * 2)}
     , m_H5T_CLONG_DOUBLE{H5Tcreate(H5T_COMPOUND, sizeof(long double) * 2)}
-    , m_H5T_LONG_DOUBLE_80_BE{H5Tcopy(H5T_IEEE_F64BE)}
-    , m_H5T_LONG_DOUBLE_80_LE{H5Tcopy(H5T_IEEE_F64LE)}
+    , m_H5T_LONG_DOUBLE_80{H5Tcopy(H5T_IEEE_F64BE)}
 {
     // create a h5py compatible bool type
     VERIFY(
@@ -109,27 +109,20 @@ HDF5IOHandlerImpl::HDF5IOHandlerImpl(
     H5Tinsert(m_H5T_CLONG_DOUBLE, "r", 0, H5T_NATIVE_LDOUBLE);
     H5Tinsert(m_H5T_CLONG_DOUBLE, "i", sizeof(long double), H5T_NATIVE_LDOUBLE);
 
-    H5Tset_size(m_H5T_LONG_DOUBLE_80_BE, 16);
-    H5Tset_order(m_H5T_LONG_DOUBLE_80_BE, H5T_ORDER_BE);
-    H5Tset_precision(m_H5T_LONG_DOUBLE_80_BE, 80);
-    H5Tset_fields(m_H5T_LONG_DOUBLE_80_BE, 79, 64, 15, 0, 64);
-    H5Tset_ebias(m_H5T_LONG_DOUBLE_80_BE, 16383);
-    H5Tset_norm(m_H5T_LONG_DOUBLE_80_BE, H5T_NORM_NONE);
-
-    H5Tset_size(m_H5T_LONG_DOUBLE_80_LE, 16);
-    H5Tset_order(m_H5T_LONG_DOUBLE_80_LE, H5T_ORDER_LE);
-    H5Tset_precision(m_H5T_LONG_DOUBLE_80_LE, 80);
-    H5Tset_fields(m_H5T_LONG_DOUBLE_80_LE, 79, 64, 15, 0, 64);
-    H5Tset_ebias(m_H5T_LONG_DOUBLE_80_LE, 16383);
-    H5Tset_norm(m_H5T_LONG_DOUBLE_80_LE, H5T_NORM_NONE);
+    H5Tset_size(m_H5T_LONG_DOUBLE_80, 16);
+    H5Tset_order(
+        m_H5T_LONG_DOUBLE_80,
+        auxiliary::platform_endianness() == auxiliary::endian::big
+            ? H5T_ORDER_BE
+            : H5T_ORDER_LE);
+    H5Tset_precision(m_H5T_LONG_DOUBLE_80, 80);
+    H5Tset_fields(m_H5T_LONG_DOUBLE_80, 79, 64, 15, 0, 64);
+    H5Tset_ebias(m_H5T_LONG_DOUBLE_80, 16383);
+    H5Tset_norm(m_H5T_LONG_DOUBLE_80, H5T_NORM_NONE);
 
     VERIFY(
-        m_H5T_LONG_DOUBLE_80_BE >= 0,
+        m_H5T_LONG_DOUBLE_80 >= 0,
         "[HDF5] Internal error: Failed to create 128-bit long double BE");
-
-    VERIFY(
-        m_H5T_LONG_DOUBLE_80_LE >= 0,
-        "[HDF5] Internal error: Failed to create 128-bit long double LE");
 
     m_chunks = auxiliary::getEnvString("OPENPMD_HDF5_CHUNKS", "auto");
     // JSON option can overwrite env option:
@@ -215,6 +208,10 @@ HDF5IOHandlerImpl::~HDF5IOHandlerImpl()
     if (status < 0)
         std::cerr << "[HDF5] Internal error: Failed to close complex long "
                      "double type\n";
+    status = H5Tclose(m_H5T_LONG_DOUBLE_80);
+    if (status < 0)
+        std::cerr
+            << "[HDF5] Internal error: Failed to close long double type\n";
 
     while (!m_openFileIDs.empty())
     {
@@ -609,12 +606,14 @@ void HDF5IOHandlerImpl::createDataset(
         }
          */
 
-        GetH5DataType getH5DataType({
-            {typeid(bool).name(), m_H5T_BOOL_ENUM},
-            {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
-            {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-            {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
-        });
+        GetH5DataType getH5DataType(
+            {{typeid(bool).name(), m_H5T_BOOL_ENUM},
+             {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
+             {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
+             {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+             {typeid(long double).name(),
+              sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
+                                       : H5T_NATIVE_LDOUBLE}});
         hid_t datatype = getH5DataType(a);
         VERIFY(
             datatype >= 0,
@@ -1016,7 +1015,9 @@ void HDF5IOHandlerImpl::openDataset(
             d = DT::FLOAT;
         else if (H5Tequal(dataset_type, H5T_NATIVE_DOUBLE))
             d = DT::DOUBLE;
-        else if (H5Tequal(dataset_type, H5T_NATIVE_LDOUBLE))
+        else if (
+            H5Tequal(dataset_type, H5T_NATIVE_LDOUBLE) ||
+            H5Tequal(dataset_type, m_H5T_LONG_DOUBLE_80))
             d = DT::LONG_DOUBLE;
         else if (H5Tequal(dataset_type, m_H5T_CFLOAT))
             d = DT::CFLOAT;
@@ -1305,12 +1306,14 @@ void HDF5IOHandlerImpl::writeDataset(
 
     std::shared_ptr<void const> data = parameters.data;
 
-    GetH5DataType getH5DataType({
-        {typeid(bool).name(), m_H5T_BOOL_ENUM},
-        {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
-        {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-        {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
-    });
+    GetH5DataType getH5DataType(
+        {{typeid(bool).name(), m_H5T_BOOL_ENUM},
+         {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
+         {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
+         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(long double).name(),
+          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
+                                   : H5T_NATIVE_LDOUBLE}});
 
     // TODO Check if parameter dtype and dataset dtype match
     Attribute a(0);
@@ -1416,12 +1419,14 @@ void HDF5IOHandlerImpl::writeAttribute(
     Attribute const att(parameters.resource);
     Datatype dtype = parameters.dtype;
     herr_t status;
-    GetH5DataType getH5DataType({
-        {typeid(bool).name(), m_H5T_BOOL_ENUM},
-        {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
-        {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-        {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
-    });
+    GetH5DataType getH5DataType(
+        {{typeid(bool).name(), m_H5T_BOOL_ENUM},
+         {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
+         {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
+         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(long double).name(),
+          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
+                                   : H5T_NATIVE_LDOUBLE}});
     hid_t dataType = getH5DataType(att);
     VERIFY(
         dataType >= 0,
@@ -1763,12 +1768,14 @@ void HDF5IOHandlerImpl::readDataset(
     default:
         throw std::runtime_error("[HDF5] Datatype not implemented in HDF5 IO");
     }
-    GetH5DataType getH5DataType({
-        {typeid(bool).name(), m_H5T_BOOL_ENUM},
-        {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
-        {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
-        {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
-    });
+    GetH5DataType getH5DataType(
+        {{typeid(bool).name(), m_H5T_BOOL_ENUM},
+         {typeid(std::complex<float>).name(), m_H5T_CFLOAT},
+         {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
+         {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
+         {typeid(long double).name(),
+          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
+                                   : H5T_NATIVE_LDOUBLE}});
     hid_t dataType = getH5DataType(a);
     VERIFY(
         dataType >= 0,
@@ -2208,7 +2215,7 @@ void HDF5IOHandlerImpl::readAttribute(
             status = H5Aread(attr_id, attr_type, vcld.data());
             a = Attribute(vcld);
         }
-        else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80_BE))
+        else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80))
         {
             // worst case, sizeof(long double) is only 8, so allocate enough
             // memory to fit 16 bytes per member
@@ -2222,21 +2229,6 @@ void HDF5IOHandlerImpl::readAttribute(
                 nullptr,
                 H5P_DEFAULT);
             a = Attribute(vld80be);
-        }
-        else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80_LE))
-        {
-            // worst case, sizeof(long double) is only 8, so allocate enough
-            // memory to fit 16 bytes per member
-            std::vector<long double> vld80le(dims[0] * 2, 0);
-            status = H5Aread(attr_id, attr_type, vld80le.data());
-            H5Tconvert(
-                attr_type,
-                H5T_NATIVE_LDOUBLE,
-                dims[0],
-                vld80le.data(),
-                nullptr,
-                H5P_DEFAULT);
-            a = Attribute(vld80le);
         }
         else if (H5Tget_class(attr_type) == H5T_STRING)
         {
