@@ -1978,6 +1978,14 @@ void HDF5IOHandlerImpl::readAttribute(
             status = H5Aread(attr_id, attr_type, &d);
             a = Attribute(d);
         }
+        else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80))
+        {
+            char bfr[16];
+            status = H5Aread(attr_id, attr_type, bfr);
+            H5Tconvert(
+                attr_type, H5T_NATIVE_LDOUBLE, 1, bfr, nullptr, H5P_DEFAULT);
+            a = Attribute(reinterpret_cast<long double *>(bfr)[0]);
+        }
         else if (H5Tequal(attr_type, H5T_NATIVE_LDOUBLE))
         {
             long double l;
@@ -2102,6 +2110,20 @@ void HDF5IOHandlerImpl::readAttribute(
                     status = H5Aread(attr_id, attr_type, &cld);
                     a = Attribute(cld);
                 }
+                else if (complexSize == 16)
+                {
+                    char bfr[2 * 16];
+                    status = H5Aread(attr_id, attr_type, bfr);
+                    H5Tconvert(
+                        attr_type,
+                        m_H5T_CLONG_DOUBLE,
+                        1,
+                        bfr,
+                        nullptr,
+                        H5P_DEFAULT);
+                    a = Attribute(
+                        reinterpret_cast<std::complex<long double> *>(bfr)[0]);
+                }
                 else
                     throw error::ReadError(
                         error::AffectedObject::Attribute,
@@ -2121,7 +2143,8 @@ void HDF5IOHandlerImpl::readAttribute(
                 error::AffectedObject::Attribute,
                 error::Reason::UnexpectedContent,
                 "HDF5",
-                "[HDF5] Unsupported scalar attribute type");
+                "[HDF5] Unsupported scalar attribute type for '" + attr_name +
+                    "'.");
     }
     else if (attr_class == H5S_SIMPLE)
     {
