@@ -612,8 +612,8 @@ void HDF5IOHandlerImpl::createDataset(
              {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
              {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
              {typeid(long double).name(),
-              sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
-                                       : H5T_NATIVE_LDOUBLE}});
+              sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
+                                        : H5T_NATIVE_LDOUBLE}});
         hid_t datatype = getH5DataType(a);
         VERIFY(
             datatype >= 0,
@@ -1312,8 +1312,8 @@ void HDF5IOHandlerImpl::writeDataset(
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
          {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
-          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
-                                   : H5T_NATIVE_LDOUBLE}});
+          sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
+                                    : H5T_NATIVE_LDOUBLE}});
 
     // TODO Check if parameter dtype and dataset dtype match
     Attribute a(0);
@@ -1425,8 +1425,8 @@ void HDF5IOHandlerImpl::writeAttribute(
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
          {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
-          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
-                                   : H5T_NATIVE_LDOUBLE}});
+          sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
+                                    : H5T_NATIVE_LDOUBLE}});
     hid_t dataType = getH5DataType(att);
     VERIFY(
         dataType >= 0,
@@ -1774,8 +1774,8 @@ void HDF5IOHandlerImpl::readDataset(
          {typeid(std::complex<double>).name(), m_H5T_CDOUBLE},
          {typeid(std::complex<long double>).name(), m_H5T_CLONG_DOUBLE},
          {typeid(long double).name(),
-          sizeof(long double) == 8 ? m_H5T_LONG_DOUBLE_80
-                                   : H5T_NATIVE_LDOUBLE}});
+          sizeof(long double) == 16 ? m_H5T_LONG_DOUBLE_80
+                                    : H5T_NATIVE_LDOUBLE}});
     hid_t dataType = getH5DataType(a);
     VERIFY(
         dataType >= 0,
