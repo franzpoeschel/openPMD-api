@@ -2208,12 +2208,6 @@ void HDF5IOHandlerImpl::readAttribute(
             status = H5Aread(attr_id, attr_type, vcld.data());
             a = Attribute(vcld);
         }
-        else if (H5Tequal(attr_type, m_H5T_CLONG_DOUBLE))
-        {
-            std::vector<std::complex<long double> > vcld(dims[0], 0);
-            status = H5Aread(attr_id, attr_type, vcld.data());
-            a = Attribute(vcld);
-        }
         else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80_BE))
         {
             // worst case, sizeof(long double) is only 8, so allocate enough
@@ -2227,8 +2221,6 @@ void HDF5IOHandlerImpl::readAttribute(
                 vld80be.data(),
                 nullptr,
                 H5P_DEFAULT);
-            std::cout << attr_name << " size " << dims[0] << ", " << vld80be[0]
-                      << " " << vld80be[1] << " " << vld80be[2] << std::endl;
             a = Attribute(vld80be);
         }
         else if (H5Tequal(attr_type, m_H5T_LONG_DOUBLE_80_LE))
@@ -2244,9 +2236,6 @@ void HDF5IOHandlerImpl::readAttribute(
                 vld80le.data(),
                 nullptr,
                 H5P_DEFAULT);
-            std::cout << attr_name << sizeof(long double) << " size " << dims[0]
-                      << ", " << vld80le[0] << " " << vld80le[1] << " "
-                      << vld80le[2] << std::endl;
             a = Attribute(vld80le);
         }
         else if (H5Tget_class(attr_type) == H5T_STRING)
@@ -2285,7 +2274,6 @@ void HDF5IOHandlerImpl::readAttribute(
         else
         {
             auto order = H5Tget_order(attr_type);
-            auto size = H5Tget_size(attr_type);
             auto prec = H5Tget_precision(attr_type);
             auto ebias = H5Tget_ebias(attr_type);
             size_t spos, epos, esize, mpos, msize;
@@ -2295,24 +2283,27 @@ void HDF5IOHandlerImpl::readAttribute(
             auto cset = H5Tget_cset(attr_type);
             auto sign = H5Tget_sign(attr_type);
 
-            std::cout << "order " << std::to_string(order) << std::endl
-                      << "prec " << std::to_string(prec) << std::endl
-                      << "ebias " << std::to_string(ebias) << std::endl
-                      << "fields " << std::to_string(spos) << " "
-                      << std::to_string(epos) << " " << std::to_string(esize)
-                      << " " << std::to_string(mpos) << " "
-                      << std::to_string(msize) << "norm "
-                      << std::to_string(norm) << std::endl
-                      << "cset " << std::to_string(cset) << std::endl
-                      << "sign " << std::to_string(sign) << std::endl
-                      << std::endl;
+            std::stringstream detailed_info;
+            detailed_info << "order " << std::to_string(order) << std::endl
+                          << "prec " << std::to_string(prec) << std::endl
+                          << "ebias " << std::to_string(ebias) << std::endl
+                          << "fields " << std::to_string(spos) << " "
+                          << std::to_string(epos) << " "
+                          << std::to_string(esize) << " "
+                          << std::to_string(mpos) << " "
+                          << std::to_string(msize) << "norm "
+                          << std::to_string(norm) << std::endl
+                          << "cset " << std::to_string(cset) << std::endl
+                          << "sign " << std::to_string(sign) << std::endl
+                          << std::endl;
 
             throw error::ReadError(
                 error::AffectedObject::Attribute,
                 error::Reason::UnexpectedContent,
                 "HDF5",
                 "[HDF5] Unsupported simple attribute type " +
-                    std::to_string(attr_type) + " for " + attr_name);
+                    std::to_string(attr_type) + " for " + attr_name +
+                    ".\n(Info for debugging: " + detailed_info.str() + ")");
         }
     }
     else
