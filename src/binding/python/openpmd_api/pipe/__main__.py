@@ -323,6 +323,7 @@ class pipe:
             for in_iteration in src.read_iterations():
                 dump_times.now("Received iteration {}".format(
                     in_iteration.iteration_index))
+                dump_times.flush()
                 if self.comm.rank == 0:
                     print("Iteration {0} contains {1} meshes:".format(
                         in_iteration.iteration_index,
@@ -355,11 +356,13 @@ class pipe:
                 dump_times.now(
                     "Closing incoming iteration {} to load {} bytes".format(
                      in_iteration.iteration_index, loadedbytes))
+                dump_times.flush()
                 in_iteration.close()
                 for patch_load in self.__particle_patches:
                     patch_load.run()
                 dump_times.now("Closing outgoing iteration {}".format(
                     in_iteration.iteration_index))
+                dump_times.flush()
                 out_iteration.close()
                 dump_times.now("Closed outgoing iteration {}".format(
                     in_iteration.iteration_index))
