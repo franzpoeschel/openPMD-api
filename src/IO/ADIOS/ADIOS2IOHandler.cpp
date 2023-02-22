@@ -40,6 +40,9 @@
 #include <string>
 #include <type_traits>
 
+#include <sys/types.h>
+#include <unistd.h>
+
 namespace openPMD
 {
 #if openPMD_USE_VERIFY
@@ -66,6 +69,28 @@ namespace openPMD
 
 #define HAS_ADIOS_2_8 (ADIOS2_VERSION_MAJOR * 100 + ADIOS2_VERSION_MINOR >= 208)
 
+namespace
+{
+    template <typename T>
+    std::string vecToString(std::vector<T> const &vec)
+    {
+        if (vec.empty())
+        {
+            return "{}";
+        }
+        std::stringstream res;
+        auto it = vec.begin();
+        res << "{" << *it;
+        ++it;
+        for (; it != vec.end(); ++it)
+        {
+            res << ", " << *it;
+        }
+        res << "}";
+        return res.str();
+    }
+} // namespace
+
 #if openPMD_HAVE_MPI
 
 ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
@@ -80,6 +105,17 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension{std::move(specifiedExtension)}
 {
+    if (access::readOnly(handler->m_backendAccess))
+    {
+        std::cout << "OPEN ADIOS LOG MPI" << std::endl;
+        int rank;
+        MPI_Comm_rank(communicator, &rank);
+        m_log.open(
+            "./ADIOS_LOG_" + std::to_string(rank) + "_" +
+                std::to_string(getpid()) + ".txt",
+            std::ios_base::trunc);
+        VERIFY_ALWAYS(m_log.good(), "FAILED OPENING LOG MPI");
+    }
     init(std::move(cfg));
 }
 
@@ -95,6 +131,14 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension(std::move(specifiedExtension))
 {
+    if (access::readOnly(handler->m_backendAccess))
+    {
+        std::cout << "OPEN ADIOS LOG NOMPI" << std::endl;
+        m_log.open(
+            "ADIOS_LOG_" + std::to_string(getpid()) + ".txt",
+            std::ios_base::trunc);
+        VERIFY_ALWAYS(m_log.good(), "FAILED OPENING LOG NOMPI");
+    }
     init(std::move(cfg));
 }
 
@@ -1581,6 +1625,9 @@ namespace detail
                 bp.name + "' from file " + fileName + ".");
         }
         auto ptr = std::static_pointer_cast<T>(bp.param.data).get();
+        impl->m_log << "GET " << vecToString(bp.param.offset) << " – "
+                    << vecToString(bp.param.extent) << "\t'" << bp.name
+                    << "'\n";
         engine.Get(var, ptr);
     }
 
@@ -2567,6 +2614,8 @@ namespace detail
             {
                 if (streamStatus == StreamStatus::DuringStep)
                 {
+                    m_impl->m_log << "ENDSTEP BEFORE CLOSE" << std::endl;
+                    m_impl->m_log.flush();
                     engine.EndStep();
                 }
                 engine.Close();
@@ -3496,9 +3545,13 @@ namespace detail
             switch (whichAPICall())
             {
             case WhichAPICall::PerformPuts:
+                m_impl->m_log << "PERFORMPUTS" << std::endl;
+                m_impl->m_log.flush();
                 engine.PerformPuts();
                 break;
             case WhichAPICall::PerformGets:
+                m_impl->m_log << "PERFORMGETS" << std::endl;
+                m_impl->m_log.flush();
                 engine.PerformGets();
                 break;
             case WhichAPICall::PerformDataWrite:
@@ -3515,6 +3568,8 @@ namespace detail
                 {
                     entry.run(*this);
                 }
+                m_impl->m_log << "PERFORMDATAWRITE" << std::endl;
+                m_impl->m_log.flush();
                 engine.PerformDataWrite();
                 m_uniquePtrPuts.clear();
                 break;
@@ -3547,9 +3602,13 @@ namespace detail
                 switch (whichAPICall())
                 {
                 case WhichAPICall::PerformPuts:
+                    m_impl->m_log << "PERFORMPUTS" << std::endl;
+                    m_impl->m_log.flush();
                     engine.PerformPuts();
                     break;
                 case WhichAPICall::PerformGets:
+                    m_impl->m_log << "PERFORMGETS" << std::endl;
+                    m_impl->m_log.flush();
                     engine.PerformGets();
                     break;
                 case WhichAPICall::PerformDataWrite:
@@ -3641,7 +3700,11 @@ namespace detail
             }
             flush(
                 ADIOS2FlushParams{FlushLevel::UserFlush},
-                [](BufferedActions &, adios2::Engine &eng) { eng.EndStep(); },
+                [this](BufferedActions &, adios2::Engine &eng) {
+                    m_impl->m_log << "ENDSTEP" << std::endl;
+                    m_impl->m_log.flush();
+                    eng.EndStep();
+                },
                 /* writeLatePuts = */ true,
                 /* flushUnconditionally = */ true);
             uncommittedAttributes.clear();

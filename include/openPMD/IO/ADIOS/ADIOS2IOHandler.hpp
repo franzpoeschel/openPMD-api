@@ -44,6 +44,7 @@
 
 #include <array>
 #include <exception>
+#include <fstream>
 #include <future>
 #include <iostream>
 #include <memory> // shared_ptr
@@ -234,6 +235,8 @@ public:
     };
 
     FlushTarget m_flushTarget = FlushTarget::Disk;
+
+    std::ofstream m_log;
 
 private:
     adios2::ADIOS m_ADIOS;

@@ -106,6 +106,7 @@ namespace
                 new (dest + i) T();
             }
             location.destroy = buffer;
+            // throw std::runtime_error("WRONG SCHEMA");
             engine.Get(var, dest, adios2::Mode::Deferred);
         }
 
