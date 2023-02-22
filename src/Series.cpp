@@ -228,19 +228,44 @@ chunk_assignment::RankMeta Series::mpiRanksMetaInfo()
         throw std::runtime_error("[Series] rankTable lines must not be empty.");
     }
 
-    Parameter<Operation::READ_DATASET> readDataset;
-    // read the whole thing
-    readDataset.offset.resize(2);
-    readDataset.extent = *openDataset.extent;
-    // @todo better cross-platform support by switching over *openDataset.dtype
-    readDataset.dtype = Datatype::CHAR;
     std::shared_ptr<char> get{
         new char[writerRanks * lineWidth],
         [](char const *ptr) { delete[] ptr; }};
-    readDataset.data = get;
 
-    IOHandler()->enqueue(IOTask(&series.m_rankTable, readDataset));
-    IOHandler()->flush(internal::defaultFlushParams);
+    auto doReadDataset = [&openDataset, this, &get, &series]() {
+        Parameter<Operation::READ_DATASET> readDataset;
+        // read the whole thing
+        readDataset.offset.resize(2);
+        readDataset.extent = *openDataset.extent;
+        // @todo better cross-platform support by switching over
+        // *openDataset.dtype
+        readDataset.dtype = Datatype::CHAR;
+        readDataset.data = get;
+
+        IOHandler()->enqueue(IOTask(&series.m_rankTable, readDataset));
+        IOHandler()->flush(internal::defaultFlushParams);
+    };
+
+#if openPMD_HAVE_MPI
+    if (series.m_communicator.has_value())
+    {
+        auto comm = series.m_communicator.value();
+        int rank{0}, size{1};
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &size);
+        if (rank == 0)
+        {
+            doReadDataset();
+        }
+        MPI_Bcast(get.get(), writerRanks * lineWidth, MPI_CHAR, 0, comm);
+    }
+    else
+    {
+        doReadDataset();
+    }
+#else
+    doReadDataset();
+#endif
 
     chunk_assignment::RankMeta res;
     for (size_t i = 0; i < writerRanks; ++i)
