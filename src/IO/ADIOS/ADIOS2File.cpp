@@ -959,6 +959,7 @@ void ADIOS2File::flush_impl(
             return;
         }
     }
+    bool needsFlush = flushUnconditionally || !m_buffer.empty();
     for (auto &ba : m_buffer)
     {
         ba->run(*this);
@@ -990,7 +991,10 @@ void ADIOS2File::flush_impl(
     switch (level)
     {
     case FlushLevel::UserFlush:
-        performPutGets(*this, eng);
+        if (needsFlush)
+        {
+            performPutGets(*this, eng);
+        }
         m_updateSpans.clear();
         m_buffer.clear();
         m_alreadyEnqueued.clear();
@@ -1024,55 +1028,121 @@ void ADIOS2File::flush_impl(
     }
 }
 
+namespace
+{
+    enum class WhichAPICall
+    {
+        PerformGets,
+        PerformPuts,
+        PerformDataWrite
+    };
+}
+
 void ADIOS2File::flush_impl(ADIOS2FlushParams flushParams, bool writeLatePuts)
 {
-    auto decideFlushAPICall =
-        [this, flushTarget = flushParams.flushTarget](adios2::Engine &engine) {
 #if ADIOS2_VERSION_MAJOR * 1000000000 + ADIOS2_VERSION_MINOR * 100000000 +     \
         ADIOS2_VERSION_PATCH * 1000000 + ADIOS2_VERSION_TWEAK >=               \
     2701001223
-            bool performDataWrite{};
-            switch (flushTarget)
-            {
-            case FlushTarget::Disk:
-            case FlushTarget::Disk_Override:
-                performDataWrite = true;
-                break;
-            case FlushTarget::Buffer:
-            case FlushTarget::Buffer_Override:
-                performDataWrite = false;
-                break;
-            }
-            performDataWrite = performDataWrite && m_engineType == "bp5";
 
-            if (performDataWrite)
+    auto whichAPICall =
+        [this, flushTarget = flushParams.flushTarget]() -> WhichAPICall {
+        switch (m_mode)
+        {
+        case adios2::Mode::Read:
+        case adios2::Mode::ReadRandomAccess:
+            return WhichAPICall::PerformGets;
+        case adios2::Mode::Write:
+        case adios2::Mode::Append:
+            // continue below
+            break;
+        default:
+            throw error::Internal("[ADIOS2] Unexpected access mode.");
+            break;
+        }
+
+        bool performDataWrite{};
+        switch (flushTarget)
+        {
+        case FlushTarget::Disk:
+        case FlushTarget::Disk_Override:
+            performDataWrite = true;
+            break;
+        case FlushTarget::Buffer:
+        case FlushTarget::Buffer_Override:
+            performDataWrite = false;
+            break;
+        }
+        performDataWrite = performDataWrite && m_engineType == "bp5";
+
+        return performDataWrite ? WhichAPICall::PerformDataWrite
+                                : WhichAPICall::PerformPuts;
+    };
+
+    auto decideFlushAPICall = [this, whichAPICall](adios2::Engine &engine) {
+        switch (whichAPICall())
+        {
+        case WhichAPICall::PerformPuts:
+            engine.PerformPuts();
+            break;
+        case WhichAPICall::PerformGets:
+            engine.PerformGets();
+            break;
+        case WhichAPICall::PerformDataWrite:
+            /*
+             * Deliberately don't write buffered attributes now since
+             * readers won't be able to see them before EndStep anyway,
+             * so there's no use. In fact, writing them now is harmful
+             * because they can't be overwritten after this anymore in the
+             * current step.
+             * Draining the uniquePtrPuts now is good however, since we
+             * should use this chance to free the memory.
+             */
+            for (auto &entry : m_uniquePtrPuts)
             {
-                /*
-                 * Deliberately don't write buffered attributes now since
-                 * readers won't be able to see them before EndStep anyway,
-                 * so there's no use. In fact, writing them now is harmful
-                 * because they can't be overwritten after this anymore in the
-                 * current step.
-                 * Draining the uniquePtrPuts now is good however, since we
-                 * should use this chance to free the memory.
-                 */
-                for (auto &entry : m_uniquePtrPuts)
-                {
-                    entry.run(*this);
-                }
-                engine.PerformDataWrite();
-                m_uniquePtrPuts.clear();
+                entry.run(*this);
             }
-            else
-            {
-                engine.PerformPuts();
-            }
+            engine.PerformDataWrite();
+            m_uniquePtrPuts.clear();
+            break;
+        }
+    };
+
 #else
+    auto whichAPICall = [this,
+                         flushTarget = flushParams.flushTarget]() -> bool {
+        switch (m_mode)
+        {
+        case adios2::Mode::Read:
+#if HAS_ADIOS_2_8
+        case adios2::Mode::ReadRandomAccess:
+#endif
+            return WhichAPICall::PerformGets;
+        case adios2::Mode::Write:
+        case adios2::Mode::Append:
+            return WhichAPICall::PerformPuts;
+        default:
+            throw error::Internal("[ADIOS2] Unexpected access mode.");
+            break;
+        }
+    };
+
+    auto decideFlushAPICall =
+        [this, performDataWrites](adios2::Engine &engine, whichAPICall) {
             (void)this;
             (void)flushTarget;
-            engine.PerformPuts();
-#endif
+            switch (whichAPICall())
+            {
+            case WhichAPICall::PerformPuts:
+                engine.PerformPuts();
+                break;
+            case WhichAPICall::PerformGets:
+                engine.PerformGets();
+                break;
+            case WhichAPICall::PerformDataWrite:
+                throw std::runtime_error("");
+            }
         };
+#endif
 
     flush_impl(
         flushParams,
@@ -1088,7 +1158,15 @@ void ADIOS2File::flush_impl(ADIOS2FlushParams flushParams, bool writeLatePuts)
             }
         },
         writeLatePuts,
-        /* flushUnconditionally = */ false);
+        /*
+         * performDataWrites() is collective, so flushes should always run
+         * in that case. Otherwise, they can be skipped.
+         * Since EndStep and BeginStep are collective, we need only pay
+         * attention to this while a step is active.
+         */
+        /* flushUnconditionally = */ whichAPICall() ==
+                WhichAPICall::PerformDataWrite &&
+            streamStatus != StreamStatus::OutsideOfStep);
 }
 
 AdvanceStatus ADIOS2File::advance(AdvanceMode mode)
