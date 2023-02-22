@@ -895,7 +895,7 @@ namespace detail
         BufferedAction &operator=(BufferedAction const &other) = delete;
         BufferedAction &operator=(BufferedAction &&other) = default;
 
-        virtual void run(BufferedActions &) = 0;
+        virtual bool run(BufferedActions &) = 0;
     };
 
     struct BufferedGet : BufferedAction
@@ -903,7 +903,7 @@ namespace detail
         std::string name;
         Parameter<Operation::READ_DATASET> param;
 
-        void run(BufferedActions &) override;
+        bool run(BufferedActions &) override;
     };
 
     struct BufferedPut : BufferedAction
@@ -911,7 +911,7 @@ namespace detail
         std::string name;
         Parameter<Operation::WRITE_DATASET> param;
 
-        void run(BufferedActions &) override;
+        bool run(BufferedActions &) override;
     };
 
     struct BufferedUniquePtrPut
@@ -930,7 +930,7 @@ namespace detail
         Parameter<Operation::READ_ATT> param;
         std::string name;
 
-        void run(BufferedActions &) override;
+        bool run(BufferedActions &) override;
     };
 
     struct BufferedAttributeRead
@@ -938,7 +938,7 @@ namespace detail
         Parameter<Operation::READ_ATT> param;
         std::string name;
 
-        void run(BufferedActions &);
+        bool run(BufferedActions &);
     };
 
     struct BufferedAttributeWrite : BufferedAction
@@ -948,7 +948,7 @@ namespace detail
         Attribute::resource resource;
         std::vector<char> bufferForVecString;
 
-        void run(BufferedActions &) override;
+        bool run(BufferedActions &) override;
     };
 
     struct I_UpdateSpan

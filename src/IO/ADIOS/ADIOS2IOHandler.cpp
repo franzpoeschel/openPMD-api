@@ -2416,15 +2416,17 @@ namespace detail
         return Datatype::BOOL;
     }
 
-    void BufferedGet::run(BufferedActions &ba)
+    bool BufferedGet::run(BufferedActions &ba)
     {
         switchAdios2VariableType<detail::DatasetReader>(
             param.dtype, ba.m_impl, *this, ba.m_IO, ba.getEngine(), ba.m_file);
+        return true;
     }
 
-    void BufferedPut::run(BufferedActions &ba)
+    bool BufferedPut::run(BufferedActions &ba)
     {
         switchAdios2VariableType<detail::WriteDataset>(param.dtype, ba, *this);
+        return true;
     }
 
     struct RunUniquePtrPut
@@ -2449,7 +2451,7 @@ namespace detail
         switchAdios2VariableType<RunUniquePtrPut>(dtype, *this, ba);
     }
 
-    void OldBufferedAttributeRead::run(BufferedActions &ba)
+    bool OldBufferedAttributeRead::run(BufferedActions &ba)
     {
         auto type = attributeInfo(ba.m_IO, name, /* verbose = */ true);
 
@@ -2465,9 +2467,10 @@ namespace detail
         Datatype ret = switchType<detail::OldAttributeReader>(
             type, ba.m_IO, name, param.resource);
         *param.dtype = ret;
+        return false;
     }
 
-    void BufferedAttributeRead::run(BufferedActions &ba)
+    bool BufferedAttributeRead::run(BufferedActions &ba)
     {
         auto type = attributeInfo(
             ba.m_IO,
@@ -2487,11 +2490,13 @@ namespace detail
         Datatype ret = switchType<detail::AttributeReader>(
             type, ba.m_IO, ba.preloadAttributes, name, param.resource);
         *param.dtype = ret;
+        return true;
     }
 
-    void BufferedAttributeWrite::run(BufferedActions &fileData)
+    bool BufferedAttributeWrite::run(BufferedActions &fileData)
     {
         switchType<detail::AttributeWriter>(dtype, *this, fileData);
+        return true;
     }
 
     BufferedActions::BufferedActions(
@@ -3352,9 +3357,12 @@ namespace detail
                 requireActiveStep();
             }
         }
+
+        bool needsFlush =
+            flushUnconditionally || schema() == SupportedSchema::s_2021_02_09;
         for (auto &ba : m_buffer)
         {
-            ba->run(*this);
+            needsFlush |= ba->run(*this);
         }
 
         if (!initializedDefaults)
@@ -3368,11 +3376,12 @@ namespace detail
         {
             for (auto &pair : m_attributeWrites)
             {
-                pair.second.run(*this);
+                needsFlush |= pair.second.run(*this);
             }
             for (auto &entry : m_uniquePtrPuts)
             {
                 entry.run(*this);
+                needsFlush = true;
             }
         }
 
@@ -3389,7 +3398,10 @@ namespace detail
         switch (level)
         {
         case FlushLevel::UserFlush:
-            performPutGets(*this, eng);
+            if (needsFlush)
+            {
+                performPutGets(*this, eng);
+            }
             m_updateSpans.clear();
             m_buffer.clear();
             m_alreadyEnqueued.clear();
@@ -3429,14 +3441,39 @@ namespace detail
         }
     }
 
+    namespace
+    {
+        enum class WhichAPICall
+        {
+            PerformGets,
+            PerformPuts,
+            PerformDataWrite
+        };
+    }
+
     void BufferedActions::flush_impl(
         ADIOS2FlushParams flushParams, bool writeLatePuts)
     {
-        auto decideFlushAPICall = [this, flushTarget = flushParams.flushTarget](
-                                      adios2::Engine &engine) {
 #if ADIOS2_VERSION_MAJOR * 1000000000 + ADIOS2_VERSION_MINOR * 100000000 +     \
         ADIOS2_VERSION_PATCH * 1000000 + ADIOS2_VERSION_TWEAK >=               \
     2701001223
+
+        auto whichAPICall =
+            [this, flushTarget = flushParams.flushTarget]() -> WhichAPICall {
+            switch (m_mode)
+            {
+            case adios2::Mode::Read:
+            case adios2::Mode::ReadRandomAccess:
+                return WhichAPICall::PerformGets;
+            case adios2::Mode::Write:
+            case adios2::Mode::Append:
+                // continue below
+                break;
+            default:
+                throw error::Internal("[ADIOS2] Unexpected access mode.");
+                break;
+            }
+
             bool performDataWrite{};
             switch (flushTarget)
             {
@@ -3451,8 +3488,20 @@ namespace detail
             }
             performDataWrite = performDataWrite && m_engineType == "bp5";
 
-            if (performDataWrite)
+            return performDataWrite ? WhichAPICall::PerformDataWrite
+                                    : WhichAPICall::PerformPuts;
+        };
+
+        auto decideFlushAPICall = [this, whichAPICall](adios2::Engine &engine) {
+            switch (whichAPICall())
             {
+            case WhichAPICall::PerformPuts:
+                engine.PerformPuts();
+                break;
+            case WhichAPICall::PerformGets:
+                engine.PerformGets();
+                break;
+            case WhichAPICall::PerformDataWrite:
                 /*
                  * Deliberately don't write buffered attributes now since
                  * readers won't be able to see them before EndStep anyway,
@@ -3468,41 +3517,63 @@ namespace detail
                 }
                 engine.PerformDataWrite();
                 m_uniquePtrPuts.clear();
+                break;
             }
-            else
-            {
-                engine.PerformPuts();
-            }
-#else
-            (void)this;
-            (void)flushTarget;
-            engine.PerformPuts();
-#endif
         };
+
+#else
+        auto whichAPICall = [this,
+                             flushTarget = flushParams.flushTarget]() -> bool {
+            switch (m_mode)
+            {
+            case adios2::Mode::Read:
+#if HAS_ADIOS_2_8
+            case adios2::Mode::ReadRandomAccess:
+#endif
+                return WhichAPICall::PerformGets;
+            case adios2::Mode::Write:
+            case adios2::Mode::Append:
+                return WhichAPICall::PerformPuts;
+            default:
+                throw error::Internal("[ADIOS2] Unexpected access mode.");
+                break;
+            }
+        };
+
+        auto decideFlushAPICall =
+            [this, performDataWrites](adios2::Engine &engine, whichAPICall) {
+                (void)this;
+                (void)flushTarget;
+                switch (whichAPICall())
+                {
+                case WhichAPICall::PerformPuts:
+                    engine.PerformPuts();
+                    break;
+                case WhichAPICall::PerformGets:
+                    engine.PerformGets();
+                    break;
+                case WhichAPICall::PerformDataWrite:
+                    throw std::runtime_error("");
+                }
+            };
+#endif
 
         flush_impl(
             flushParams,
             [decideFlushAPICall = std::move(decideFlushAPICall)](
                 BufferedActions &ba, adios2::Engine &eng) {
-                switch (ba.m_mode)
-                {
-                case adios2::Mode::Write:
-                case adios2::Mode::Append:
-                    decideFlushAPICall(eng);
-                    break;
-                case adios2::Mode::Read:
-#if HAS_ADIOS_2_8
-                case adios2::Mode::ReadRandomAccess:
-#endif
-                    eng.PerformGets();
-                    break;
-                default:
-                    throw error::Internal("[ADIOS2] Unexpected access mode.");
-                    break;
-                }
+                decideFlushAPICall(eng);
             },
             writeLatePuts,
-            /* flushUnconditionally = */ false);
+            /*
+             * performDataWrites() is collective, so flushes should always run
+             * in that case. Otherwise, they can be skipped.
+             * Since EndStep and BeginStep are collective, we need only pay
+             * attention to this while a step is active.
+             */
+            /* flushUnconditionally = */ whichAPICall() ==
+                    WhichAPICall::PerformDataWrite &&
+                streamStatus != StreamStatus::OutsideOfStep);
     }
 
     AdvanceStatus
