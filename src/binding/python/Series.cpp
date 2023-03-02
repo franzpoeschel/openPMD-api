@@ -180,6 +180,10 @@ this method.
         .def_property(
             "meshes_path", &Series::meshesPath, &Series::setMeshesPath)
         .def_property(
+            "mpi_ranks_meta_info",
+            &Series::mpiRanksMetaInfo,
+            &Series::setMpiRanksMetaInfo)
+        .def_property(
             "particles_path", &Series::particlesPath, &Series::setParticlesPath)
         .def_property("author", &Series::author, &Series::setAuthor)
         .def_property(
