@@ -543,7 +543,17 @@ void CommonADIOS1IOHandlerImpl<ChildClass>::createDataset(
     {
         /* ADIOS variable definitions require the file to be (re-)opened to take
          * effect/not cause errors */
-        auto res = m_filePaths.find(writable->parent);
+        typename decltype(m_filePaths)::iterator res{};
+        if (writable->parent)
+        {
+            res = m_filePaths.find(writable->parent);
+        }
+        else
+        {
+            throw std::runtime_error(
+                "[ADIOS1] Internal error: CREATE_DATASET task must have a "
+                "parent.");
+        }
 
         int64_t group = m_groups[res->second];
 
