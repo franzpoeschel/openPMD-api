@@ -66,6 +66,11 @@ namespace internal
      */
     class SeriesData : public AttributableData
     {
+        // friend class openPMD::SeriesInterface;
+        // friend class openPMD::Iteration;
+        // friend class openPMD::Series;
+        // friend class SeriesInternal;
+
     public:
         explicit SeriesData() = default;
 
@@ -169,6 +174,18 @@ namespace internal
         std::optional<ParsePreference> m_parsePreference;
 
         void close();
+
+#if openPMD_HAVE_MPI
+        /*
+         * @todo find a better place to put MPI-specific members
+         */
+        std::optional<MPI_Comm> m_communicator;
+#endif
+        Attributable m_rankTable;
+        std::optional<std::string> m_rankTableSource;
+        Parameter<Operation::CREATE_DATASET> m_createRankTable;
+        std::vector<Parameter<Operation::WRITE_DATASET> > m_chunks;
+        std::optional<chunk_assignment::RankMeta> m_bufferedRanktableReadonly;
     }; // SeriesData
 
     class SeriesInternal;
@@ -303,6 +320,24 @@ public:
      * @return  Reference to modified series.
      */
     Series &setMeshesPath(std::string const &meshesPath);
+
+    /**
+     * @throw   no_such_attribute_error If optional attribute is not present.
+     * @return  Vector with a String per (writing) MPI rank, indicating user-
+     *          defined meta information per rank. Example: host name.
+     */
+    chunk_assignment::RankMeta mpiRanksMetaInfo();
+
+    /**
+     * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
+     *        a String per (writing) MPI rank, indicating user-
+     *        defined meta information per rank. Example: host name.
+     *        MPI collective.
+     *        @todo make private, only expose non-collective access methods
+     *
+     * @return Reference to modified series.
+     */
+    Series &setMpiRanksMetaInfo(std::string const &myRankInfo);
 
     /**
      * @throw   no_such_attribute_error If optional attribute is not present.
@@ -612,6 +647,7 @@ OPENPMD_private
         bool flushIOHandler = true);
     void flushMeshesPath();
     void flushParticlesPath();
+    void flushRankTable();
     void readFileBased();
     void readOneIterationFileBased(std::string const &filePath);
     /**

@@ -27,9 +27,11 @@
 #include "openPMD/auxiliary/Date.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/version.hpp"
 
+#include <algorithm>
 #include <cctype>
 #include <exception>
 #include <iomanip>
@@ -178,6 +180,214 @@ Series &Series::setMeshesPath(std::string const &mp)
         setAttribute("meshesPath", mp + "/");
     dirty() = true;
     return *this;
+}
+
+chunk_assignment::RankMeta Series::mpiRanksMetaInfo()
+{
+    auto &series = get();
+    if (series.m_bufferedRanktableReadonly.has_value())
+    {
+        return series.m_bufferedRanktableReadonly.value();
+    }
+    Parameter<Operation::LIST_DATASETS> listDatasets;
+    IOHandler()->enqueue(IOTask(this, listDatasets));
+    IOHandler()->flush(internal::defaultFlushParams);
+    if (std::none_of(
+            listDatasets.datasets->begin(),
+            listDatasets.datasets->end(),
+            [](std::string const &str) { return str == "rankTable"; }))
+    {
+        series.m_bufferedRanktableReadonly = chunk_assignment::RankMeta{};
+        return {};
+    }
+    Parameter<Operation::OPEN_DATASET> openDataset;
+    openDataset.name = "rankTable";
+    IOHandler()->enqueue(IOTask(&series.m_rankTable, openDataset));
+
+    IOHandler()->flush(internal::defaultFlushParams);
+    if (openDataset.extent->size() != 2)
+    {
+        // @todo use better error type
+        throw std::runtime_error("[Series] rankTable must be 2D.");
+    }
+    if (*openDataset.dtype != Datatype::CHAR &&
+        *openDataset.dtype != Datatype::UCHAR &&
+        *openDataset.dtype != Datatype::SCHAR)
+    {
+        // @todo use better error type
+        throw std::runtime_error("[Series] rankTable must have char type.");
+    }
+
+    auto writerRanks = (*openDataset.extent)[0];
+    auto lineWidth = (*openDataset.extent)[1];
+
+    if (lineWidth < 1)
+    {
+        // Check this because our indexing logic later relies on this
+        // @todo use better error type
+        throw std::runtime_error("[Series] rankTable lines must not be empty.");
+    }
+
+    Parameter<Operation::READ_DATASET> readDataset;
+    // read the whole thing
+    readDataset.offset.resize(2);
+    readDataset.extent = *openDataset.extent;
+    // @todo better cross-platform support by switching over *openDataset.dtype
+    readDataset.dtype = Datatype::CHAR;
+    std::shared_ptr<char> get{
+        new char[writerRanks * lineWidth],
+        [](char const *ptr) { delete[] ptr; }};
+    readDataset.data = get;
+
+    IOHandler()->enqueue(IOTask(&series.m_rankTable, readDataset));
+    IOHandler()->flush(internal::defaultFlushParams);
+
+    chunk_assignment::RankMeta res;
+    for (size_t i = 0; i < writerRanks; ++i)
+    {
+        if (get.get()[(i + 1) * lineWidth - 1] != 0)
+        {
+            throw std::runtime_error(
+                "[Series] rankTable lines must be null-terminated strings.");
+        }
+        // Use C-String constructor for std::string in the following line
+        // std::string::string(char const*);
+        res[i] = get.get() + i * lineWidth;
+    }
+    series.m_bufferedRanktableReadonly = res;
+    return res;
+}
+
+#if 0
+Series &
+Series::setMpiRanksMetaInfo( chunk_assignment::RankMeta rankMeta )
+{
+    std::vector< std::string > asContiguousVector;
+    asContiguousVector.reserve( rankMeta.size() );
+    try
+    {
+        for( auto & hostname : rankMeta )
+        {
+            asContiguousVector.emplace_back( std::move( hostname.second ) );
+        }
+    }
+    catch( std::out_of_range const & )
+    {
+        throw std::runtime_error( "[setMpiRanksMetaInfo] Can only set meta "
+                                  "info for contiguous ranks 0 to n." );
+    }
+
+    setAttribute( "rankMetaInfo", std::move( asContiguousVector ) );
+    return *this;
+}
+#endif
+
+Series &Series::setMpiRanksMetaInfo(std::string const &myRankInfo)
+{
+    auto &series = get();
+    unsigned long long mySize = myRankInfo.size() + 1; // null character
+    int rank{0}, size{1};
+    unsigned long long maxSize = mySize;
+
+    auto createRankTable = [&series, &size, &maxSize]() {
+        series.m_createRankTable.name = "rankTable";
+        series.m_createRankTable.dtype = Datatype::CHAR;
+        series.m_createRankTable.extent = {uint64_t(size), uint64_t(maxSize)};
+    };
+    auto writeDataset = [&series, &rank, &maxSize](
+                            std::shared_ptr<char> put, size_t num_lines = 1) {
+        Parameter<Operation::WRITE_DATASET> paramWriteDataset;
+        paramWriteDataset.dtype = Datatype::CHAR;
+        paramWriteDataset.offset = {uint64_t(rank), 0};
+        paramWriteDataset.extent = {num_lines, maxSize};
+        paramWriteDataset.data = std::move(put);
+        series.m_chunks.push_back(std::move(paramWriteDataset));
+    };
+
+#if openPMD_HAVE_MPI
+    if (series.m_communicator.has_value())
+    {
+        auto comm = series.m_communicator.value();
+        MPI_Comm_rank(comm, &rank);
+        MPI_Comm_size(comm, &size);
+        // todo char portability
+        auto [charBuffer, lineLength, numLines] =
+            auxiliary::collectStringsAsMatrixTo(comm, 0, myRankInfo);
+        maxSize = lineLength;
+        (void)numLines; // it's the MPI size
+
+        if (rank == 0)
+        {
+            createRankTable();
+            auto asRawPtr = new std::vector<char>(std::move(charBuffer));
+            std::shared_ptr<char> put{
+                asRawPtr->data(),
+                /*
+                 * A nicer solution would be to std::move() the vector into the
+                 * closure and let RAII deal with it. But clang6 doesn't
+                 * correctly implement C++17 closure move initialization, so
+                 * we go the extra mile and use raw pointers.
+                 * > [m_charBuffer = std::move(charBuffer)](char *){
+                 * >     // no-op
+                 * > }
+                 */
+                [asRawPtr](char *) { asRawPtr->~vector(); }};
+            writeDataset(std::move(put), /* num_lines = */ size);
+        }
+        return *this;
+    }
+#endif
+
+    createRankTable();
+
+    std::shared_ptr<char> put{
+        new char[maxSize]{}, [](char const *ptr) { delete[] ptr; }};
+    std::copy_n(myRankInfo.c_str(), mySize, put.get());
+
+    writeDataset(std::move(put));
+
+    return *this;
+}
+
+void Series::flushRankTable()
+{
+    auto &series = get();
+    if (series.m_rankTableSource.has_value())
+    {
+        if (!series.m_chunks.empty())
+        {
+            throw error::WrongAPIUsage(
+                "[Series] Writing the rank table manually (via the API call) "
+                "and automatically (via the JSON option) is mutually "
+                "exclusive.");
+        }
+        if (series.m_rankTableSource.value() == "hostname")
+        {
+            setMpiRanksMetaInfo(host_info::hostname());
+        }
+        else
+        {
+            throw error::WrongAPIUsage(
+                "[Series] Wrong value for JSON option 'rank_table': '" +
+                series.m_rankTableSource.value() + "'.");
+        }
+    }
+    if (series.m_chunks.empty())
+    {
+        return;
+    }
+
+    if (!series.m_rankTable.written())
+    {
+        IOHandler()->enqueue(
+            IOTask(&series.m_rankTable, series.m_createRankTable));
+    }
+    for (auto &writeDataset : series.m_chunks)
+    {
+        IOHandler()->enqueue(
+            IOTask(&series.m_rankTable, std::move(writeDataset)));
+    }
+    series.m_chunks.clear();
 }
 
 std::string Series::particlesPath() const
@@ -919,6 +1129,8 @@ void Series::flushGorVBased(
             fCreate.name = series.m_name;
             fCreate.encoding = iterationEncoding();
             IOHandler()->enqueue(IOTask(this, fCreate));
+
+            flushRankTable();
         }
 
         series.iterations.flush(
@@ -2151,6 +2363,7 @@ void Series::parseJsonOptions(TracingJSON &options, ParsedInput &input)
     auto &series = get();
     getJsonOption<bool>(
         options, "defer_iteration_parsing", series.m_parseLazily);
+    getJsonOptionLowerCase(options, "rank_table", series.m_rankTableSource);
     // backend key
     {
         std::map<std::string, Format> const backendDescriptors{
@@ -2298,6 +2511,7 @@ Series::Series(
     : Attributable{nullptr}, m_series{new internal::SeriesData}
 {
     Attributable::setData(m_series);
+    m_series->m_communicator = comm;
     iterations = m_series->iterations;
     json::TracingJSON optionsJson =
         json::parseOptions(options, comm, /* considerFiles = */ true);
@@ -2311,6 +2525,7 @@ Series::Series(
         comm,
         optionsJson);
     init(std::move(handler), std::move(input));
+    m_series->m_rankTable.linkHierarchy(writable());
     json::warnGlobalUnusedOptions(optionsJson);
 }
 #endif
@@ -2328,6 +2543,7 @@ Series::Series(
     auto handler = createIOHandler(
         input->path, at, input->format, input->filenameExtension, optionsJson);
     init(std::move(handler), std::move(input));
+    m_series->m_rankTable.linkHierarchy(writable());
     json::warnGlobalUnusedOptions(optionsJson);
 }
 
