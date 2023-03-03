@@ -28,6 +28,14 @@
 
 #include <sstream>
 
+// @todo put these in common header
+PYBIND11_MAKE_OPAQUE(openPMD::ChunkInfo)
+PYBIND11_MAKE_OPAQUE(std::vector<openPMD::ChunkInfo>)
+PYBIND11_MAKE_OPAQUE(openPMD::WrittenChunkInfo)
+PYBIND11_MAKE_OPAQUE(openPMD::ChunkTable)
+PYBIND11_MAKE_OPAQUE(openPMD::chunk_assignment::Assignment)
+PYBIND11_MAKE_OPAQUE(openPMD::chunk_assignment::PartialAssignment)
+
 namespace py = pybind11;
 using namespace openPMD;
 
