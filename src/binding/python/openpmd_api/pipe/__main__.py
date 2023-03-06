@@ -333,8 +333,8 @@ class pipe:
                 chunk_table = src.available_chunks()
                 strategy = distribution_strategy(shape, self.comm.rank,
                                                  self.comm.size)
-                my_chunks = strategy.assign_chunks(chunk_table, self.inranks,
-                                                   self.outranks)
+                my_chunks = strategy.assign(chunk_table, self.inranks,
+                                            self.outranks)
                 for chunk in my_chunks[
                         self.comm.rank] if self.comm.rank in my_chunks else []:
                     if debug:

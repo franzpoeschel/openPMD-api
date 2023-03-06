@@ -238,19 +238,40 @@ void init_Chunk(py::module &m)
     py::implicitly_convertible<ChunkTable, std::vector<ChunkInfo>>();
 
     py::class_<PartialStrategy, PyPartialStrategy>(m, "PartialStrategy")
-        .def(py::init<>());
+        .def(py::init<>())
+        .def(
+            "assign",
+            py::overload_cast<ChunkTable, RankMeta const &, RankMeta const &>(
+                &PartialStrategy::assign),
+            py::arg("chunk_table"),
+            py::arg("rank_meta_in") = RankMeta(),
+            py::arg("rank_meta_out") = RankMeta())
+        .def(
+            "assign",
+            py::overload_cast<
+                PartialAssignment,
+                RankMeta const &,
+                RankMeta const &>(&PartialStrategy::assign),
+            py::arg("partial_assignment"),
+            py::arg("rank_meta_in") = RankMeta(),
+            py::arg("rank_meta_out") = RankMeta());
 
     py::class_<Strategy, PyStrategy>(m, "Strategy")
         .def(py::init<>())
         .def(
-            "assign_chunks",
-            [](Strategy &self,
-               ChunkTable table,
-               RankMeta const &rankMetaIn,
-               RankMeta const &rankMetaOut) {
-                return self.assign(std::move(table), rankMetaIn, rankMetaOut);
-            },
+            "assign",
+            py::overload_cast<ChunkTable, RankMeta const &, RankMeta const &>(
+                &Strategy::assign),
             py::arg("chunk_table"),
+            py::arg("rank_meta_in") = RankMeta(),
+            py::arg("rank_meta_out") = RankMeta())
+        .def(
+            "assign",
+            py::overload_cast<
+                PartialAssignment,
+                RankMeta const &,
+                RankMeta const &>(&Strategy::assign),
+            py::arg("partial_assignment"),
             py::arg("rank_meta_in") = RankMeta(),
             py::arg("rank_meta_out") = RankMeta());
 
