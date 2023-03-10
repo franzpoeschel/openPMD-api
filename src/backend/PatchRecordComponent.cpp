@@ -46,14 +46,17 @@ PatchRecordComponent &PatchRecordComponent::resetDataset(Dataset d)
         throw std::runtime_error(
             "A Records Dataset can not (yet) be changed after it has been "
             "written.");
-    if (d.extent.empty())
-        throw std::runtime_error("Dataset extent must be at least 1D.");
-    if (std::any_of(
-            d.extent.begin(), d.extent.end(), [](Extent::value_type const &i) {
-                return i == 0u;
-            }))
-        throw std::runtime_error(
-            "Dataset extent must not be zero in any dimension.");
+    if (d.dtype != Datatype::UNDEFINED)
+    {
+        if (d.extent.empty())
+            throw std::runtime_error("Dataset extent must be at least 1D.");
+        if (std::any_of(
+                d.extent.begin(),
+                d.extent.end(),
+                [](Extent::value_type const &i) { return i == 0u; }))
+            throw std::runtime_error(
+                "Dataset extent must not be zero in any dimension.");
+    }
 
     get().m_dataset = d;
     dirty() = true;
