@@ -233,9 +233,15 @@ void init_Chunk(py::module &m)
     py::implicitly_convertible<py::dict, Assignment>();
     py::bind_map<RankMeta>(m, "RankMeta");
     py::implicitly_convertible<py::dict, RankMeta>();
-    py::bind_vector<ChunkTable>(m, "ChunkTable");
-    py::implicitly_convertible<py::list, ChunkTable>();
-    py::implicitly_convertible<ChunkTable, std::vector<ChunkInfo>>();
+    {
+        auto chunkTable = py::bind_vector<ChunkTable>(m, "ChunkTable");
+        py::implicitly_convertible<py::list, ChunkTable>();
+        py::implicitly_convertible<ChunkTable, std::vector<ChunkInfo>>();
+        m.def("merge_chunks", [](std::vector<ChunkInfo> v) {
+            chunk_assignment::mergeChunks(v);
+            return v;
+        });
+    }
 
     py::class_<PartialStrategy, PyPartialStrategy>(m, "PartialStrategy")
         .def(py::init<>())
