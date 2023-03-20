@@ -65,7 +65,7 @@ namespace internal
         typename T,
         typename T_key = std::string,
         typename T_container = std::map<T_key, T> >
-    class ContainerData : public AttributableData
+    class ContainerData : virtual public AttributableData
     {
     public:
         using InternalContainer = T_container;
@@ -128,7 +128,7 @@ template <
     typename T,
     typename T_key = std::string,
     typename T_container = std::map<T_key, T> >
-class Container : public Attributable
+class Container : virtual public Attributable
 {
     static_assert(
         std::is_base_of<Attributable, T>::value,
@@ -147,22 +147,14 @@ protected:
     using ContainerData = internal::ContainerData<T, T_key, T_container>;
     using InternalContainer = T_container;
 
-    std::shared_ptr<ContainerData> m_containerData{new ContainerData()};
-
-    inline void setData(std::shared_ptr<ContainerData> containerData)
-    {
-        m_containerData = std::move(containerData);
-        Attributable::setData(m_containerData);
-    }
-
     inline InternalContainer const &container() const
     {
-        return m_containerData->m_container;
+        return dynamic_cast<ContainerData const &>(*m_attri).m_container;
     }
 
     inline InternalContainer &container()
     {
-        return m_containerData->m_container;
+        return dynamic_cast<ContainerData &>(*m_attri).m_container;
     }
 
 public:
@@ -428,10 +420,6 @@ public:
 OPENPMD_protected
     // clang-format on
 
-    Container(std::shared_ptr<ContainerData> containerData)
-        : Attributable{containerData}, m_containerData{std::move(containerData)}
-    {}
-
     void clear_unchecked()
     {
         if (written())
@@ -454,13 +442,9 @@ OPENPMD_protected
         flushAttributes(flushParams);
     }
 
-    // clang-format off
-OPENPMD_private
-    // clang-format on
-
-    Container() : Attributable{nullptr}
+    Container()
     {
-        Attributable::setData(m_containerData);
+        Attributable::setData(std::make_shared<ContainerData>());
     }
 };
 
@@ -532,7 +516,8 @@ namespace internal
         ~EraseStaleEntries()
         {
             auto &map = m_originalContainer.container();
-            using iterator_t = typename BareContainer_t::const_iterator;
+            using iterator_t =
+                typename BareContainer_t::InternalContainer::const_iterator;
             std::vector<iterator_t> deleteMe;
             deleteMe.reserve(map.size() - m_accessedKeys.size());
             for (iterator_t it = map.begin(); it != map.end(); ++it)

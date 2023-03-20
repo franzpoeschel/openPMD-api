@@ -27,11 +27,7 @@ namespace openPMD
 {
 namespace internal
 {
-    PatchRecordComponentData::PatchRecordComponentData()
-    {
-        PatchRecordComponent impl{{this, [](auto const *) {}}};
-        impl.setUnitSI(1);
-    }
+    PatchRecordComponentData::PatchRecordComponentData() = default;
 } // namespace internal
 
 PatchRecordComponent &PatchRecordComponent::setUnitSI(double usi)
@@ -78,15 +74,12 @@ Extent PatchRecordComponent::getExtent() const
     }
 }
 
-PatchRecordComponent::PatchRecordComponent() : BaseRecordComponent{nullptr}
+PatchRecordComponent::PatchRecordComponent()
 {
-    BaseRecordComponent::setData(m_patchRecordComponentData);
+    Attributable::setData(
+        std::make_shared<internal::PatchRecordComponentData>());
+    setUnitSI(1);
 }
-
-PatchRecordComponent::PatchRecordComponent(
-    std::shared_ptr<internal::PatchRecordComponentData> data)
-    : BaseRecordComponent{data}, m_patchRecordComponentData{std::move(data)}
-{}
 
 void PatchRecordComponent::flush(
     std::string const &name, internal::FlushParams const &flushParams)

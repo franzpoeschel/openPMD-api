@@ -39,10 +39,6 @@ namespace internal
 
 Attributable::Attributable() = default;
 
-Attributable::Attributable(std::shared_ptr<internal::AttributableData> attri)
-    : m_attri{std::move(attri)}
-{}
-
 Attribute Attributable::getAttribute(std::string const &key) const
 {
     auto &attri = get();
@@ -120,7 +116,10 @@ Series Attributable::retrieveSeries() const
     }
     auto seriesData = &auxiliary::deref_dynamic_cast<internal::SeriesData>(
         findSeries->attributable);
-    return Series{{seriesData, [](auto const *) {}}};
+    Series res;
+    res.setData(
+        std::shared_ptr<internal::SeriesData>{seriesData, [](auto const *) {}});
+    return res;
 }
 
 Iteration const &Attributable::containingIteration() const
@@ -199,7 +198,9 @@ auto Attributable::myPath() const -> MyPath
     std::reverse(res.group.begin(), res.group.end());
     auto &seriesData = auxiliary::deref_dynamic_cast<internal::SeriesData>(
         findSeries->attributable);
-    Series series{{&seriesData, [](auto const *) {}}};
+    Series series;
+    series.setData(std::shared_ptr<internal::SeriesData>{
+        &seriesData, [](auto const *) {}});
     res.seriesName = series.name();
     res.seriesExtension = suffix(seriesData.m_format);
     res.directory = IOHandler()->directory;
