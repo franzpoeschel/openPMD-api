@@ -32,8 +32,11 @@ namespace openPMD
 {
 namespace internal
 {
-    template <typename T_elem>
-    class BaseRecordData : public ContainerData<T_elem>
+    template <typename T_elem // = T_RecordComponent
+              >
+    class BaseRecordData final
+        : public ContainerData<T_elem>
+        , public T_elem::Data_t
     {
     public:
         /**
@@ -55,13 +58,22 @@ namespace internal
 } // namespace internal
 
 template <typename T_elem>
-class BaseRecord : public Container<T_elem>
+class BaseRecord
+    : public Container<T_elem>
+    , public T_elem // T_RecordComponent
 {
+    using T_RecordComponent = T_elem;
+    using T_Container = Container<T_elem>;
+    using T_Self = BaseRecord<T_elem>;
     friend class Iteration;
     friend class ParticleSpecies;
     friend class PatchRecord;
     friend class Record;
     friend class Mesh;
+
+    static_assert(
+        traits::GenerationPolicy<T_RecordComponent>::is_noop,
+        "Internal error: Scalar components cannot have generation policies.");
 
     using Data_t = internal::BaseRecordData<T_elem>;
     std::shared_ptr<Data_t> m_baseRecordData{new Data_t()};
@@ -89,8 +101,8 @@ public:
     using const_reference = typename Container<T_elem>::const_reference;
     using pointer = typename Container<T_elem>::pointer;
     using const_pointer = typename Container<T_elem>::const_pointer;
-    using iterator = typename Container<T_elem>::iterator;
-    using const_iterator = typename Container<T_elem>::const_iterator;
+    using iterator = typename T_Container::iterator;
+    using const_iterator = typename T_Container::const_iterator;
 
     virtual ~BaseRecord() = default;
 
@@ -165,7 +177,9 @@ namespace internal
 template <typename T_elem>
 BaseRecord<T_elem>::BaseRecord()
 {
-    Attributable::setData(std::make_shared<Data_t>());
+    using T_RecordComponentData = typename T_RecordComponent::Data_t;
+    auto baseRecordData = std::make_shared<Data_t>();
+    Attributable::setData(std::move(baseRecordData));
 }
 
 template <typename T_elem>
@@ -284,7 +298,7 @@ template <typename T_elem>
 inline std::array<double, 7> BaseRecord<T_elem>::unitDimension() const
 {
     return this->getAttribute("unitDimension")
-        .template get<std::array<double, 7> >();
+        .template get<std::array<double, 7>>();
 }
 
 template <typename T_elem>
@@ -303,7 +317,7 @@ inline void BaseRecord<T_elem>::readBase()
     this->IOHandler()->enqueue(IOTask(this, aRead));
     this->IOHandler()->flush(internal::defaultFlushParams);
     if (auto val =
-            Attribute(*aRead.resource).getOptional<std::array<double, 7> >();
+            Attribute(*aRead.resource).getOptional<std::array<double, 7>>();
         val.has_value())
         this->setAttribute("unitDimension", val.value());
     else
@@ -332,7 +346,7 @@ template <typename T_elem>
 inline void BaseRecord<T_elem>::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
-    if (!this->written() && this->empty())
+    if (!this->written() && this->T_Container::empty())
         throw std::runtime_error(
             "A Record can not be written without any contained "
             "RecordComponents: " +
