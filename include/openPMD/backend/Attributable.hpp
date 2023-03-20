@@ -81,39 +81,6 @@ namespace internal
         A_MAP m_attributes;
     };
 
-    enum class SetAttributeMode : char
-    {
-        WhileReadingAttributes,
-        FromPublicAPICall
-    };
-
-    /** Verify values of attributes in the frontend
-     *
-     * verify string attributes are not empty (backend restriction, e.g., HDF5)
-     */
-    template <typename T>
-    inline void attr_value_check(
-        std::string const /* key */, T /* value */, SetAttributeMode)
-    {}
-
-    template <>
-    inline void attr_value_check(
-        std::string const key, std::string const value, SetAttributeMode mode)
-    {
-        switch (mode)
-        {
-        case SetAttributeMode::FromPublicAPICall:
-            if (value.empty())
-                throw std::runtime_error(
-                    "[setAttribute] Value for string attribute '" + key +
-                    "' must not be empty!");
-            break;
-        case SetAttributeMode::WhileReadingAttributes:
-            // no checks while reading
-            break;
-        }
-    }
-
     template <typename>
     class BaseRecordData;
 } // namespace internal
