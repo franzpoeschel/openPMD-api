@@ -106,11 +106,9 @@ class RecordComponent : public BaseRecordComponent
     friend class Container;
     friend class Iteration;
     friend class ParticleSpecies;
-    template <typename T_elem, typename T_RecordComponent>
-    friend class BaseRecord;
     template <typename, typename, typename>
     friend class internal::BaseRecordData;
-    template <typename, typename>
+    template <typename>
     friend class BaseRecord;
     friend class Record;
     friend class Mesh;

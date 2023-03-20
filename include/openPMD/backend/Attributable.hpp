@@ -128,7 +128,7 @@ class Attributable
     // @todo remove unnecessary friend (wew that sounds bitter)
     using A_MAP = std::map<std::string, Attribute>;
     friend Writable *getWritable(Attributable *);
-    template <typename T_elem, typename T_RecordComponent>
+    template <typename T_elem>
     friend class BaseRecord;
     template <typename T_elem>
     friend class BaseRecordInterface;

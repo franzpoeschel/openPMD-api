@@ -33,7 +33,7 @@
 
 namespace openPMD
 {
-template <typename, typename>
+template <typename>
 class BaseRecord;
 namespace internal
 {
@@ -146,14 +146,14 @@ namespace internal
     };
 } // namespace internal
 
-template <typename T_elem, typename T_RecordComponent_ = T_elem>
+template <typename T_elem>
 class BaseRecord
     : public Container<T_elem>
-    , public T_RecordComponent_
+    , public T_elem // T_RecordComponent
 {
-    using T_RecordComponent = T_RecordComponent_;
+    using T_RecordComponent = T_elem;
     using T_Container = Container<T_elem>;
-    using T_Self = BaseRecord<T_elem, T_RecordComponent>;
+    using T_Self = BaseRecord<T_elem>;
     friend class Iteration;
     friend class ParticleSpecies;
     friend class PatchRecord;
@@ -345,8 +345,7 @@ public:
     mapped_type &at(key_type const &key)
     {
         return const_cast<mapped_type &>(
-            static_cast<BaseRecord<T_elem, T_RecordComponent> const *>(this)
-                ->at(key));
+            static_cast<BaseRecord<T_elem> const *>(this)->at(key));
     }
 
     mapped_type const &at(key_type const &key) const
@@ -556,8 +555,8 @@ namespace internal
     }
 } // namespace internal
 
-template <typename T_elem, typename T_RecordComponent>
-BaseRecord<T_elem, T_RecordComponent>::BaseRecord()
+template <typename T_elem>
+BaseRecord<T_elem>::BaseRecord()
 {
     T_Container::setData(m_baseRecordData);
     T_RecordComponent::setData(m_baseRecordData);
@@ -569,22 +568,21 @@ BaseRecord<T_elem, T_RecordComponent>::BaseRecord()
         std::make_pair(RecordComponent::SCALAR, std::move(rc)));
 }
 
-template <typename T_elem, typename T_RecordComponent>
-inline std::array<double, 7>
-BaseRecord<T_elem, T_RecordComponent>::unitDimension() const
+template <typename T_elem>
+inline std::array<double, 7> BaseRecord<T_elem>::unitDimension() const
 {
     return this->getAttribute("unitDimension")
         .template get<std::array<double, 7>>();
 }
 
-template <typename T_elem, typename T_RecordComponent>
-inline bool BaseRecord<T_elem, T_RecordComponent>::scalar() const
+template <typename T_elem>
+inline bool BaseRecord<T_elem>::scalar() const
 {
     return get().m_datasetDefined;
 }
 
-template <typename T_elem, typename T_RecordComponent>
-inline void BaseRecord<T_elem, T_RecordComponent>::readBase()
+template <typename T_elem>
+inline void BaseRecord<T_elem>::readBase()
 {
     using DT = Datatype;
     Parameter<Operation::READ_ATT> aRead;
@@ -618,8 +616,8 @@ inline void BaseRecord<T_elem, T_RecordComponent>::readBase()
             "Unexpected Attribute datatype for 'timeOffset'");
 }
 
-template <typename T_elem, typename T_RecordComponent>
-inline void BaseRecord<T_elem, T_RecordComponent>::flush(
+template <typename T_elem>
+inline void BaseRecord<T_elem>::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
     if (!this->written() && this->empty() && !get().m_datasetDefined)
@@ -633,8 +631,8 @@ inline void BaseRecord<T_elem, T_RecordComponent>::flush(
     // method doesn't do it
 }
 
-template <typename T_elem, typename T_RecordComponent>
-inline bool BaseRecord<T_elem, T_RecordComponent>::dirtyRecursive() const
+template <typename T_elem>
+inline bool BaseRecord<T_elem>::dirtyRecursive() const
 {
     if (this->dirty())
     {

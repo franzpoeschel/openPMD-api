@@ -66,7 +66,7 @@ class Writable final
     friend class internal::AttributableData;
     friend class internal::SeriesData;
     friend class Attributable;
-    template <typename T_elem, typename T_RecordComponent>
+    template <typename T_elem>
     friend class BaseRecord;
     template <typename T_elem>
     friend class BaseRecordInterface;

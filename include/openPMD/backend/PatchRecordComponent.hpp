@@ -67,7 +67,7 @@ class PatchRecordComponent : public BaseRecordComponent
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
-    template <typename, typename>
+    template <typename>
     friend class BaseRecord;
     template <typename, typename, typename>
     friend class internal::BaseRecordData;
