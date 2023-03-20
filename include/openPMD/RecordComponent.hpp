@@ -105,8 +105,6 @@ class RecordComponent : public BaseRecordComponent
     friend class ParticleSpecies;
     template <typename T_elem>
     friend class BaseRecord;
-    template <typename T_elem>
-    friend class BaseRecordInterface;
     friend class Record;
     friend class Mesh;
     template <typename>
@@ -432,31 +430,23 @@ private:
      */
     bool dirtyRecursive() const;
 
-    std::shared_ptr<internal::RecordComponentData> m_recordComponentData{
-        new internal::RecordComponentData()};
-
-    RecordComponent();
-
     // clang-format off
 OPENPMD_protected
     // clang-format on
 
-    RecordComponent(std::shared_ptr<internal::RecordComponentData>);
+    using Data_t = internal::RecordComponentData;
 
-    inline internal::RecordComponentData const &get() const
+    RecordComponent();
+
+    inline Data_t const &get() const
     {
-        return *m_recordComponentData;
+        return dynamic_cast<Data_t const &>(*m_attri);
     }
 
-    inline internal::RecordComponentData &get()
+    inline Data_t &get()
     {
-        return *m_recordComponentData;
-    }
-
-    inline void setData(std::shared_ptr<internal::RecordComponentData> data)
-    {
-        m_recordComponentData = std::move(data);
-        BaseRecordComponent::setData(m_recordComponentData);
+        auto &res = dynamic_cast<Data_t &>(*m_attri);
+        return res;
     }
 
     void readBase();

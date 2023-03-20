@@ -114,9 +114,6 @@ protected:
     std::shared_ptr<internal::AttributableData> m_attri{
         new internal::AttributableData()};
 
-    // Should not be called publicly, only by implementing classes
-    Attributable(std::shared_ptr<internal::AttributableData>);
-
 public:
     Attributable();
 
@@ -356,9 +353,11 @@ OPENPMD_protected
         return m_attri->m_writable;
     }
 
-    inline void setData(std::shared_ptr<internal::AttributableData> attri)
+    template <typename T = internal::AttributableData>
+    inline void setData(std::shared_ptr<T> attri)
     {
-        m_attri = std::move(attri);
+        m_attri = std::static_pointer_cast<internal::AttributableData>(
+            std::move(attri));
     }
 
     inline internal::AttributableData &get()

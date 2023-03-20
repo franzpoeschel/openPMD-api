@@ -39,22 +39,15 @@ namespace internal
 {
     RecordComponentData::RecordComponentData()
     {
-        RecordComponent impl{
-            std::shared_ptr<RecordComponentData>{this, [](auto const *) {}}};
-        impl.setUnitSI(1);
-        impl.resetDataset(Dataset(Datatype::CHAR, {1}));
+        m_dataset = Dataset(Datatype::CHAR, {1});
     }
 } // namespace internal
 
-RecordComponent::RecordComponent() : BaseRecordComponent{nullptr}
+RecordComponent::RecordComponent()
 {
-    BaseRecordComponent::setData(m_recordComponentData);
+    Attributable::setData(std::make_shared<internal::RecordComponentData>());
+    setUnitSI(1);
 }
-
-RecordComponent::RecordComponent(
-    std::shared_ptr<internal::RecordComponentData> data)
-    : BaseRecordComponent{data}, m_recordComponentData{std::move(data)}
-{}
 
 // We need to instantiate this somewhere otherwise there might be linker issues
 // despite this thing actually being constepxr
