@@ -56,7 +56,7 @@ namespace internal
         PatchRecordComponentData();
     };
 
-    template <typename, typename, typename>
+    template <typename>
     class BaseRecordData;
 } // namespace internal
 

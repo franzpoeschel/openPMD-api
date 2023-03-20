@@ -114,7 +114,7 @@ namespace internal
         }
     }
 
-    template <typename, typename, typename>
+    template <typename>
     class BaseRecordData;
 } // namespace internal
 

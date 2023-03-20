@@ -96,7 +96,7 @@ namespace internal
         bool m_hasBeenExtended = false;
     };
 
-    template <typename, typename, typename>
+    template <typename>
     class BaseRecordData;
 } // namespace internal
 

@@ -104,26 +104,27 @@ public:
     ChunkTable availableChunks();
 
 protected:
-    std::shared_ptr<internal::BaseRecordComponentData>
-        m_baseRecordComponentData{new internal::BaseRecordComponentData()};
+    using Data_t = internal::BaseRecordComponentData;
 
-    inline internal::BaseRecordComponentData const &get() const
+    std::shared_ptr<Data_t> m_baseRecordComponentData{new Data_t()};
+
+    inline Data_t const &get() const
     {
         return *m_baseRecordComponentData;
     }
 
-    inline internal::BaseRecordComponentData &get()
+    inline Data_t &get()
     {
         return *m_baseRecordComponentData;
     }
 
-    inline void setData(std::shared_ptr<internal::BaseRecordComponentData> data)
+    inline void setData(std::shared_ptr<Data_t> data)
     {
         m_baseRecordComponentData = std::move(data);
         Attributable::setData(m_baseRecordComponentData);
     }
 
-    void datasetDefined(internal::BaseRecordComponentData &);
+    void datasetDefined(Data_t &);
 
     BaseRecordComponent();
 }; // BaseRecordComponent
