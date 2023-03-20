@@ -2269,7 +2269,8 @@ namespace internal
         if (this->m_lastFlushSuccessful && m_writable.IOHandler &&
             m_writable.IOHandler->has_value())
         {
-            Series impl{{this, [](auto const *) {}}};
+            Series impl;
+            impl.setData({this, [](auto const *) {}});
             impl.flush();
             impl.flushStep(/* doFlush = */ true);
         }
@@ -2284,14 +2285,8 @@ namespace internal
     }
 } // namespace internal
 
-Series::Series() : Attributable{nullptr}, iterations{}
+Series::Series() : Attributable(NoInit()), iterations{}
 {}
-
-Series::Series(std::shared_ptr<internal::SeriesData> data)
-    : Attributable{data}, m_series{std::move(data)}
-{
-    iterations = m_series->iterations;
-}
 
 #if openPMD_HAVE_MPI
 Series::Series(
@@ -2299,10 +2294,9 @@ Series::Series(
     Access at,
     MPI_Comm comm,
     std::string const &options)
-    : Attributable{nullptr}, m_series{new internal::SeriesData}
+    : Attributable(NoInit())
 {
-    Attributable::setData(m_series);
-    iterations = m_series->iterations;
+    setData(std::make_shared<internal::SeriesData>());
     json::TracingJSON optionsJson =
         json::parseOptions(options, comm, /* considerFiles = */ true);
     auto input = parseInput(filepath);
@@ -2322,10 +2316,9 @@ Series::Series(
 
 Series::Series(
     std::string const &filepath, Access at, std::string const &options)
-    : Attributable{nullptr}, m_series{new internal::SeriesData}
+    : Attributable(NoInit())
 {
-    Attributable::setData(m_series);
-    iterations = m_series->iterations;
+    setData(std::make_shared<internal::SeriesData>());
     json::TracingJSON optionsJson =
         json::parseOptions(options, /* considerFiles = */ true);
     auto input = parseInput(filepath);
@@ -2343,15 +2336,16 @@ Series::Series(
 
 Series::operator bool() const
 {
-    return m_series.operator bool();
+    return m_attri.operator bool();
 }
 
 ReadIterations Series::readIterations()
 {
     // Use private constructor instead of copy constructor to avoid
     // object slicing
-    return {
-        this->m_series, IOHandler()->m_frontendAccess, get().m_parsePreference};
+    Series res;
+    res.setData(std::dynamic_pointer_cast<internal::SeriesData>(this->m_attri));
+    return {res, IOHandler()->m_frontendAccess, get().m_parsePreference};
 }
 
 WriteIterations Series::writeIterations()
@@ -2367,7 +2361,6 @@ WriteIterations Series::writeIterations()
 void Series::close()
 {
     get().close();
-    m_series.reset();
     m_attri.reset();
 }
 
