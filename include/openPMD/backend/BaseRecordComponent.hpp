@@ -47,6 +47,10 @@ namespace internal
          * instead defined via light-weight attributes.
          */
         bool m_isConstant = false;
+        /*
+         * ... document this ...
+         */
+        bool m_datasetDefined = false;
 
         BaseRecordComponentData(BaseRecordComponentData const &) = delete;
         BaseRecordComponentData(BaseRecordComponentData &&) = delete;
@@ -111,6 +115,8 @@ protected:
     {
         return dynamic_cast<Data_t &>(*m_attri);
     }
+
+    void datasetDefined(Data_t &);
 
     BaseRecordComponent();
 }; // BaseRecordComponent

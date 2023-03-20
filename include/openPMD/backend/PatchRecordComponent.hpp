@@ -121,12 +121,15 @@ OPENPMD_protected
 
     inline Data_t const &get() const
     {
+        // cannot call this in the const overload
+        // datasetDefined(*m_recordComponentData);
         return dynamic_cast<Data_t const &>(*m_attri);
     }
 
     inline Data_t &get()
     {
         auto &res = dynamic_cast<Data_t &>(*m_attri);
+        datasetDefined(res);
         return res;
     }
 }; // PatchRecordComponent

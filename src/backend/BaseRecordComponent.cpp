@@ -71,4 +71,9 @@ BaseRecordComponent::BaseRecordComponent()
         std::make_shared<internal::BaseRecordComponentData>());
 }
 
+void BaseRecordComponent::datasetDefined(
+    internal::BaseRecordComponentData &data)
+{
+    data.m_datasetDefined = true;
+}
 } // namespace openPMD
