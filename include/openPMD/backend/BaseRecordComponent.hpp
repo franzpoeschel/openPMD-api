@@ -52,6 +52,8 @@ namespace internal
          */
         bool m_datasetDefined = false;
 
+        bool datasetDefined() const;
+
         BaseRecordComponentData(BaseRecordComponentData const &) = delete;
         BaseRecordComponentData(BaseRecordComponentData &&) = delete;
 

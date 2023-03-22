@@ -46,7 +46,6 @@ namespace internal
 RecordComponent::RecordComponent()
 {
     Attributable::setData(std::make_shared<internal::RecordComponentData>());
-    setUnitSI(1);
 }
 
 // We need to instantiate this somewhere otherwise there might be linker issues
@@ -211,6 +210,10 @@ void RecordComponent::flush(
             throw error::WrongAPIUsage(
                 "[RecordComponent] Must set specific datatype (Use "
                 "resetDataset call).");
+        }
+        if (!containsAttribute("unitSI"))
+        {
+            setUnitSI(1);
         }
         if (!written())
         {

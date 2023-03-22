@@ -23,6 +23,15 @@
 
 namespace openPMD
 {
+
+namespace internal
+{
+    bool BaseRecordComponentData::datasetDefined() const
+    {
+        return m_datasetDefined;
+    }
+} // namespace internal
+
 double BaseRecordComponent::unitSI() const
 {
     return getAttribute("unitSI").get<double>();
