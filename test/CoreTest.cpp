@@ -191,12 +191,7 @@ TEST_CASE("myPath", "[core]")
     auto scalarMeshComponent = scalarMesh[RecordComponent::SCALAR];
     REQUIRE(
         pathOf(scalarMeshComponent) ==
-        vec_t{
-            "iterations",
-            "1234",
-            "meshes",
-            "e_chargeDensity",
-            RecordComponent::SCALAR});
+        vec_t{"iterations", "1234", "meshes", "e_chargeDensity"});
     writeSomething(scalarMeshComponent);
 
     auto vectorMesh = iteration.meshes["E"];
@@ -232,13 +227,7 @@ TEST_CASE("myPath", "[core]")
     auto speciesWeightingX = speciesWeighting[RecordComponent::SCALAR];
     REQUIRE(
         pathOf(speciesWeightingX) ==
-        vec_t{
-            "iterations",
-            "1234",
-            "particles",
-            "e",
-            "weighting",
-            RecordComponent::SCALAR});
+        vec_t{"iterations", "1234", "particles", "e", "weighting"});
     writeSomething(speciesWeightingX);
 
     REQUIRE(
@@ -289,8 +278,7 @@ TEST_CASE("myPath", "[core]")
             "particles",
             "e",
             "particlePatches",
-            "numParticles",
-            RecordComponent::SCALAR});
+            "numParticles"});
 #endif
 }
 
@@ -439,16 +427,21 @@ TEST_CASE("record_constructor_test", "[core]")
     ps["position"][RecordComponent::SCALAR].resetDataset(dset);
     ps["positionOffset"][RecordComponent::SCALAR].resetDataset(dset);
 
-    REQUIRE(r["x"].unitSI() == 1);
-    REQUIRE(r["x"].numAttributes() == 1); /* unitSI */
-    REQUIRE(r["y"].unitSI() == 1);
-    REQUIRE(r["y"].numAttributes() == 1); /* unitSI */
-    REQUIRE(r["z"].unitSI() == 1);
-    REQUIRE(r["z"].numAttributes() == 1); /* unitSI */
+    // unitSI is set upon flushing
+    // REQUIRE(r["x"].unitSI() == 1);
+    REQUIRE(r["x"].numAttributes() == 0); /* unitSI */
+    // REQUIRE(r["y"].unitSI() == 1);
+    REQUIRE(r["y"].numAttributes() == 0); /* unitSI */
+    // REQUIRE(r["z"].unitSI() == 1);
+    REQUIRE(r["z"].numAttributes() == 0); /* unitSI */
     std::array<double, 7> zeros{{0., 0., 0., 0., 0., 0., 0.}};
     REQUIRE(r.unitDimension() == zeros);
     REQUIRE(r.timeOffset<float>() == static_cast<float>(0));
     REQUIRE(r.numAttributes() == 2); /* timeOffset, unitDimension */
+    o.flush();
+    REQUIRE(r["x"].unitSI() == 1);
+    REQUIRE(r["y"].unitSI() == 1);
+    REQUIRE(r["z"].unitSI() == 1);
 }
 
 TEST_CASE("record_modification_test", "[core]")
@@ -505,15 +498,11 @@ TEST_CASE("mesh_constructor_test", "[core]")
     Mesh &m = o.iterations[42].meshes["E"];
 
     std::vector<double> pos{0};
-    REQUIRE(m["x"].unitSI() == 1);
-    REQUIRE(m["x"].numAttributes() == 2); /* unitSI, position */
-    REQUIRE(m["x"].position<double>() == pos);
-    REQUIRE(m["y"].unitSI() == 1);
-    REQUIRE(m["y"].numAttributes() == 2); /* unitSI, position */
-    REQUIRE(m["y"].position<double>() == pos);
-    REQUIRE(m["z"].unitSI() == 1);
-    REQUIRE(m["z"].numAttributes() == 2); /* unitSI, position */
-    REQUIRE(m["z"].position<double>() == pos);
+    /* unitSI and position are set to default values upon flushing */
+    REQUIRE(m["x"].numAttributes() == 0); /* unitSI, position */
+    REQUIRE(m["y"].numAttributes() == 0); /* unitSI, position */
+    REQUIRE(m["z"].numAttributes() == 0); /* unitSI, position */
+
     REQUIRE(m.geometry() == Mesh::Geometry::cartesian);
     REQUIRE(m.dataOrder() == Mesh::DataOrder::C);
     std::vector<std::string> al{"x"};
@@ -527,6 +516,17 @@ TEST_CASE("mesh_constructor_test", "[core]")
         m.numAttributes() ==
         8); /* axisLabels, dataOrder, geometry, gridGlobalOffset, gridSpacing,
                gridUnitSI, timeOffset, unitDimension */
+
+    o.flush();
+    REQUIRE(m["x"].unitSI() == 1);
+    REQUIRE(m["x"].numAttributes() == 2); /* unitSI, position */
+    REQUIRE(m["x"].position<double>() == pos);
+    REQUIRE(m["y"].unitSI() == 1);
+    REQUIRE(m["y"].numAttributes() == 2); /* unitSI, position */
+    REQUIRE(m["y"].position<double>() == pos);
+    REQUIRE(m["z"].unitSI() == 1);
+    REQUIRE(m["z"].numAttributes() == 2); /* unitSI, position */
+    REQUIRE(m["z"].position<double>() == pos);
 }
 
 TEST_CASE("mesh_modification_test", "[core]")
@@ -1010,6 +1010,8 @@ TEST_CASE("empty_record_test", "[core]")
                       "RecordComponents: E"));
     o.iterations[1].meshes["E"][RecordComponent::SCALAR].resetDataset(
         Dataset(Datatype::DOUBLE, {1}));
+    auto B = o.iterations[1].meshes["B"];
+    B.resetDataset(Dataset(Datatype::DOUBLE, {1}));
     o.flush();
 }
 
