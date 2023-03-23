@@ -22,14 +22,19 @@
 
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/UnitDimension.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Container.hpp"
 
 #include <array>
 #include <stdexcept>
 #include <string>
+#include <type_traits> // std::remove_reference_t
+#include <utility> // std::declval
 
 namespace openPMD
 {
+template <typename>
+class BaseRecord;
 namespace internal
 {
     template <typename T_elem // = T_RecordComponent
@@ -38,7 +43,18 @@ namespace internal
         : public ContainerData<T_elem>
         , public T_elem::Data_t
     {
+        using T_RecordComponent = T_elem;
+
     public:
+        /*
+         * Non-owning iterator, so that we can mock the iterator for
+         * the deprecated SCALAR keyword.
+         * Non-owning to avoid memory loops.
+         * Not nice, but it's deprecated for a reason.
+         */
+        std::optional<std::pair<std::string const, T_RecordComponent>>
+            m_iterator;
+
         BaseRecordData();
 
         BaseRecordData(BaseRecordData const &) = delete;
@@ -46,6 +62,87 @@ namespace internal
 
         BaseRecordData &operator=(BaseRecordData const &) = delete;
         BaseRecordData &operator=(BaseRecordData &&) = delete;
+    };
+
+    // @todo change T_InternalContainer to direct iterator type
+    template <typename T_BaseRecord, typename T_BaseIterator>
+    class ScalarIterator
+    {
+        using T_Container = typename T_BaseRecord::T_Container;
+        using T_Value =
+            std::remove_reference_t<decltype(*std::declval<T_BaseIterator>())>;
+        using Left = T_BaseIterator;
+        struct Right
+        { /*Empty*/
+            constexpr bool operator==(Right const &) const noexcept
+            {
+                return true;
+            }
+            constexpr bool operator!=(Right const &) const noexcept
+            {
+                return false;
+            }
+        };
+
+        template <typename, typename>
+        friend class openPMD::BaseRecord;
+
+        T_BaseRecord *m_baseRecord = nullptr;
+        std::variant<Left, Right> m_iterator;
+
+        explicit ScalarIterator() = default;
+
+        ScalarIterator(T_BaseRecord *baseRecord)
+            : m_baseRecord(baseRecord), m_iterator(Right())
+        {}
+        ScalarIterator(T_BaseRecord *baseRecord, Left iterator)
+            : m_baseRecord(baseRecord), m_iterator(std::move(iterator))
+        {}
+
+    public:
+        ScalarIterator &operator++()
+        {
+            std::visit(
+                auxiliary::overloaded{
+                    [](Left &left) { ++left; },
+                    [this](Right &) {
+                        m_iterator = m_baseRecord->container().end();
+                    }},
+                m_iterator);
+            return *this;
+        }
+
+        T_Value *operator->()
+        {
+            return std::visit(
+                auxiliary::overloaded{
+                    [](Left &left) -> T_Value * { return left.operator->(); },
+                    [this](Right &) -> T_Value * {
+                        /*
+                         * We cannot create this value on the fly since we only
+                         * give out a pointer, so that would be use-after-free.
+                         * Instead, we just keep one value around inside
+                         * BaseRecordData and give it out when needed.
+                         */
+                        return &m_baseRecord->get().m_iterator.value();
+                    }},
+                m_iterator);
+        }
+
+        T_Value &operator*()
+        {
+            return *operator->();
+        }
+
+        bool operator==(ScalarIterator const &other) const
+        {
+            return this->m_iterator == other.m_iterator;
+        }
+
+        bool operator!=(ScalarIterator const &other) const
+        {
+            return !operator==(other);
+        }
     };
 } // namespace internal
 
@@ -62,6 +159,8 @@ class BaseRecord
     friend class PatchRecord;
     friend class Record;
     friend class Mesh;
+    template <typename, typename>
+    friend class internal::ScalarIterator;
 
     static_assert(
         traits::GenerationPolicy<T_RecordComponent>::is_noop,
@@ -93,8 +192,60 @@ public:
     using const_reference = typename Container<T_elem>::const_reference;
     using pointer = typename Container<T_elem>::pointer;
     using const_pointer = typename Container<T_elem>::const_pointer;
-    using iterator = typename T_Container::iterator;
-    using const_iterator = typename T_Container::const_iterator;
+
+    using iterator = internal::ScalarIterator<
+        T_Self,
+        typename T_Container::InternalContainer::iterator>;
+    using const_iterator = internal::ScalarIterator<
+        T_Self const,
+        typename T_Container::InternalContainer::const_iterator>;
+
+private:
+    template <typename... Arg>
+    iterator makeIterator(Arg &&...arg)
+    {
+        return iterator{this, std::forward<Arg>(arg)...};
+    }
+    template <typename... Arg>
+    const_iterator makeIterator(Arg &&...arg) const
+    {
+        return const_iterator{this, std::forward<Arg>(arg)...};
+    }
+
+public:
+    iterator begin()
+    {
+        if (get().m_datasetDefined)
+        {
+            return makeIterator();
+        }
+        else
+        {
+            return makeIterator(T_Container::begin());
+        }
+    }
+
+    const_iterator begin() const
+    {
+        if (get().m_datasetDefined)
+        {
+            return makeIterator();
+        }
+        else
+        {
+            return makeIterator(T_Container::begin());
+        }
+    }
+
+    iterator end()
+    {
+        return makeIterator(T_Container::end());
+    }
+
+    const_iterator end() const
+    {
+        return makeIterator(T_Container::end());
+    }
 
     virtual ~BaseRecord() = default;
 
@@ -104,6 +255,12 @@ public:
     mapped_type const &at(key_type const &key) const;
     size_type erase(key_type const &key);
     iterator erase(iterator res);
+    bool empty() const noexcept;
+    iterator find(key_type const &key);
+    const_iterator find(key_type const &key) const;
+    size_type count(key_type const &key) const;
+    size_type size() const;
+
     //! @todo add also, as soon as added in Container:
     // iterator erase(const_iterator first, const_iterator last) override;
 
@@ -170,17 +327,37 @@ namespace internal
 template <typename T_elem>
 BaseRecord<T_elem>::BaseRecord()
 {
+    using T_RecordComponentData = typename T_RecordComponent::Data_t;
     auto baseRecordData = std::make_shared<Data_t>();
+    auto rawRCData = static_cast<T_RecordComponentData *>(baseRecordData.get());
+    T_RecordComponent rc;
+    rc.setData(
+        std::shared_ptr<T_RecordComponentData>{rawRCData, [](auto const *) {}});
+    baseRecordData->m_iterator.emplace(
+        std::make_pair(RecordComponent::SCALAR, std::move(rc)));
     Attributable::setData(std::move(baseRecordData));
 }
 
 template <typename T_elem>
-inline typename BaseRecord<T_elem>::mapped_type &
-BaseRecord<T_elem>::operator[](key_type const &key)
+auto BaseRecord<T_elem>::operator[](key_type const &key) -> mapped_type &
 {
     auto it = this->find(key);
     if (it != this->end())
-        return it->second;
+    {
+        return std::visit(
+            auxiliary::overloaded{
+                [](typename iterator::Left &l) -> mapped_type & {
+                    return l->second;
+                },
+                [this](typename iterator::Right &) -> mapped_type & {
+                    /*
+                     * Do not use the iterator result, as it is a non-owning
+                     * handle
+                     */
+                    return static_cast<mapped_type &>(*this);
+                }},
+            it.m_iterator);
+    }
     else
     {
         bool const keyScalar = (key == RecordComponent::SCALAR);
@@ -204,12 +381,25 @@ BaseRecord<T_elem>::operator[](key_type const &key)
 }
 
 template <typename T_elem>
-inline typename BaseRecord<T_elem>::mapped_type &
-BaseRecord<T_elem>::operator[](key_type &&key)
+auto BaseRecord<T_elem>::operator[](key_type &&key) -> mapped_type &
 {
     auto it = this->find(key);
     if (it != this->end())
-        return it->second;
+    {
+        return std::visit(
+            auxiliary::overloaded{
+                [](typename iterator::Left &l) -> mapped_type & {
+                    return l->second;
+                },
+                [this](typename iterator::Right &) -> mapped_type & {
+                    /*
+                     * Do not use the iterator result, as it is a non-owning
+                     * handle
+                     */
+                    return static_cast<mapped_type &>(*this);
+                }},
+            it.m_iterator);
+    }
     else
     {
         bool const keyScalar = (key == RecordComponent::SCALAR);
@@ -259,8 +449,7 @@ auto BaseRecord<T_elem>::at(key_type const &key) const -> mapped_type const &
 }
 
 template <typename T_elem>
-inline typename BaseRecord<T_elem>::size_type
-BaseRecord<T_elem>::erase(key_type const &key)
+auto BaseRecord<T_elem>::erase(key_type const &key) -> size_type
 {
     bool const keyScalar = (key == RecordComponent::SCALAR);
     size_type res;
@@ -275,7 +464,7 @@ BaseRecord<T_elem>::erase(key_type const &key)
             this->IOHandler()->enqueue(IOTask(this, dDelete));
             this->IOHandler()->flush(internal::defaultFlushParams);
         }
-        res = get().datasetDefined() ? 1 : 0;
+        res = get().m_datasetDefined ? 1 : 0;
     }
 
     if (keyScalar)
@@ -288,21 +477,101 @@ BaseRecord<T_elem>::erase(key_type const &key)
 }
 
 template <typename T_elem>
-inline typename BaseRecord<T_elem>::iterator
-BaseRecord<T_elem>::erase(iterator res)
+auto BaseRecord<T_elem>::erase(iterator it) -> iterator
 {
-    bool const keyScalar = (res->first == RecordComponent::SCALAR);
-    iterator ret;
-    if (!keyScalar || (keyScalar && this->at(res->first).constant()))
-        ret = Container<T_elem>::erase(res);
+    return std::visit(
+        auxiliary::overloaded{
+            [this](typename iterator::Left &left) {
+                return makeIterator(T_Container::erase(left));
+            },
+            [this](typename iterator::Right &) {
+                if (this->written())
+                {
+                    Parameter<Operation::DELETE_DATASET> dDelete;
+                    dDelete.name = ".";
+                    this->IOHandler()->enqueue(IOTask(this, dDelete));
+                    this->IOHandler()->flush(internal::defaultFlushParams);
+                    this->written() = false;
+                }
+                this->writable().abstractFilePosition.reset();
+                this->get().m_datasetDefined = false;
+                return end();
+            }},
+        it.m_iterator);
+}
+
+template <typename T_elem>
+auto BaseRecord<T_elem>::empty() const noexcept -> bool
+{
+    return !scalar() && T_Container::empty();
+}
+
+template <typename T_elem>
+auto BaseRecord<T_elem>::find(key_type const &key) -> iterator
+{
+    auto &r = get();
+    if (key == RecordComponent::SCALAR && get().m_datasetDefined)
+    {
+        if (r.m_datasetDefined)
+        {
+            return begin();
+        }
+        else
+        {
+            return end();
+        }
+    }
     else
     {
-        throw std::runtime_error(
-            "Unreachable! Iterators do not yet cover scalars (they will in a "
-            "later commit).");
+        return makeIterator(r.m_container.find(key));
     }
+}
 
-    return ret;
+template <typename T_elem>
+auto BaseRecord<T_elem>::find(key_type const &key) const -> const_iterator
+{
+    auto &r = get();
+    if (key == RecordComponent::SCALAR && get().m_datasetDefined)
+    {
+        if (r.m_datasetDefined)
+        {
+            return begin();
+        }
+        else
+        {
+            return end();
+        }
+    }
+    else
+    {
+        return makeIterator(r.m_container.find(key));
+    }
+}
+
+template <typename T_elem>
+auto BaseRecord<T_elem>::count(key_type const &key) const -> size_type
+{
+    if (key == RecordComponent::SCALAR)
+    {
+        return get().m_datasetDefined ? 1 : 0;
+    }
+    else
+    {
+        return T_Container::count(key);
+    }
+}
+
+template <typename T_elem>
+auto BaseRecord<T_elem>::size() const -> size_type
+{
+    if (scalar())
+    {
+        return 1;
+    }
+    else
+    {
+        return T_Container::size();
+    }
 }
 
 template <typename T_elem>
@@ -315,7 +584,7 @@ inline std::array<double, 7> BaseRecord<T_elem>::unitDimension() const
 template <typename T_elem>
 inline bool BaseRecord<T_elem>::scalar() const
 {
-    return get().datasetDefined();
+    return get().m_datasetDefined;
 }
 
 template <typename T_elem>
@@ -357,8 +626,7 @@ template <typename T_elem>
 inline void BaseRecord<T_elem>::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
-    if (!this->written() && this->T_Container::empty() &&
-        !get().datasetDefined())
+    if (!this->written() && this->empty() && !get().m_datasetDefined)
         throw std::runtime_error(
             "A Record can not be written without any contained "
             "RecordComponents: " +
