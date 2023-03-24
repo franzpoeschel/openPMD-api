@@ -196,12 +196,6 @@ public:
                         deref_dynamic_cast<Parameter<O::AVAILABLE_CHUNKS> >(
                             i.parameter.get()));
                     break;
-                case O::KEEP_SYNCHRONOUS:
-                    keepSynchronous(
-                        i.writable,
-                        deref_dynamic_cast<Parameter<O::KEEP_SYNCHRONOUS> >(
-                            i.parameter.get()));
-                    break;
                 case O::DEREGISTER:
                     deregister(
                         i.writable,
@@ -563,14 +557,6 @@ public:
      */
     virtual void
     listAttributes(Writable *, Parameter<Operation::LIST_ATTS> &) = 0;
-
-    /** Treat the current Writable as equivalent to that in the parameter object
-     *
-     * Using the default implementation (which copies the abstractFilePath
-     * into the current writable) should be enough for all backends.
-     */
-    void
-    keepSynchronous(Writable *, Parameter<Operation::KEEP_SYNCHRONOUS> param);
 
     /** Notify the backend that the Writable has been / will be deallocated.
      *
