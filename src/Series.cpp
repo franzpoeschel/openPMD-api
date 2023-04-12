@@ -769,7 +769,7 @@ void Series::flushFileBased(
                 break;
             case IO::HasBeenOpened:
                 // continue below
-                it->second.flush(flushParams);
+                it->second.flushIteration(flushParams);
                 break;
             }
 
@@ -879,7 +879,7 @@ void Series::flushGorVBased(
                 break;
             case IO::HasBeenOpened:
                 // continue below
-                it->second.flush(flushParams);
+                it->second.flushIteration(flushParams);
                 break;
             }
 
