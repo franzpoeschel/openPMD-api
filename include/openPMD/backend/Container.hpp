@@ -101,10 +101,6 @@ template <
     typename T_container = std::map<T_key, T> >
 class Container : virtual public Attributable
 {
-    static_assert(
-        std::is_base_of<Attributable, T>::value,
-        "Type of container element must be derived from Writable");
-
     friend class Iteration;
     friend class ParticleSpecies;
     friend class ParticlePatches;
@@ -463,11 +459,32 @@ OPENPMD_protected
 
     Container() : Attributable(NoInit())
     {
+        /*
+         * This check cannot happen at the class scope, because T
+         * might still be an incomplete type, e.g. in
+         * class CustomHierarchy : public Container<CustomHierarchy>
+         * The next-best thing is doing the check in
+         * the constructor.
+         */
+        static_assert(
+            std::is_base_of<Attributable, T>::value,
+            "Type of container element must be derived from Writable");
         setData(std::make_shared<ContainerData>());
     }
 
     Container(NoInit) : Attributable(NoInit())
-    {}
+    {
+        /*
+         * This check cannot happen at the class scope, because T
+         * might still be an incomplete type, e.g. in
+         * class CustomHierarchy : public Container<CustomHierarchy>
+         * The next-best thing is doing the check in
+         * the constructor.
+         */
+        static_assert(
+            std::is_base_of<Attributable, T>::value,
+            "Type of container element must be derived from Writable");
+    }
 
 public:
     /*

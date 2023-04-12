@@ -26,6 +26,7 @@
 
 #pragma once
 
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/backend/Attributable.hpp"
 
 #include <pybind11/pybind11.h>
