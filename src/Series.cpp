@@ -1311,7 +1311,7 @@ void Series::flushFileBased(
                 break;
             case IO::HasBeenOpened:
                 // continue below
-                it->second.flush(flushParams);
+                it->second.flushIteration(flushParams);
                 break;
             }
 
@@ -1429,7 +1429,7 @@ void Series::flushGorVBased(
                         series.m_snapshotToStep.at(it->first)};
                     IOHandler()->enqueue(IOTask(this, std::move(param)));
                 }
-                it->second.flush(flushParams);
+                it->second.flushIteration(flushParams);
                 break;
             }
 

@@ -19,6 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
@@ -47,7 +48,7 @@ namespace openPMD
 using internal::CloseStatus;
 using internal::DeferredParseAccess;
 
-Iteration::Iteration() : Attributable(NoInit())
+Iteration::Iteration() : CustomHierarchy(NoInit())
 {
     setData(std::make_shared<Data_t>());
     setTime(static_cast<double>(0));
@@ -264,7 +265,7 @@ void Iteration::flushFileBased(
     case FlushLevel::SkeletonOnly:
     case FlushLevel::InternalFlush:
     case FlushLevel::UserFlush:
-        flush(flushParams);
+        flushIteration(flushParams);
         break;
     }
 }
@@ -287,7 +288,7 @@ void Iteration::flushGroupBased(
     case FlushLevel::SkeletonOnly:
     case FlushLevel::InternalFlush:
     case FlushLevel::UserFlush:
-        flush(flushParams);
+        flushIteration(flushParams);
         break;
     }
 }
@@ -310,7 +311,7 @@ void Iteration::flushVariableBased(
     case FlushLevel::SkeletonOnly:
     case FlushLevel::InternalFlush:
     case FlushLevel::UserFlush:
-        flush(flushParams);
+        flushIteration(flushParams);
         break;
     }
 
@@ -336,7 +337,7 @@ void Iteration::flushVariableBased(
     }
 }
 
-void Iteration::flush(internal::FlushParams const &flushParams)
+void Iteration::flushIteration(internal::FlushParams const &flushParams)
 {
     Parameter<Operation::TOUCH> touch;
     IOHandler()->enqueue(IOTask(&writable(), touch));
