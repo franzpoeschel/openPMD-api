@@ -74,10 +74,9 @@ Extent PatchRecordComponent::getExtent() const
     }
 }
 
-PatchRecordComponent::PatchRecordComponent()
+PatchRecordComponent::PatchRecordComponent() : BaseRecordComponent(NoInit())
 {
-    Attributable::setData(
-        std::make_shared<internal::PatchRecordComponentData>());
+    setData(std::make_shared<Data_t>());
     setUnitSI(1);
 }
 

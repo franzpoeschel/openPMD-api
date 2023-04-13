@@ -37,7 +37,18 @@ namespace internal
     {}
 } // namespace internal
 
-Attributable::Attributable() = default;
+Attributable::Attributable()
+{
+    // Might already be initialized by inheriting classes due to virtual
+    // inheritance
+    if (!m_attri)
+    {
+        m_attri = std::make_shared<Data_t>();
+    }
+}
+
+Attributable::Attributable(NoInit)
+{}
 
 Attribute Attributable::getAttribute(std::string const &key) const
 {

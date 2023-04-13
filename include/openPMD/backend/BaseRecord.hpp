@@ -64,19 +64,26 @@ class BaseRecord : public Container<T_elem>
     friend class Mesh;
 
     using Data_t = internal::BaseRecordData<T_elem>;
-    std::shared_ptr<Data_t> m_baseRecordData{new Data_t()};
+    std::shared_ptr<Data_t> m_baseRecordData;
 
     inline Data_t const &get() const
     {
-        return dynamic_cast<Data_t const &>(*this->m_attri);
+        return *m_baseRecordData;
     }
 
     inline Data_t &get()
     {
-        return dynamic_cast<Data_t &>(*this->m_attri);
+        return *m_baseRecordData;
     }
 
     BaseRecord();
+
+protected:
+    inline void setData(std::shared_ptr<Data_t> data)
+    {
+        m_baseRecordData = std::move(data);
+        Container<T_elem>::setData(m_baseRecordData);
+    }
 
 public:
     using key_type = typename Container<T_elem>::key_type;
@@ -163,9 +170,9 @@ namespace internal
 } // namespace internal
 
 template <typename T_elem>
-BaseRecord<T_elem>::BaseRecord()
+BaseRecord<T_elem>::BaseRecord() : Container<T_elem>(Attributable::NoInit())
 {
-    Attributable::setData(std::make_shared<Data_t>());
+    setData(std::make_shared<Data_t>());
 }
 
 template <typename T_elem>

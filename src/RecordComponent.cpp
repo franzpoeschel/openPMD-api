@@ -40,9 +40,9 @@ namespace internal
     RecordComponentData::RecordComponentData() = default;
 } // namespace internal
 
-RecordComponent::RecordComponent()
+RecordComponent::RecordComponent() : BaseRecordComponent(NoInit())
 {
-    Attributable::setData(std::make_shared<internal::RecordComponentData>());
+    setData(std::make_shared<Data_t>());
     setUnitSI(1);
 }
 

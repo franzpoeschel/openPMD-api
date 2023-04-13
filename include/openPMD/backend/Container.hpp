@@ -147,14 +147,22 @@ protected:
     using ContainerData = internal::ContainerData<T, T_key, T_container>;
     using InternalContainer = T_container;
 
+    std::shared_ptr<ContainerData> m_containerData;
+
+    inline void setData(std::shared_ptr<ContainerData> containerData)
+    {
+        m_containerData = std::move(containerData);
+        Attributable::setData(m_containerData);
+    }
+
     inline InternalContainer const &container() const
     {
-        return dynamic_cast<ContainerData const &>(*m_attri).m_container;
+        return m_containerData->m_container;
     }
 
     inline InternalContainer &container()
     {
-        return dynamic_cast<ContainerData &>(*m_attri).m_container;
+        return m_containerData->m_container;
     }
 
 public:
@@ -442,10 +450,13 @@ OPENPMD_protected
         flushAttributes(flushParams);
     }
 
-    Container()
+    Container() : Attributable(NoInit())
     {
-        Attributable::setData(std::make_shared<ContainerData>());
+        setData(std::make_shared<ContainerData>());
     }
+
+    Container(NoInit) : Attributable(NoInit())
+    {}
 };
 
 namespace internal

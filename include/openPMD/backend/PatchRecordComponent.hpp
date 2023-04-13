@@ -118,17 +118,24 @@ OPENPMD_protected
 
     using Data_t = internal::PatchRecordComponentData;
 
+    std::shared_ptr<Data_t> m_patchRecordComponentData;
+
     PatchRecordComponent();
 
     inline Data_t const &get() const
     {
-        return dynamic_cast<Data_t const &>(*m_attri);
+        return *m_patchRecordComponentData;
     }
 
     inline Data_t &get()
     {
-        auto &res = dynamic_cast<Data_t &>(*m_attri);
-        return res;
+        return *m_patchRecordComponentData;
+    }
+
+    inline void setData(std::shared_ptr<Data_t> data)
+    {
+        m_patchRecordComponentData = std::move(data);
+        BaseRecordComponent::setData(m_patchRecordComponentData);
     }
 }; // PatchRecordComponent
 

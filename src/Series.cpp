@@ -2280,7 +2280,7 @@ namespace internal
     }
 } // namespace internal
 
-Series::Series() : iterations{}
+Series::Series() : Attributable(NoInit()), iterations{}
 {}
 
 #if openPMD_HAVE_MPI
@@ -2289,10 +2289,9 @@ Series::Series(
     Access at,
     MPI_Comm comm,
     std::string const &options)
+    : Attributable(NoInit())
 {
-    auto series = std::make_shared<internal::SeriesData>();
-    iterations = series->iterations;
-    Attributable::setData(std::move(series));
+    setData(std::make_shared<internal::SeriesData>());
     json::TracingJSON optionsJson =
         json::parseOptions(options, comm, /* considerFiles = */ true);
     auto input = parseInput(filepath);
@@ -2311,10 +2310,9 @@ Series::Series(
 
 Series::Series(
     std::string const &filepath, Access at, std::string const &options)
+    : Attributable(NoInit())
 {
-    auto series = std::make_shared<internal::SeriesData>();
-    iterations = series->iterations;
-    Attributable::setData(std::move(series));
+    setData(std::make_shared<internal::SeriesData>());
     json::TracingJSON optionsJson =
         json::parseOptions(options, /* considerFiles = */ true);
     auto input = parseInput(filepath);

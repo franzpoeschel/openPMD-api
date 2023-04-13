@@ -434,18 +434,24 @@ OPENPMD_protected
     // clang-format on
 
     using Data_t = internal::RecordComponentData;
+    std::shared_ptr<Data_t> m_recordComponentData;
 
     RecordComponent();
 
     inline Data_t const &get() const
     {
-        return dynamic_cast<Data_t const &>(*m_attri);
+        return *m_recordComponentData;
     }
 
     inline Data_t &get()
     {
-        auto &res = dynamic_cast<Data_t &>(*m_attri);
-        return res;
+        return *m_recordComponentData;
+    }
+
+    inline void setData(std::shared_ptr<internal::RecordComponentData> data)
+    {
+        m_recordComponentData = std::move(data);
+        BaseRecordComponent::setData(m_recordComponentData);
     }
 
     void readBase();

@@ -111,11 +111,16 @@ class Attributable
     friend class WriteIterations;
 
 protected:
-    std::shared_ptr<internal::AttributableData> m_attri{
-        new internal::AttributableData()};
+    // tag for internal constructor
+    struct NoInit
+    {};
+
+    using Data_t = internal::AttributableData;
+    std::shared_ptr<Data_t> m_attri;
 
 public:
     Attributable();
+    Attributable(NoInit);
 
     virtual ~Attributable() = default;
 
@@ -353,11 +358,9 @@ OPENPMD_protected
         return m_attri->m_writable;
     }
 
-    template <typename T = internal::AttributableData>
-    inline void setData(std::shared_ptr<T> attri)
+    inline void setData(std::shared_ptr<internal::AttributableData> attri)
     {
-        m_attri = std::static_pointer_cast<internal::AttributableData>(
-            std::move(attri));
+        m_attri = std::move(attri);
     }
 
     inline internal::AttributableData &get()
