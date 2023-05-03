@@ -21,6 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/Iteration.hpp"
 
 #include <ios>
@@ -32,7 +33,11 @@ using namespace openPMD;
 
 void init_Iteration(py::module &m)
 {
-    py::class_<Iteration, Attributable>(m, "Iteration")
+    py::class_<
+        Iteration,
+        CustomHierarchy,
+        Container<CustomHierarchy>,
+        Attributable>(m, "Iteration")
         .def(py::init<Iteration const &>())
 
         .def(

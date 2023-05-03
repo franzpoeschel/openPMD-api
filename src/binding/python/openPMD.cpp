@@ -41,6 +41,7 @@ void init_Dataset(py::module &);
 void init_Datatype(py::module &);
 void init_Error(py::module &);
 void init_Helper(py::module &);
+void init_CustomHierarchy(py::module &);
 void init_Iteration(py::module &);
 void init_IterationEncoding(py::module &);
 void init_Mesh(py::module &);
@@ -94,6 +95,7 @@ PYBIND11_MODULE(openpmd_api_cxx, m)
     init_Dataset(m);
     init_Datatype(m);
     init_Helper(m);
+    init_CustomHierarchy(m);
     init_Iteration(m);
     init_IterationEncoding(m);
     init_BaseRecordComponent(m);
