@@ -1,6 +1,7 @@
 // expose private and protected members for invasive testing
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/Access.hpp"
 #if openPMD_USE_INVASIVE_TESTS
 #define OPENPMD_private public:
 #define OPENPMD_protected public:
@@ -156,6 +157,39 @@ TEST_CASE("attribute_dtype_test", "[core]")
         REQUIRE(Datatype::LONG == a.dtype);
 #endif
     }
+}
+
+TEST_CASE("custom_hierarchies", "[core]")
+{
+    std::string filePath = "../samples/custom_hierarchies.json";
+    Series write(filePath, Access::CREATE);
+    write.iterations[0];
+    write.close();
+
+    Series read(filePath, Access::READ_ONLY);
+    REQUIRE(read.iterations[0].size() == 0);
+    read.close();
+
+    write = Series(filePath, Access::READ_WRITE);
+    write.iterations[0]["custom"]["hierarchy"];
+    write.iterations[0]["custom"].setAttribute("string", "attribute");
+    write.iterations[0]["custom"]["hierarchy"].setAttribute("number", 3);
+    write.iterations[0]["no_attributes"];
+    write.close();
+
+    read = Series(filePath, Access::READ_ONLY);
+    REQUIRE(read.iterations[0].size() == 2);
+    REQUIRE(read.iterations[0].count("custom") == 1);
+    REQUIRE(read.iterations[0].count("no_attributes") == 1);
+    REQUIRE(
+        read.iterations[0]["custom"]
+            .getAttribute("string")
+            .get<std::string>() == "attribute");
+    REQUIRE(
+        read.iterations[0]["custom"]["hierarchy"]
+            .getAttribute("number")
+            .get<int>() == 3);
+    read.close();
 }
 
 TEST_CASE("myPath", "[core]")

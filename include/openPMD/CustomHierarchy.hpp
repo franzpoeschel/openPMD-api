@@ -20,9 +20,12 @@
  */
 #pragma once
 
+#include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/backend/Container.hpp"
 
 #include <iostream>
+#include <set>
+#include <string>
 #include <type_traits>
 
 namespace openPMD
@@ -30,12 +33,18 @@ namespace openPMD
 class CustomHierarchy;
 namespace internal
 {
+    struct MeshesParticlesPath
+    {
+        std::set<std::string> paths;
+        [[nodiscard]] bool ignore(std::string const &name) const;
+    };
     using CustomHierarchyData = ContainerData<CustomHierarchy>;
-}
+} // namespace internal
 
 class CustomHierarchy : public Container<CustomHierarchy>
 {
     friend class Iteration;
+    friend class Container<CustomHierarchy>;
 
 private:
     using Container_t = Container<CustomHierarchy>;
@@ -50,6 +59,10 @@ protected:
     {
         Container_t::setData(std::move(data));
     }
+
+    void read(internal::MeshesParticlesPath const &);
+
+    void flush(std::string const &path, internal::FlushParams const &) override;
 
 public:
     CustomHierarchy(CustomHierarchy const &other) = default;

@@ -19,6 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Series.hpp"
@@ -290,8 +291,12 @@ void Iteration::flushVariableBased(
     }
 }
 
+/*
+ * @todo move much of this logic to CustomHierarchy::flush
+ */
 void Iteration::flushIteration(internal::FlushParams const &flushParams)
 {
+    CustomHierarchy::flush("", flushParams);
     if (access::readOnly(IOHandler()->m_frontendAccess))
     {
         for (auto &m : meshes)
@@ -388,6 +393,9 @@ void Iteration::readGorVBased(std::string const &groupPath, bool doBeginStep)
     read_impl(groupPath);
 }
 
+/*
+ * @todo move lots of this to CustomHierarchy::read
+ */
 void Iteration::read_impl(std::string const &groupPath)
 {
     Parameter<Operation::OPEN_PATH> pOpen;
@@ -482,6 +490,21 @@ void Iteration::read_impl(std::string const &groupPath)
     {
         hasMeshes = s.containsAttribute("meshesPath");
         hasParticles = s.containsAttribute("particlesPath");
+    }
+
+    {
+        internal::MeshesParticlesPath mpp;
+        if (hasMeshes)
+        {
+            mpp.paths.emplace(auxiliary::trim(
+                s.meshesPath(), [](char const &c) { return c == '/'; }));
+        }
+        if (hasParticles)
+        {
+            mpp.paths.emplace(auxiliary::trim(
+                s.particlesPath(), [](char const &c) { return c == '/'; }));
+        }
+        CustomHierarchy::read(mpp);
     }
 
     if (hasMeshes)
