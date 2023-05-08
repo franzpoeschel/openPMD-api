@@ -181,6 +181,10 @@ TEST_CASE("custom_hierarchies", "[core]")
     REQUIRE(read.iterations[0].size() == 2);
     REQUIRE(read.iterations[0].count("custom") == 1);
     REQUIRE(read.iterations[0].count("no_attributes") == 1);
+    REQUIRE(read.iterations[0]["custom"].size() == 1);
+    REQUIRE(read.iterations[0]["custom"].count("hierarchy") == 1);
+    REQUIRE(read.iterations[0]["custom"]["hierarchy"].size() == 0);
+    REQUIRE(read.iterations[0]["no_attributes"].size() == 0);
     REQUIRE(
         read.iterations[0]["custom"]
             .getAttribute("string")
@@ -190,6 +194,54 @@ TEST_CASE("custom_hierarchies", "[core]")
             .getAttribute("number")
             .get<int>() == 3);
     read.close();
+
+    write = Series(filePath, Access::READ_WRITE);
+    {
+        write.iterations[0]["custom"]["hierarchy"];
+        write.iterations[0]["custom"].datasets()["emptyDataset"].makeEmpty(
+            Datatype::FLOAT, 3);
+        write.iterations[0]["custom"]["hierarchy"].setAttribute("number", 3);
+        write.iterations[0]["no_attributes"];
+        auto iteration_level_ds =
+            write.iterations[0].datasets()["iteration_level_dataset"];
+        iteration_level_ds.resetDataset({Datatype::INT, {10}});
+        std::vector<int> data(10, 5);
+        iteration_level_ds.storeChunk(data);
+        write.close();
+    }
+
+    read = Series(filePath, Access::READ_ONLY);
+    {
+        REQUIRE(read.iterations[0].size() == 2);
+        REQUIRE(read.iterations[0].count("custom") == 1);
+        REQUIRE(read.iterations[0].count("no_attributes") == 1);
+        REQUIRE(read.iterations[0]["custom"].size() == 1);
+        REQUIRE(read.iterations[0]["custom"].count("hierarchy") == 1);
+        REQUIRE(read.iterations[0]["custom"]["hierarchy"].size() == 0);
+        REQUIRE(read.iterations[0]["no_attributes"].size() == 0);
+
+        REQUIRE(read.iterations[0].datasets().size() == 1);
+        REQUIRE(read.iterations[0]["custom"].datasets().size() == 1);
+        REQUIRE(
+            read.iterations[0]["custom"]["hierarchy"].datasets().size() == 0);
+        REQUIRE(read.iterations[0]["no_attributes"].datasets().size() == 0);
+
+        auto iteration_level_ds =
+            read.iterations[0].datasets()["iteration_level_dataset"];
+        REQUIRE(iteration_level_ds.getDatatype() == Datatype::INT);
+        REQUIRE(iteration_level_ds.getExtent() == Extent{10});
+        auto loaded_chunk = iteration_level_ds.loadChunk<int>();
+        iteration_level_ds.seriesFlush();
+        for (size_t i = 0; i < 10; ++i)
+        {
+            REQUIRE(loaded_chunk.get()[i] == 5);
+        }
+
+        auto constant_dataset =
+            read.iterations[0]["custom"].datasets()["emptyDataset"];
+        REQUIRE(constant_dataset.getDatatype() == Datatype::FLOAT);
+        REQUIRE(constant_dataset.getExtent() == Extent{0, 0, 0});
+    }
 }
 
 TEST_CASE("myPath", "[core]")

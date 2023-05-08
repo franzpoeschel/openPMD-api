@@ -21,6 +21,7 @@
 #pragma once
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/Container.hpp"
 
 #include <iostream>
@@ -38,7 +39,13 @@ namespace internal
         std::set<std::string> paths;
         [[nodiscard]] bool ignore(std::string const &name) const;
     };
-    using CustomHierarchyData = ContainerData<CustomHierarchy>;
+
+    struct CustomHierarchyData : ContainerData<CustomHierarchy>
+    {
+        explicit CustomHierarchyData();
+
+        Container<RecordComponent> m_embeddedDatasets;
+    };
 } // namespace internal
 
 class CustomHierarchy : public Container<CustomHierarchy>
@@ -48,8 +55,21 @@ class CustomHierarchy : public Container<CustomHierarchy>
 
 private:
     using Container_t = Container<CustomHierarchy>;
-    using Data_t = typename Container_t::ContainerData;
-    static_assert(std::is_same_v<Data_t, internal::CustomHierarchyData>);
+    using Data_t = internal::CustomHierarchyData;
+    static_assert(std::is_base_of_v<Container_t::ContainerData, Data_t>);
+
+    std::shared_ptr<Data_t> m_customHierarchyData;
+
+    void init();
+
+    [[nodiscard]] Data_t &get()
+    {
+        return *m_customHierarchyData;
+    }
+    [[nodiscard]] Data_t const &get() const
+    {
+        return *m_customHierarchyData;
+    }
 
 protected:
     CustomHierarchy();
@@ -57,6 +77,7 @@ protected:
 
     inline void setData(std::shared_ptr<Data_t> data)
     {
+        m_customHierarchyData = data;
         Container_t::setData(std::move(data));
     }
 
@@ -70,5 +91,7 @@ public:
 
     CustomHierarchy &operator=(CustomHierarchy const &) = default;
     CustomHierarchy &operator=(CustomHierarchy &&) = default;
+
+    Container<RecordComponent> datasets();
 };
 } // namespace openPMD
