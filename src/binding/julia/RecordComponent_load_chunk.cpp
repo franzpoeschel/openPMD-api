@@ -10,7 +10,11 @@ void define_julia_RecordComponent_load_chunk(
         "cxx_load_chunk_" NAME,                                                \
         static_cast<void (RecordComponent::*)(                                 \
             std::shared_ptr<TYPE>, Offset, Extent)>(                           \
-            &RecordComponent::loadChunk<TYPE>));
+            &RecordComponent::loadChunk<TYPE>));                               \
+    type.method(                                                               \
+        "cxx_load_chunk_" NAME,                                                \
+        static_cast<std::shared_ptr<TYPE> (RecordComponent::*)(                \
+            Offset, Extent)>(&RecordComponent::loadChunk<TYPE>));
     {
         FORALL_SCALAR_OPENPMD_TYPES(USE_TYPE)
     }
