@@ -10,5 +10,6 @@ using namespace openPMD;
 void init_CustomHierarchy(py::module &m)
 {
     py::class_<CustomHierarchy, Container<CustomHierarchy>, Attributable>(
-        m, "CustomHierarchy");
+        m, "CustomHierarchy")
+        .def("datasets", &CustomHierarchy::datasets);
 }
