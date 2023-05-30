@@ -293,6 +293,7 @@ class Series : public Attributable
     friend class internal::SeriesData;
     friend class internal::AttributableData;
     friend class StatefulSnapshotsContainer;
+    friend class CustomHierarchy;
 
 public:
     explicit Series();
@@ -446,6 +447,7 @@ public:
      * <CODE>basePath</CODE>.
      */
     std::string meshesPath() const;
+    std::vector<std::string> meshesPaths() const;
     /** Set the path to <A
      * HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#mesh-based-records">mesh
      * records</A>, relative(!) to <CODE>basePath</CODE>.
@@ -456,6 +458,7 @@ public:
      * @return  Reference to modified series.
      */
     Series &setMeshesPath(std::string const &meshesPath);
+    Series &setMeshesPath(std::vector<std::string> const &meshesPath);
 
     /**
      * @return True if there is a rankTable dataset defined for this Series.
@@ -501,6 +504,7 @@ public:
      * <CODE>basePath</CODE>.
      */
     std::string particlesPath() const;
+    std::vector<std::string> particlesPaths() const;
     /** Set the path to groups for each <A
      * HREF="https://github.com/openPMD/openPMD-standard/blob/latest/STANDARD.md#particle-records">particle
      * species</A>, relative(!) to <CODE>basePath</CODE>.
@@ -511,6 +515,7 @@ public:
      * @return  Reference to modified series.
      */
     Series &setParticlesPath(std::string const &particlesPath);
+    Series &setParticlesPath(std::vector<std::string> const &particlesPath);
 
     /**
      * @throw   no_such_attribute_error If optional attribute is not present.
@@ -897,8 +902,6 @@ OPENPMD_private
         iterations_iterator end,
         internal::FlushParams const &flushParams,
         bool flushIOHandler = true);
-    void flushMeshesPath();
-    void flushParticlesPath();
     void flushRankTable();
     /* Parameter `read_only_this_single_iteration` used for reopening an
      * Iteration after closing it.
