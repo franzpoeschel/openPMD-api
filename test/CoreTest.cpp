@@ -242,6 +242,44 @@ TEST_CASE("custom_hierarchies", "[core]")
         REQUIRE(constant_dataset.getDatatype() == Datatype::FLOAT);
         REQUIRE(constant_dataset.getExtent() == Extent{0, 0, 0});
     }
+    read.close();
+
+    write = Series(filePath, Access::READ_WRITE);
+    {
+        std::vector<int> data(10, 3);
+
+        auto E_x = write.iterations[0]["custom_meshes"].meshes["E"]["x"];
+        E_x.resetDataset({Datatype::INT, {10}});
+        E_x.storeChunk(data, {0}, {10});
+
+        auto e_pos_x = write.iterations[0]["custom_particles"]
+                           .particles["e"]["position"]["x"];
+        e_pos_x.resetDataset({Datatype::INT, {10}});
+        e_pos_x.storeChunk(data, {0}, {10});
+        write.close();
+    }
+
+    read = Series(filePath, Access::READ_ONLY);
+    {
+        REQUIRE(read.iterations[0]["custom_meshes"].meshes.size() == 1);
+        REQUIRE(read.iterations[0]["custom_meshes"].meshes.count("E") == 1);
+        auto E_x_loaded = read.iterations[0]["custom_meshes"]
+                              .meshes["E"]["x"]
+                              .loadChunk<int>();
+        REQUIRE(read.iterations[0]["custom_particles"].particles.size() == 1);
+        REQUIRE(
+            read.iterations[0]["custom_particles"].particles.count("e") == 1);
+        auto e_pos_x_loaded = read.iterations[0]["custom_particles"]
+                                  .particles["e"]["position"]["x"]
+                                  .loadChunk<int>();
+        read.flush();
+
+        for (size_t i = 0; i < 10; ++i)
+        {
+            REQUIRE(E_x_loaded.get()[i] == 3);
+            REQUIRE(e_pos_x_loaded.get()[i] == 3);
+        }
+    }
 }
 
 TEST_CASE("myPath", "[core]")

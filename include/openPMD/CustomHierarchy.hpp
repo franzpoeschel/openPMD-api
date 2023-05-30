@@ -39,8 +39,17 @@ namespace internal
 {
     struct MeshesParticlesPath
     {
-        std::set<std::string> paths;
+        std::optional<std::string> meshesPath;
+        std::optional<std::string> particlesPath;
         [[nodiscard]] bool ignore(std::string const &name) const;
+        [[nodiscard]] inline bool hasMeshes() const noexcept
+        {
+            return meshesPath.has_value();
+        }
+        [[nodiscard]] inline bool hasParticles() const noexcept
+        {
+            return particlesPath.has_value();
+        }
     };
 
     struct CustomHierarchyData : ContainerData<CustomHierarchy>
@@ -73,6 +82,9 @@ private:
     {
         return *m_customHierarchyData;
     }
+
+    void readMeshes(std::string const &meshesPath);
+    void readParticles(std::string const &particlesPath);
 
 protected:
     CustomHierarchy();

@@ -25,8 +25,10 @@
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attributable.hpp"
 
+#include <algorithm>
 #include <deque>
 #include <memory>
 
@@ -36,7 +38,13 @@ namespace internal
 {
     bool MeshesParticlesPath::ignore(const std::string &name) const
     {
-        return paths.find(name) != paths.end();
+        auto no_slashes = [](std::string const &str) {
+            return auxiliary::trim(str, [](char const &c) { return c == '/'; });
+        };
+        return (meshesPath.has_value() &&
+                name == no_slashes(meshesPath.value())) ||
+            (particlesPath.has_value() &&
+             name == no_slashes(particlesPath.value()));
     }
 
     CustomHierarchyData::CustomHierarchyData()
@@ -62,6 +70,126 @@ CustomHierarchy::CustomHierarchy()
 CustomHierarchy::CustomHierarchy(NoInit) : Container_t(NoInit())
 {}
 
+void CustomHierarchy::readMeshes(std::string const &meshesPath)
+{
+    Parameter<Operation::OPEN_PATH> pOpen;
+    Parameter<Operation::LIST_PATHS> pList;
+
+    pOpen.path = meshesPath;
+    IOHandler()->enqueue(IOTask(&meshes, pOpen));
+
+    meshes.readAttributes(ReadMode::FullyReread);
+
+    internal::EraseStaleEntries<decltype(meshes)> map{meshes};
+
+    /* obtain all non-scalar meshes */
+    IOHandler()->enqueue(IOTask(&meshes, pList));
+    IOHandler()->flush(internal::defaultFlushParams);
+
+    Parameter<Operation::LIST_ATTS> aList;
+    for (auto const &mesh_name : *pList.paths)
+    {
+        Mesh &m = map[mesh_name];
+        pOpen.path = mesh_name;
+        aList.attributes->clear();
+        IOHandler()->enqueue(IOTask(&m, pOpen));
+        IOHandler()->enqueue(IOTask(&m, aList));
+        IOHandler()->flush(internal::defaultFlushParams);
+
+        auto att_begin = aList.attributes->begin();
+        auto att_end = aList.attributes->end();
+        auto value = std::find(att_begin, att_end, "value");
+        auto shape = std::find(att_begin, att_end, "shape");
+        if (value != att_end && shape != att_end)
+        {
+            MeshRecordComponent &mrc = m;
+            IOHandler()->enqueue(IOTask(&mrc, pOpen));
+            IOHandler()->flush(internal::defaultFlushParams);
+            mrc.get().m_isConstant = true;
+        }
+        m.read();
+        try
+        {
+            m.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read mesh with name '" << mesh_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(mesh_name);
+        }
+    }
+
+    /* obtain all scalar meshes */
+    Parameter<Operation::LIST_DATASETS> dList;
+    IOHandler()->enqueue(IOTask(&meshes, dList));
+    IOHandler()->flush(internal::defaultFlushParams);
+
+    Parameter<Operation::OPEN_DATASET> dOpen;
+    for (auto const &mesh_name : *dList.datasets)
+    {
+        Mesh &m = map[mesh_name];
+        dOpen.name = mesh_name;
+        IOHandler()->enqueue(IOTask(&m, dOpen));
+        IOHandler()->flush(internal::defaultFlushParams);
+        MeshRecordComponent &mrc = m;
+        IOHandler()->enqueue(IOTask(&mrc, dOpen));
+        IOHandler()->flush(internal::defaultFlushParams);
+        mrc.written() = false;
+        mrc.resetDataset(Dataset(*dOpen.dtype, *dOpen.extent));
+        mrc.written() = true;
+        try
+        {
+            m.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read mesh with name '" << mesh_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(mesh_name);
+        }
+    }
+}
+
+void CustomHierarchy::readParticles(std::string const &particlesPath)
+{
+    Parameter<Operation::OPEN_PATH> pOpen;
+    Parameter<Operation::LIST_PATHS> pList;
+
+    pOpen.path = particlesPath;
+    IOHandler()->enqueue(IOTask(&particles, pOpen));
+
+    particles.readAttributes(ReadMode::FullyReread);
+
+    /* obtain all particle species */
+    pList.paths->clear();
+    IOHandler()->enqueue(IOTask(&particles, pList));
+    IOHandler()->flush(internal::defaultFlushParams);
+
+    internal::EraseStaleEntries<decltype(particles)> map{particles};
+    for (auto const &species_name : *pList.paths)
+    {
+        ParticleSpecies &p = map[species_name];
+        pOpen.path = species_name;
+        IOHandler()->enqueue(IOTask(&p, pOpen));
+        IOHandler()->flush(internal::defaultFlushParams);
+        try
+        {
+            p.read();
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read particle species with name '"
+                      << species_name
+                      << "' and will skip it due to read error:\n"
+                      << err.what() << std::endl;
+            map.forget(species_name);
+        }
+    }
+}
+
 void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
 {
     /*
@@ -69,9 +197,73 @@ void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
      * Path is created/opened already at entry point of method, method needs
      * to create/open path for contained subpaths.
      */
-    Attributable::readAttributes(ReadMode::FullyReread);
+
     Parameter<Operation::LIST_PATHS> pList;
     IOHandler()->enqueue(IOTask(this, pList));
+    IOHandler()->flush(internal::defaultFlushParams);
+
+    auto thisGroupHasMeshesOrParticles =
+        [&pList](std::optional<std::string> meshesOrParticlesPath) -> bool {
+        if (!meshesOrParticlesPath.has_value())
+        {
+            return false;
+        }
+        auto no_slashes = [](std::string const &str) {
+            return auxiliary::trim(str, [](char const &c) { return c == '/'; });
+        };
+        std::string look_for = no_slashes(meshesOrParticlesPath.value());
+        auto const &paths = *pList.paths;
+        return std::find_if(
+                   paths.begin(),
+                   paths.end(),
+                   [&no_slashes, &look_for](std::string const &entry) {
+                       return no_slashes(entry) == look_for;
+                   }) != paths.end();
+    };
+
+    if (thisGroupHasMeshesOrParticles(mpp.meshesPath))
+    {
+        try
+        {
+            readMeshes(mpp.meshesPath.value());
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read meshes at location '"
+                      << myPath().printGroup()
+                      << "' and will skip them due to read error:\n"
+                      << err.what() << std::endl;
+            meshes = {};
+            meshes.dirty() = false;
+        }
+    }
+    else
+    {
+        meshes.dirty() = false;
+    }
+
+    if (thisGroupHasMeshesOrParticles(mpp.particlesPath))
+    {
+        try
+        {
+            readParticles(mpp.particlesPath.value());
+        }
+        catch (error::ReadError const &err)
+        {
+            std::cerr << "Cannot read particles at location '"
+                      << myPath().printGroup()
+                      << "' and will skip them due to read error:\n"
+                      << err.what() << std::endl;
+            particles = {};
+            particles.dirty() = false;
+        }
+    }
+    else
+    {
+        particles.dirty() = false;
+    }
+
+    Attributable::readAttributes(ReadMode::FullyReread);
     Parameter<Operation::LIST_DATASETS> dList;
     IOHandler()->enqueue(IOTask(this, dList));
     IOHandler()->flush(internal::defaultFlushParams);
@@ -147,7 +339,7 @@ void CustomHierarchy::flush(
          * meshesPath and particlesPath are stored there */
         Series s = retrieveSeries();
 
-        if (!meshes.empty() || s.containsAttribute("meshesPath"))
+        if (!meshes.empty())
         {
             if (!s.containsAttribute("meshesPath"))
             {
@@ -163,7 +355,7 @@ void CustomHierarchy::flush(
             meshes.dirty() = false;
         }
 
-        if (!particles.empty() || s.containsAttribute("particlesPath"))
+        if (!particles.empty())
         {
             if (!s.containsAttribute("particlesPath"))
             {
