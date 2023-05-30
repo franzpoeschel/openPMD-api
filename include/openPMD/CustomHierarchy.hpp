@@ -88,7 +88,7 @@ protected:
 
     void flush(std::string const &path, internal::FlushParams const &) override;
 
-    virtual void linkHierarchy(Writable &w);
+    void linkHierarchy(Writable &w) override;
 
 public:
     CustomHierarchy(CustomHierarchy const &other) = default;
