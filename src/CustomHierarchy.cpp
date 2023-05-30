@@ -397,6 +397,47 @@ void CustomHierarchy::linkHierarchy(Writable &w)
     particles.linkHierarchy(this->writable());
 }
 
+bool CustomHierarchy::dirtyRecursive() const
+{
+    if (dirty())
+    {
+        return true;
+    }
+    if (particles.dirty() || meshes.dirty())
+    {
+        return true;
+    }
+    for (auto const &pair : particles)
+    {
+        if (pair.second.dirtyRecursive())
+        {
+            return true;
+        }
+    }
+    for (auto const &pair : meshes)
+    {
+        if (pair.second.dirtyRecursive())
+        {
+            return true;
+        }
+    }
+    for (auto const &pair : *this)
+    {
+        if (pair.second.dirtyRecursive())
+        {
+            return true;
+        }
+    }
+    for (auto const &pair : get().m_embeddedDatasets)
+    {
+        if (pair.second.dirtyRecursive())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 Container<RecordComponent> CustomHierarchy::datasets()
 {
     Container<RecordComponent> res = get().m_embeddedDatasets;
