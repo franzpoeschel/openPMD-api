@@ -192,6 +192,7 @@ class Series : public Attributable
 {
     friend class Attributable;
     friend class Iteration;
+    friend class CustomHierarchy;
     friend class Writable;
     friend class SeriesIterator;
     friend class internal::SeriesData;

@@ -24,6 +24,7 @@
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/RecordComponent.hpp"
+#include "openPMD/Series.hpp"
 #include "openPMD/backend/Attributable.hpp"
 
 #include <deque>
@@ -121,6 +122,9 @@ void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
     }
 }
 
+/*
+ * @todo Avoid repeated calls of retrieveSeries, the hierarchy might be deep.
+ */
 void CustomHierarchy::flush(
     std::string const & /* path */, internal::FlushParams const &flushParams)
 {
@@ -129,6 +133,55 @@ void CustomHierarchy::flush(
      * Path is created/opened already at entry point of method, method needs
      * to create/open path for contained subpaths.
      */
+
+    if (access::readOnly(IOHandler()->m_frontendAccess))
+    {
+        for (auto &m : meshes)
+            m.second.flush(m.first, flushParams);
+        for (auto &species : particles)
+            species.second.flush(species.first, flushParams);
+    }
+    else
+    {
+        /* Find the root point [Series] of this file,
+         * meshesPath and particlesPath are stored there */
+        Series s = retrieveSeries();
+
+        if (!meshes.empty() || s.containsAttribute("meshesPath"))
+        {
+            if (!s.containsAttribute("meshesPath"))
+            {
+                s.setMeshesPath("meshes/");
+                s.flushMeshesPath();
+            }
+            meshes.flush(s.meshesPath(), flushParams);
+            for (auto &m : meshes)
+                m.second.flush(m.first, flushParams);
+        }
+        else
+        {
+            meshes.dirty() = false;
+        }
+
+        if (!particles.empty() || s.containsAttribute("particlesPath"))
+        {
+            if (!s.containsAttribute("particlesPath"))
+            {
+                s.setParticlesPath("particles/");
+                s.flushParticlesPath();
+            }
+            particles.flush(s.particlesPath(), flushParams);
+            for (auto &species : particles)
+                species.second.flush(species.first, flushParams);
+        }
+        else
+        {
+            particles.dirty() = false;
+        }
+
+        flushAttributes(flushParams);
+    }
+
     Parameter<Operation::CREATE_PATH> pCreate;
     for (auto &[name, subpath] : *this)
     {
@@ -143,7 +196,6 @@ void CustomHierarchy::flush(
     {
         dataset.flush(name, flushParams);
     }
-    flushAttributes(flushParams);
 }
 
 void CustomHierarchy::linkHierarchy(Writable &w)
