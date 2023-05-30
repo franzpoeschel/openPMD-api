@@ -11,5 +11,18 @@ void init_CustomHierarchy(py::module &m)
 {
     py::class_<CustomHierarchy, Container<CustomHierarchy>, Attributable>(
         m, "CustomHierarchy")
-        .def("datasets", &CustomHierarchy::datasets);
+        .def("datasets", &CustomHierarchy::datasets)
+
+        .def_readwrite(
+            "meshes",
+            &CustomHierarchy::meshes,
+            py::return_value_policy::copy,
+            // garbage collection: return value must be freed before Iteration
+            py::keep_alive<1, 0>())
+        .def_readwrite(
+            "particles",
+            &CustomHierarchy::particles,
+            py::return_value_policy::copy,
+            // garbage collection: return value must be freed before Iteration
+            py::keep_alive<1, 0>());
 }

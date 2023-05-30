@@ -43,8 +43,6 @@ Iteration::Iteration() : CustomHierarchy(NoInit())
     setTime(static_cast<double>(0));
     setDt(static_cast<double>(1));
     setTimeUnitSI(1);
-    meshes.writable().ownKeyWithinParent = "meshes";
-    particles.writable().ownKeyWithinParent = "particles";
 }
 
 template <typename T>
@@ -854,13 +852,6 @@ bool Iteration::dirtyRecursive() const
         }
     }
     return false;
-}
-
-void Iteration::linkHierarchy(Writable &w)
-{
-    Attributable::linkHierarchy(w);
-    meshes.linkHierarchy(this->writable());
-    particles.linkHierarchy(this->writable());
 }
 
 void Iteration::runDeferredParseAccess()

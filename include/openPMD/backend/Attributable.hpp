@@ -109,6 +109,7 @@ class Attributable
     friend class Series;
     friend class Writable;
     friend class WriteIterations;
+    friend class CustomHierarchy;
 
 protected:
     // tag for internal constructor

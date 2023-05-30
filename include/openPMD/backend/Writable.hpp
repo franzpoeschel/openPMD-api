@@ -73,6 +73,7 @@ class Writable final
     template <typename T, typename T_key, typename T_container>
     friend class Container;
     friend class Iteration;
+    friend class CustomHierarchy;
     friend class Mesh;
     friend class ParticleSpecies;
     friend class Series;

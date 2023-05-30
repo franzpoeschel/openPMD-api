@@ -21,8 +21,11 @@
 #pragma once
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/Mesh.hpp"
+#include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/Writable.hpp"
 
 #include <iostream>
 #include <set>
@@ -85,6 +88,8 @@ protected:
 
     void flush(std::string const &path, internal::FlushParams const &) override;
 
+    virtual void linkHierarchy(Writable &w);
+
 public:
     CustomHierarchy(CustomHierarchy const &other) = default;
     CustomHierarchy(CustomHierarchy &&other) = default;
@@ -93,5 +98,8 @@ public:
     CustomHierarchy &operator=(CustomHierarchy &&) = default;
 
     Container<RecordComponent> datasets();
+
+    Container<Mesh> meshes{};
+    Container<ParticleSpecies> particles{}; // particleSpecies?
 };
 } // namespace openPMD

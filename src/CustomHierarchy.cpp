@@ -55,6 +55,8 @@ namespace internal
 CustomHierarchy::CustomHierarchy()
 {
     setData(std::make_shared<Data_t>());
+    meshes.writable().ownKeyWithinParent = "meshes";
+    particles.writable().ownKeyWithinParent = "particles";
 }
 CustomHierarchy::CustomHierarchy(NoInit) : Container_t(NoInit())
 {}
@@ -142,6 +144,13 @@ void CustomHierarchy::flush(
         dataset.flush(name, flushParams);
     }
     flushAttributes(flushParams);
+}
+
+void CustomHierarchy::linkHierarchy(Writable &w)
+{
+    Attributable::linkHierarchy(w);
+    meshes.linkHierarchy(this->writable());
+    particles.linkHierarchy(this->writable());
 }
 
 Container<RecordComponent> CustomHierarchy::datasets()
