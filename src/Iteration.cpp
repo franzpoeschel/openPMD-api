@@ -807,33 +807,6 @@ void Iteration::setStepStatus(StepStatus status)
     }
 }
 
-bool Iteration::dirtyRecursive() const
-{
-    if (dirty())
-    {
-        return true;
-    }
-    if (particles.dirty() || meshes.dirty())
-    {
-        return true;
-    }
-    for (auto const &pair : particles)
-    {
-        if (pair.second.dirtyRecursive())
-        {
-            return true;
-        }
-    }
-    for (auto const &pair : meshes)
-    {
-        if (pair.second.dirtyRecursive())
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 void Iteration::runDeferredParseAccess()
 {
     if (access::read(IOHandler()->m_frontendAccess))
