@@ -11,13 +11,11 @@ struct UseType
     {
         type.method(
             "cxx_load_" + datatypeToString(determineDatatype<T>()),
-            static_cast<void (RecordComponent::*)(
-                std::shared_ptr<T>, Offset, Extent)>(
+            overload_cast<std::shared_ptr<T>, Offset, Extent>(
                 &RecordComponent::loadChunk<T>));
         type.method(
             "cxx_load_" + datatypeToString(determineDatatype<T>()),
-            static_cast<std::shared_ptr<T> (RecordComponent::*)(
-                Offset, Extent)>(&RecordComponent::loadChunk<T>));
+            overload_cast<Offset, Extent>(&RecordComponent::loadChunk<T>));
     }
 };
 } // namespace
