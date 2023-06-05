@@ -52,62 +52,7 @@ using sized_uint_t = typename sized_uint<I>::type;
 
 using array_double_7 = std::array<double, 7>;
 
-/*
- * Generate code fo all openPMD types. Use is e.g. as follows:
- *   #define USE_TYPE(NAME, ENUM, TYPE)                    \
- *     type.method("get_" NAME, &Attribute::get<TYPE>);
- *   FORALL_OPENPMD_TYPES(USE_TYPE)
- *   #undef USE_TYPE
- */
-
 // We disable `long double` since Julia does not support this type
-#define FORALL_OPENPMD_TYPES(MACRO)                                            \
-    MACRO("CHAR", Datatype::CHAR, char)                                        \
-    MACRO("UCHAR", Datatype::UCHAR, unsigned char)                             \
-    MACRO("SHORT", Datatype::SHORT, short)                                     \
-    MACRO("INT", Datatype::INT, int)                                           \
-    MACRO("LONG", Datatype::LONG, long)                                        \
-    MACRO("LONGLONG", Datatype::LONGLONG, long long)                           \
-    MACRO("USHORT", Datatype::USHORT, unsigned short)                          \
-    MACRO("UINT", Datatype::UINT, unsigned int)                                \
-    MACRO("ULONG", Datatype::ULONG, unsigned long)                             \
-    MACRO("ULONGLONG", Datatype::ULONGLONG, unsigned long long)                \
-    MACRO("FLOAT", Datatype::FLOAT, float)                                     \
-    MACRO("DOUBLE", Datatype::DOUBLE, double)                                  \
-    /* MACRO("LONG_DOUBLE", Datatype::LONG_DOUBLE, long double) */             \
-    MACRO("CFLOAT", Datatype::CFLOAT, std::complex<float>)                     \
-    MACRO("CDOUBLE", Datatype::CDOUBLE, std::complex<double>)                  \
-    /* MACRO("CLONG_DOUBLE", Datatype::CLONG_DOUBLE, std::complex<long         \
-     * double>) */                                                             \
-    MACRO("STRING", Datatype::STRING, std::string)                             \
-    MACRO("VEC_CHAR", Datatype::VEC_CHAR, std::vector<char>)                   \
-    MACRO("VEC_UCHAR", Datatype::VEC_UCHAR, std::vector<unsigned char>)        \
-    MACRO("VEC_SHORT", Datatype::VEC_SHORT, std::vector<short>)                \
-    MACRO("VEC_INT", Datatype::VEC_INT, std::vector<int>)                      \
-    MACRO("VEC_LONG", Datatype::VEC_LONG, std::vector<long>)                   \
-    MACRO("VEC_LONGLONG", Datatype::VEC_LONGLONG, std::vector<long long>)      \
-    MACRO("VEC_USHORT", Datatype::VEC_USHORT, std::vector<unsigned short>)     \
-    MACRO("VEC_UINT", Datatype::VEC_UINT, std::vector<unsigned int>)           \
-    MACRO("VEC_ULONG", Datatype::VEC_ULONG, std::vector<unsigned long>)        \
-    MACRO(                                                                     \
-        "VEC_ULONGLONG",                                                       \
-        Datatype::VEC_ULONGLONG,                                               \
-        std::vector<unsigned long long>)                                       \
-    MACRO("VEC_FLOAT", Datatype::VEC_FLOAT, std::vector<float>)                \
-    MACRO("VEC_DOUBLE", Datatype::VEC_DOUBLE, std::vector<double>)             \
-    /* MACRO("VEC_LONG_DOUBLE", Datatype::VEC_LONG_DOUBLE, std::vector<long    \
-     * double>) */                                                             \
-    MACRO(                                                                     \
-        "VEC_CFLOAT", Datatype::VEC_CFLOAT, std::vector<std::complex<float>>)  \
-    MACRO(                                                                     \
-        "VEC_CDOUBLE",                                                         \
-        Datatype::VEC_CDOUBLE,                                                 \
-        std::vector<std::complex<double>>)                                     \
-    /* MACRO("VEC_CLONG_DOUBLE", Datatype::VEC_CLONG_DOUBLE,                   \
-     * std::vector<std::complex<long double>>) */                              \
-    MACRO("VEC_STRING", Datatype::VEC_STRING, std::vector<std::string>)        \
-    MACRO("ARR_DBL_7", Datatype::ARR_DBL_7, array_double_7)                    \
-    MACRO("BOOL", Datatype::BOOL, bool)
 
 /**
  * Generalizes switching over an openPMD datatype.
