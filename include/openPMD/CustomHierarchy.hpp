@@ -28,28 +28,44 @@
 #include "openPMD/backend/Writable.hpp"
 
 #include <iostream>
-#include <set>
+#include <regex>
 #include <string>
 #include <type_traits>
+#include <vector>
 
 namespace openPMD
 {
+class Series;
+
 class CustomHierarchy;
 namespace internal
 {
+    enum class ContainedType
+    {
+        Group,
+        Mesh,
+        Particle
+    };
     struct MeshesParticlesPath
     {
-        std::optional<std::string> meshesPath;
-        std::optional<std::string> particlesPath;
-        [[nodiscard]] bool ignore(std::string const &name) const;
-        [[nodiscard]] inline bool hasMeshes() const noexcept
-        {
-            return meshesPath.has_value();
-        }
-        [[nodiscard]] inline bool hasParticles() const noexcept
-        {
-            return particlesPath.has_value();
-        }
+        std::map<std::string, std::regex> meshesPath;
+        std::map<std::string, std::regex> particlesPath;
+
+        explicit MeshesParticlesPath() = default;
+        MeshesParticlesPath(
+            std::vector<std::string> const &meshes,
+            std::vector<std::string> const &particles);
+        MeshesParticlesPath(Series const &);
+
+        [[nodiscard]] ContainedType determineType(
+            std::vector<std::string> const &path,
+            std::string const &name) const;
+        [[nodiscard]] bool isParticle(
+            std::vector<std::string> const &path,
+            std::string const &name) const;
+        [[nodiscard]] bool isMesh(
+            std::vector<std::string> const &path,
+            std::string const &name) const;
     };
 
     struct CustomHierarchyData : ContainerData<CustomHierarchy>
@@ -86,6 +102,11 @@ private:
     void readMeshes(std::string const &meshesPath);
     void readParticles(std::string const &particlesPath);
 
+    void flush_internal(
+        internal::FlushParams const &,
+        internal::MeshesParticlesPath &,
+        std::vector<std::string> currentPath);
+
 protected:
     CustomHierarchy();
     CustomHierarchy(NoInit);
@@ -97,6 +118,9 @@ protected:
     }
 
     void read(internal::MeshesParticlesPath const &);
+    void read(
+        internal::MeshesParticlesPath const &,
+        std::vector<std::string> &currentPath);
 
     void flush(std::string const &path, internal::FlushParams const &) override;
 

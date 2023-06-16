@@ -28,6 +28,7 @@
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Writable.hpp"
 
+#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <tuple>
@@ -447,16 +448,10 @@ void Iteration::read_impl(std::string const &groupPath)
         hasParticles = s.containsAttribute("particlesPath");
     }
 
-    internal::MeshesParticlesPath mpp;
-    if (hasMeshes)
-    {
-        mpp.meshesPath = s.meshesPath();
-    }
-    if (hasParticles)
-    {
-        mpp.particlesPath = s.particlesPath();
-    }
-    CustomHierarchy::read(mpp);
+    internal::MeshesParticlesPath mpp(
+        hasMeshes ? s.meshesPaths() : std::vector<std::string>(),
+        hasParticles ? s.particlesPaths() : std::vector<std::string>());
+    CustomHierarchy::read(std::move(mpp));
 
 #ifdef openPMD_USE_INVASIVE_TESTS
     if (containsAttribute("__openPMD_internal_fail"))

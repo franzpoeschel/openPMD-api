@@ -2013,7 +2013,7 @@ inline void fileBased_write_test(const std::string &backend)
         REQUIRE(o.iterationFormat() == "serial_fileBased_write%03T");
         REQUIRE(o.openPMD() == "1.1.0");
         REQUIRE(o.openPMDextension() == 1u);
-        REQUIRE(o.particlesPath() == "particles/");
+        REQUIRE(o.particlesPath() == "particles");
         REQUIRE_FALSE(o.containsAttribute("meshesPath"));
         REQUIRE_THROWS_AS(o.meshesPath(), no_such_attribute_error);
         std::array<double, 7> udim{{1, 0, 0, 0, 0, 0, 0}};

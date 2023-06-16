@@ -30,21 +30,116 @@
 
 #include <algorithm>
 #include <deque>
+#include <iterator>
 #include <memory>
+#include <regex>
+#include <sstream>
 
 namespace openPMD
 {
+
+namespace
+{
+    std::string
+    concatWithSep(std::vector<std::string> const &v, std::string const &sep)
+    {
+        switch (v.size())
+        {
+        case 0:
+            return "";
+        case 1:
+            return *v.begin();
+        default:
+            break;
+        }
+        std::stringstream res;
+        auto it = v.begin();
+        res << *it++;
+        for (; it != v.end(); ++it)
+        {
+            res << sep << *it;
+        }
+        return res.str();
+    }
+
+    // Not specifying std::regex_constants::optimize here, only using it where
+    // it makes sense to.
+    constexpr std::regex_constants::syntax_option_type regex_flags =
+        std::regex_constants::egrep;
+} // namespace
+
 namespace internal
 {
-    bool MeshesParticlesPath::ignore(const std::string &name) const
+    namespace
     {
+        bool anyPathRegexMatches(
+            std::map<std::string, std::regex> regexes,
+            std::vector<std::string> const &path,
+            std::string const &name)
+        {
+            std::string fullPath =
+                path.empty() ? name : concatWithSep(path, "/") + "/" + name;
+            return std::any_of(
+                regexes.begin(), regexes.end(), [&fullPath](auto const &regex) {
+                    return std::regex_match(fullPath, regex.second);
+                });
+        }
+    } // namespace
+
+    MeshesParticlesPath::MeshesParticlesPath(
+        std::vector<std::string> const &meshes,
+        std::vector<std::string> const &particles)
+    {
+        // @todo: instead, replace all slashes by (/|^|$) in order to make the
+        // matcher not care about slashes at the beginning or the end
         auto no_slashes = [](std::string const &str) {
             return auxiliary::trim(str, [](char const &c) { return c == '/'; });
         };
-        return (meshesPath.has_value() &&
-                name == no_slashes(meshesPath.value())) ||
-            (particlesPath.has_value() &&
-             name == no_slashes(particlesPath.value()));
+        for (auto [map, vec] :
+             {std::make_pair(&this->meshesPath, &meshes),
+              std::make_pair(&this->particlesPath, &particles)})
+        {
+            std::transform(
+                vec->begin(),
+                vec->end(),
+                std::inserter(*map, map->begin()),
+                [&no_slashes](auto const &str) {
+                    auto without_slashes = no_slashes(str);
+                    return std::make_pair(
+                        without_slashes,
+                        std::regex(
+                            without_slashes,
+                            regex_flags | std::regex_constants::optimize));
+                });
+        }
+    }
+
+    ContainedType MeshesParticlesPath::determineType(
+        std::vector<std::string> const &path, std::string const &name) const
+    {
+        if (isMesh(path, name))
+        {
+            return ContainedType::Mesh;
+        }
+        else if (isParticle(path, name))
+        {
+            return ContainedType::Particle;
+        }
+        else
+        {
+            return ContainedType::Group;
+        }
+    }
+
+    bool MeshesParticlesPath::isParticle(
+        std::vector<std::string> const &path, std::string const &name) const
+    {
+        return anyPathRegexMatches(particlesPath, path, name);
+    }
+    bool MeshesParticlesPath::isMesh(
+        std::vector<std::string> const &path, std::string const &name) const
+    {
+        return anyPathRegexMatches(meshesPath, path, name);
     }
 
     CustomHierarchyData::CustomHierarchyData()
@@ -192,6 +287,14 @@ void CustomHierarchy::readParticles(std::string const &particlesPath)
 
 void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
 {
+    std::vector<std::string> currentPath;
+    read(mpp, currentPath);
+}
+
+void CustomHierarchy::read(
+    internal::MeshesParticlesPath const &mpp,
+    std::vector<std::string> &currentPath)
+{
     /*
      * Convention for CustomHierarchy::flush and CustomHierarchy::read:
      * Path is created/opened already at entry point of method, method needs
@@ -200,93 +303,70 @@ void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
 
     Parameter<Operation::LIST_PATHS> pList;
     IOHandler()->enqueue(IOTask(this, pList));
-    IOHandler()->flush(internal::defaultFlushParams);
-
-    auto thisGroupHasMeshesOrParticles =
-        [&pList](std::optional<std::string> meshesOrParticlesPath) -> bool {
-        if (!meshesOrParticlesPath.has_value())
-        {
-            return false;
-        }
-        auto no_slashes = [](std::string const &str) {
-            return auxiliary::trim(str, [](char const &c) { return c == '/'; });
-        };
-        std::string look_for = no_slashes(meshesOrParticlesPath.value());
-        auto const &paths = *pList.paths;
-        return std::find_if(
-                   paths.begin(),
-                   paths.end(),
-                   [&no_slashes, &look_for](std::string const &entry) {
-                       return no_slashes(entry) == look_for;
-                   }) != paths.end();
-    };
-
-    if (thisGroupHasMeshesOrParticles(mpp.meshesPath))
-    {
-        try
-        {
-            readMeshes(mpp.meshesPath.value());
-        }
-        catch (error::ReadError const &err)
-        {
-            std::cerr << "Cannot read meshes at location '"
-                      << myPath().printGroup()
-                      << "' and will skip them due to read error:\n"
-                      << err.what() << std::endl;
-            meshes = {};
-            meshes.dirty() = false;
-        }
-    }
-    else
-    {
-        meshes.dirty() = false;
-    }
-
-    if (thisGroupHasMeshesOrParticles(mpp.particlesPath))
-    {
-        try
-        {
-            readParticles(mpp.particlesPath.value());
-        }
-        catch (error::ReadError const &err)
-        {
-            std::cerr << "Cannot read particles at location '"
-                      << myPath().printGroup()
-                      << "' and will skip them due to read error:\n"
-                      << err.what() << std::endl;
-            particles = {};
-            particles.dirty() = false;
-        }
-    }
-    else
-    {
-        particles.dirty() = false;
-    }
 
     Attributable::readAttributes(ReadMode::FullyReread);
     Parameter<Operation::LIST_DATASETS> dList;
     IOHandler()->enqueue(IOTask(this, dList));
     IOHandler()->flush(internal::defaultFlushParams);
+
+    meshes.dirty() = false;
+    particles.dirty() = false;
     std::deque<std::string> constantComponentsPushback;
     for (auto const &path : *pList.paths)
     {
-        if (mpp.ignore(path))
+        switch (mpp.determineType(currentPath, path))
         {
-            continue;
+        case internal::ContainedType::Group: {
+            Parameter<Operation::OPEN_PATH> pOpen;
+            pOpen.path = path;
+            auto subpath = this->operator[](path);
+            IOHandler()->enqueue(IOTask(&subpath, pOpen));
+            currentPath.emplace_back(path);
+            subpath.read(mpp, currentPath);
+            currentPath.pop_back();
+            if (subpath.size() == 0 && subpath.containsAttribute("shape") &&
+                subpath.containsAttribute("value"))
+            {
+                // This is not a group, but a constant record component
+                // Writable::~Writable() will deal with removing this from the
+                // backend again.
+                constantComponentsPushback.push_back(path);
+                container().erase(path);
+            }
+            break;
         }
-        Parameter<Operation::OPEN_PATH> pOpen;
-        pOpen.path = path;
-        auto subpath = this->operator[](path);
-        IOHandler()->enqueue(IOTask(&subpath, pOpen));
-        subpath.read(mpp);
-        if (subpath.size() == 0 && subpath.containsAttribute("shape") &&
-            subpath.containsAttribute("value"))
-        {
-            // This is not a group, but a constant record component
-            // Writable::~Writable() will deal with removing this from the
-            // backend again.
-            constantComponentsPushback.push_back(path);
-            container().erase(path);
+        case internal::ContainedType::Mesh: {
+            try
+            {
+                readMeshes(path);
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read meshes at location '"
+                          << myPath().printGroup()
+                          << "' and will skip them due to read error:\n"
+                          << err.what() << std::endl;
+                meshes = {};
+                meshes.dirty() = false;
+            }
+            break;
+        }
+        case internal::ContainedType::Particle: {
+            try
+            {
+                readParticles(path);
+            }
+            catch (error::ReadError const &err)
+            {
+                std::cerr << "Cannot read particles at location '"
+                          << myPath().printGroup()
+                          << "' and will skip them due to read error:\n"
+                          << err.what() << std::endl;
+                particles = {};
+                particles.dirty() = false;
+            }
+            break;
+        }
         }
     }
     auto &data = get();
@@ -314,11 +394,10 @@ void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
     }
 }
 
-/*
- * @todo Avoid repeated calls of retrieveSeries, the hierarchy might be deep.
- */
-void CustomHierarchy::flush(
-    std::string const & /* path */, internal::FlushParams const &flushParams)
+void CustomHierarchy::flush_internal(
+    internal::FlushParams const &flushParams,
+    internal::MeshesParticlesPath &mpp,
+    std::vector<std::string> currentPath)
 {
     /*
      * Convention for CustomHierarchy::flush and CustomHierarchy::read:
@@ -335,18 +414,19 @@ void CustomHierarchy::flush(
     }
     else
     {
-        /* Find the root point [Series] of this file,
-         * meshesPath and particlesPath are stored there */
-        Series s = retrieveSeries();
-
         if (!meshes.empty())
         {
-            if (!s.containsAttribute("meshesPath"))
+            // @todo make this flexible again
+            constexpr char const *defaultMeshesPath = "meshes";
+            if (!mpp.isMesh(currentPath, defaultMeshesPath))
             {
-                s.setMeshesPath("meshes/");
-                s.flushMeshesPath();
+                std::string fullPath = currentPath.empty()
+                    ? defaultMeshesPath
+                    : concatWithSep(currentPath, "/") + "/" + defaultMeshesPath;
+                mpp.meshesPath.emplace(
+                    fullPath, std::regex(fullPath, regex_flags));
             }
-            meshes.flush(s.meshesPath(), flushParams);
+            meshes.flush(defaultMeshesPath, flushParams);
             for (auto &m : meshes)
                 m.second.flush(m.first, flushParams);
         }
@@ -357,12 +437,18 @@ void CustomHierarchy::flush(
 
         if (!particles.empty())
         {
-            if (!s.containsAttribute("particlesPath"))
+            // @todo make this flexible again
+            constexpr char const *defaultParticlesPath = "particles";
+            if (!mpp.isParticle(currentPath, defaultParticlesPath))
             {
-                s.setParticlesPath("particles/");
-                s.flushParticlesPath();
+                std::string fullPath = currentPath.empty()
+                    ? defaultParticlesPath
+                    : concatWithSep(currentPath, "/") + "/" +
+                        defaultParticlesPath;
+                mpp.particlesPath.emplace(
+                    fullPath, std::regex(fullPath, regex_flags));
             }
-            particles.flush(s.particlesPath(), flushParams);
+            particles.flush(defaultParticlesPath, flushParams);
             for (auto &species : particles)
                 species.second.flush(species.first, flushParams);
         }
@@ -382,11 +468,48 @@ void CustomHierarchy::flush(
             pCreate.path = name;
             IOHandler()->enqueue(IOTask(&subpath, pCreate));
         }
-        subpath.flush(name, flushParams);
+        currentPath.emplace_back(name);
+        subpath.flush_internal(flushParams, mpp, currentPath);
+        currentPath.pop_back();
     }
     for (auto &[name, dataset] : get().m_embeddedDatasets)
     {
         dataset.flush(name, flushParams);
+    }
+}
+void CustomHierarchy::flush(
+    std::string const & /* path */, internal::FlushParams const &flushParams)
+{
+    /*
+     * Convention for CustomHierarchy::flush and CustomHierarchy::read:
+     * Path is created/opened already at entry point of method, method needs
+     * to create/open path for contained subpaths.
+     */
+
+    Series s = this->retrieveSeries();
+    internal::MeshesParticlesPath mpp(s.meshesPaths(), s.particlesPaths());
+    auto num_meshes_paths = mpp.meshesPath.size();
+    auto num_particles_paths = mpp.particlesPath.size();
+    std::vector<std::string> currentPath;
+    flush_internal(flushParams, mpp, currentPath);
+    std::vector<std::string> meshesPaths, particlesPaths;
+    for (auto [map, vec] :
+         {std::make_pair(&mpp.meshesPath, &meshesPaths),
+          std::make_pair(&mpp.particlesPath, &particlesPaths)})
+    {
+        std::transform(
+            map->begin(),
+            map->end(),
+            std::back_inserter(*vec),
+            [](auto const &pair) { return pair.first; });
+    }
+    if (meshesPaths.size() > num_meshes_paths)
+    {
+        s.setMeshesPath(meshesPaths);
+    }
+    if (particlesPaths.size() > num_particles_paths)
+    {
+        s.setParticlesPath(particlesPaths);
     }
 }
 
