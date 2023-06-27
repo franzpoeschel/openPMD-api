@@ -261,7 +261,9 @@ TEST_CASE("custom_hierarchies", "[core]")
 
     read = Series(filePath, Access::READ_ONLY);
     {
-        REQUIRE(read.iterations[0]["custom_meshes"].meshes.size() == 1);
+        auto it0 = read.iterations[0];
+        auto custom_meshes = it0["custom_meshes"];
+        REQUIRE(custom_meshes.meshes.size() == 1);
         REQUIRE(read.iterations[0]["custom_meshes"].meshes.count("E") == 1);
         auto E_x_loaded = read.iterations[0]["custom_meshes"]
                               .meshes["E"]["x"]
@@ -286,7 +288,7 @@ TEST_CASE("custom_hierarchies_no_rw", "[core]")
 {
     std::string filePath = "../samples/custom_hierarchies.bp";
     Series write(filePath, Access::CREATE);
-    write.setMeshesPath(std::vector<std::string>{".*/meshes"});
+    write.setMeshesPath(std::vector<std::string>{".*/meshes/"});
     write.iterations[0]["custom"]["hierarchy"];
     write.iterations[0]["custom"].setAttribute("string", "attribute");
     write.iterations[0]["custom"]["hierarchy"].setAttribute("number", 3);

@@ -73,6 +73,8 @@ namespace internal
         explicit CustomHierarchyData();
 
         Container<RecordComponent> m_embeddedDatasets;
+        Container<Mesh> m_embeddedMeshes;
+        Container<ParticleSpecies> m_embeddedParticles;
     };
 } // namespace internal
 
@@ -99,13 +101,18 @@ private:
         return *m_customHierarchyData;
     }
 
-    void readMeshes(std::string const &meshesPath);
-    void readParticles(std::string const &particlesPath);
+    void readNonscalarMesh(std::string const &name);
+    void readScalarMesh(std::string const &name);
+    void readParticleSpecies(std::string const &name);
 
     void flush_internal(
         internal::FlushParams const &,
         internal::MeshesParticlesPath &,
         std::vector<std::string> currentPath);
+
+    template <typename T>
+    static void
+    synchronizeContainers(Container<T> &target, Container<T> &source);
 
 protected:
     CustomHierarchy();
@@ -145,7 +152,10 @@ public:
 
     Container<RecordComponent> datasets();
 
+    template <typename ContainedType>
+    auto asContainerOf() -> Container<ContainedType>;
+
     Container<Mesh> meshes{};
-    Container<ParticleSpecies> particles{}; // particleSpecies?
+    Container<ParticleSpecies> particles{};
 };
 } // namespace openPMD

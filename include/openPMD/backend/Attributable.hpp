@@ -50,12 +50,14 @@ class AbstractFilePosition;
 class Attributable;
 class Iteration;
 class Series;
+class CustomHierarchy;
 
 namespace internal
 {
     class AttributableData
     {
         friend class openPMD::Attributable;
+        friend class openPMD::CustomHierarchy;
 
     public:
         AttributableData();
@@ -83,6 +85,7 @@ namespace internal
 
     template <typename, typename>
     class BaseRecordData;
+    struct CustomHierarchyData;
 } // namespace internal
 
 /** @brief Layer to manage storage of attributes associated with file objects.
@@ -110,6 +113,7 @@ class Attributable
     friend class Writable;
     friend class WriteIterations;
     friend class CustomHierarchy;
+    friend class internal::CustomHierarchyData;
 
 protected:
     // tag for internal constructor
