@@ -167,13 +167,12 @@ CustomHierarchy::CustomHierarchy()
 CustomHierarchy::CustomHierarchy(NoInit) : Container_t(NoInit())
 {}
 
-void CustomHierarchy::readNonscalarMesh(std::string const &mesh_name)
+void CustomHierarchy::readNonscalarMesh(
+    EraseStaleMeshes &map, std::string const &mesh_name)
 {
     Parameter<Operation::OPEN_PATH> pOpen;
     Parameter<Operation::LIST_ATTS> aList;
 
-    internal::EraseStaleEntries<decltype(get().m_embeddedMeshes)> map{
-        get().m_embeddedMeshes};
     Mesh &m = map[mesh_name];
 
     pOpen.path = mesh_name;
@@ -207,15 +206,11 @@ void CustomHierarchy::readNonscalarMesh(std::string const &mesh_name)
     }
 }
 
-void CustomHierarchy::readScalarMesh(std::string const &mesh_name)
+void CustomHierarchy::readScalarMesh(
+    EraseStaleMeshes &map, std::string const &mesh_name)
 {
     Parameter<Operation::OPEN_PATH> pOpen;
     Parameter<Operation::LIST_PATHS> pList;
-
-    auto &data = get();
-
-    internal::EraseStaleEntries<decltype(data.m_embeddedMeshes)> map{
-        data.m_embeddedMeshes};
 
     Parameter<Operation::OPEN_DATASET> dOpen;
     Mesh &m = map[mesh_name];
@@ -239,13 +234,12 @@ void CustomHierarchy::readScalarMesh(std::string const &mesh_name)
     }
 }
 
-void CustomHierarchy::readParticleSpecies(std::string const &species_name)
+void CustomHierarchy::readParticleSpecies(
+    EraseStaleParticles &map, std::string const &species_name)
 {
     Parameter<Operation::OPEN_PATH> pOpen;
     Parameter<Operation::LIST_PATHS> pList;
 
-    internal::EraseStaleEntries<decltype(get().m_embeddedParticles)> map{
-        get().m_embeddedParticles};
     ParticleSpecies &p = map[species_name];
     pOpen.path = species_name;
     IOHandler()->enqueue(IOTask(&p, pOpen));
@@ -291,9 +285,10 @@ void CustomHierarchy::read(
     IOHandler()->enqueue(IOTask(this, dList));
     IOHandler()->flush(internal::defaultFlushParams);
 
-    meshes.dirty() = false;
-    particles.dirty() = false;
     std::deque<std::string> constantComponentsPushback;
+    auto &data = get();
+    EraseStaleMeshes meshesMap(data.m_embeddedMeshes);
+    EraseStaleParticles particlesMap(data.m_embeddedParticles);
     for (auto const &path : *pList.paths)
     {
         switch (mpp.determineType(currentPath, path))
@@ -334,38 +329,35 @@ void CustomHierarchy::read(
         case internal::ContainedType::Mesh: {
             try
             {
-                readNonscalarMesh(path);
+                readNonscalarMesh(meshesMap, path);
             }
             catch (error::ReadError const &err)
             {
-                std::cerr << "Cannot read meshes at location '"
-                          << myPath().printGroup()
+                std::cerr << "Cannot read mesh at location '"
+                          << myPath().printGroup() << "/" << path
                           << "' and will skip them due to read error:\n"
                           << err.what() << std::endl;
-                meshes = {};
-                meshes.dirty() = false;
+                meshesMap.forget(path);
             }
             break;
         }
         case internal::ContainedType::Particle: {
             try
             {
-                readParticleSpecies(path);
+                readParticleSpecies(particlesMap, path);
             }
             catch (error::ReadError const &err)
             {
-                std::cerr << "Cannot read particles at location '"
-                          << myPath().printGroup()
+                std::cerr << "Cannot read particle species at location '"
+                          << myPath().printGroup() << "/" << path
                           << "' and will skip them due to read error:\n"
                           << err.what() << std::endl;
-                particles = {};
-                particles.dirty() = false;
+                particlesMap.forget(path);
             }
             break;
         }
         }
     }
-    auto &data = get();
     for (auto const &path : *dList.datasets)
     {
         switch (mpp.determineType(currentPath, path))
@@ -385,7 +377,7 @@ void CustomHierarchy::read(
             break;
         }
         case internal::ContainedType::Mesh:
-            readScalarMesh(path);
+            readScalarMesh(meshesMap, path);
             break;
         case internal::ContainedType::Particle:
             std::cerr

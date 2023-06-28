@@ -101,9 +101,12 @@ private:
         return *m_customHierarchyData;
     }
 
-    void readNonscalarMesh(std::string const &name);
-    void readScalarMesh(std::string const &name);
-    void readParticleSpecies(std::string const &name);
+    using EraseStaleMeshes = internal::EraseStaleEntries<Container<Mesh>>;
+    using EraseStaleParticles =
+        internal::EraseStaleEntries<Container<ParticleSpecies>>;
+    void readNonscalarMesh(EraseStaleMeshes &map, std::string const &name);
+    void readScalarMesh(EraseStaleMeshes &map, std::string const &name);
+    void readParticleSpecies(EraseStaleParticles &map, std::string const &name);
 
     void flush_internal(
         internal::FlushParams const &,
