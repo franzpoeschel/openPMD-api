@@ -1887,7 +1887,7 @@ AdvanceStatus Series::advance(
     else
     {
         param.mode = mode;
-        IOTask task(&file.m_writable, param);
+        IOTask task(&file->m_writable, param);
         IOHandler()->enqueue(task);
     }
 
@@ -1977,7 +1977,7 @@ AdvanceStatus Series::advance(AdvanceMode mode)
 
     Parameter<Operation::ADVANCE> param;
     param.mode = mode;
-    IOTask task(&series.m_writable, param);
+    IOTask task(&series->m_writable, param);
     IOHandler()->enqueue(task);
 
     // We cannot call Series::flush now, since the IO handler is still filled
@@ -2306,8 +2306,9 @@ namespace internal
          * `Series` is needlessly flushed a second time. Otherwise, error
          * messages can get very confusing.
          */
-        if (this->m_lastFlushSuccessful && m_writable.IOHandler &&
-            m_writable.IOHandler->has_value())
+        if (this->m_lastFlushSuccessful &&
+            operator*().m_writable.IOHandler &&
+            operator*().m_writable.IOHandler->has_value())
         {
             Series impl;
             impl.setData({this, [](auto const *) {}});
@@ -2318,9 +2319,9 @@ namespace internal
         // This releases the openPMD hierarchy
         iterations.container().clear();
         // Release the IO Handler
-        if (m_writable.IOHandler)
+        if (operator*().m_writable.IOHandler)
         {
-            *m_writable.IOHandler = std::nullopt;
+            *operator*().m_writable.IOHandler = std::nullopt;
         }
     }
 } // namespace internal

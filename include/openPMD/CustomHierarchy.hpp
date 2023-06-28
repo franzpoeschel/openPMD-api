@@ -150,10 +150,10 @@ public:
     CustomHierarchy &operator=(CustomHierarchy const &) = default;
     CustomHierarchy &operator=(CustomHierarchy &&) = default;
 
-    Container<RecordComponent> datasets();
+    Container<RecordComponent> &datasets();
 
     template <typename ContainedType>
-    auto asContainerOf() -> Container<ContainedType>;
+    auto asContainerOf() -> Container<ContainedType> &;
 
     Container<Mesh> meshes{};
     Container<ParticleSpecies> particles{};

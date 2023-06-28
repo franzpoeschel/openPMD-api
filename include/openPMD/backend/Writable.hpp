@@ -47,6 +47,7 @@ class Span;
 
 namespace internal
 {
+    class SharedAttributableData;
     class AttributableData;
     class SeriesData;
 } // namespace internal
@@ -63,6 +64,7 @@ namespace internal
  */
 class Writable final
 {
+    friend class internal::SharedAttributableData;
     friend class internal::AttributableData;
     friend class internal::SeriesData;
     friend class Attributable;
@@ -128,6 +130,11 @@ OPENPMD_private
      */
     std::shared_ptr<std::optional<std::unique_ptr<AbstractIOHandler>>>
         IOHandler = nullptr;
+    /*
+     * Link to the containing Attributable.
+     * If multiple Attributables share the same Writable, then the creating one.
+     * (See SharedAttributableData)
+     */
     internal::AttributableData *attributable = nullptr;
     Writable *parent = nullptr;
     bool dirty = true;

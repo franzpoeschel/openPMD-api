@@ -145,16 +145,15 @@ namespace internal
     {
         /*
          * m_embeddeddatasets and its friends should point to the same instance
-         * of Attributable Can only use a non-owning pointer in here in order to
-         * avoid shared pointer cycles. When handing this object out to users,
-         * we create a copy that has a proper owning pointer (see
-         * CustomHierarchy::datasets()).
+         * of Attributable.
          */
         for (auto p : std::initializer_list<Attributable *>{
                  &m_embeddedDatasets, &m_embeddedMeshes, &m_embeddedParticles})
         {
-            (*p).Attributable::setData(
-                std::shared_ptr<AttributableData>(this, [](auto const *) {}));
+            static_cast<std::shared_ptr<internal::SharedAttributableData> &>(
+                *p->m_attri) =
+                static_cast<
+                    std::shared_ptr<internal::SharedAttributableData> &>(*this);
         }
     }
 } // namespace internal
@@ -425,12 +424,12 @@ void CustomHierarchy::synchronizeContainers(
         target_container.emplace(std::move(pair));
     }
     source.container().clear();
-    auto &target_attributes = target.m_attri->m_attributes;
-    for (auto &pair : source.m_attri->m_attributes)
+    auto &target_attributes = target.get().m_attributes;
+    for (auto &pair : source.get().m_attributes)
     {
         target_attributes.emplace(std::move(pair));
     }
-    source.m_attri->m_attributes.clear();
+    source.get().m_attributes.clear();
     source.setData(target.m_containerData);
     // We need to do this since we redirect the Attributable pointers for some
     // members:
@@ -454,14 +453,14 @@ void CustomHierarchy::flush_internal(
     {
         if (!meshes.empty())
         {
-            auto defaultMeshes =
+            auto &defaultMeshes =
                 (*this)[defaultMeshesPath].asContainerOf<Mesh>();
             synchronizeContainers(defaultMeshes, meshes);
         }
 
         if (!particles.empty())
         {
-            auto defaultParticles =
+            auto &defaultParticles =
                 (*this)[defaultParticlesPath].asContainerOf<ParticleSpecies>();
             synchronizeContainers(defaultParticles, particles);
         }
@@ -594,54 +593,45 @@ bool CustomHierarchy::dirtyRecursive() const
     return false;
 }
 
-Container<RecordComponent> CustomHierarchy::datasets()
+Container<RecordComponent> &CustomHierarchy::datasets()
 {
-    Container<RecordComponent> res = get().m_embeddedDatasets;
-    res.Attributable::setData(m_customHierarchyData);
-    return res;
+    return get().m_embeddedDatasets;
 }
 
 template <typename ContainedType>
-auto CustomHierarchy::asContainerOf() -> Container<ContainedType>
+auto CustomHierarchy::asContainerOf() -> Container<ContainedType> &
 {
     if constexpr (std::is_same_v<ContainedType, CustomHierarchy>)
     {
         return *static_cast<Container<CustomHierarchy> *>(this);
     }
+    else if constexpr (std::is_same_v<ContainedType, Mesh>)
+    {
+        return get().m_embeddedMeshes;
+    }
+    else if constexpr (std::is_same_v<ContainedType, ParticleSpecies>)
+    {
+        return get().m_embeddedParticles;
+    }
+    else if constexpr (std::is_same_v<ContainedType, RecordComponent>)
+    {
+        return get().m_embeddedDatasets;
+    }
     else
     {
-        Container<ContainedType> res = [&data = get()]() {
-            if constexpr (std::is_same_v<ContainedType, Mesh>)
-            {
-                return data.m_embeddedMeshes;
-            }
-            else if constexpr (std::is_same_v<ContainedType, ParticleSpecies>)
-            {
-                return data.m_embeddedParticles;
-            }
-            else if constexpr (std::is_same_v<ContainedType, RecordComponent>)
-            {
-                return data.m_embeddedDatasets;
-            }
-            else
-            {
-                static_assert(
-                    auxiliary::dependent_false_v<ContainedType>,
-                    "[CustomHierarchy::asContainerOf] Type parameter must be "
-                    "one of: CustomHierarchy, RecordComponent, Mesh, "
-                    "ParticleSpecies.");
-            }
-        }();
-        res.Attributable::setData(m_customHierarchyData);
-        return res;
+        static_assert(
+            auxiliary::dependent_false_v<ContainedType>,
+            "[CustomHierarchy::asContainerOf] Type parameter must be "
+            "one of: CustomHierarchy, RecordComponent, Mesh, "
+            "ParticleSpecies.");
     }
 }
 
 template auto CustomHierarchy::asContainerOf<CustomHierarchy>()
-    -> Container<CustomHierarchy>;
+    -> Container<CustomHierarchy> &;
 template auto CustomHierarchy::asContainerOf<RecordComponent>()
-    -> Container<RecordComponent>;
-template auto CustomHierarchy::asContainerOf<Mesh>() -> Container<Mesh>;
+    -> Container<RecordComponent> &;
+template auto CustomHierarchy::asContainerOf<Mesh>() -> Container<Mesh> &;
 template auto CustomHierarchy::asContainerOf<ParticleSpecies>()
-    -> Container<ParticleSpecies>;
+    -> Container<ParticleSpecies> &;
 } // namespace openPMD
