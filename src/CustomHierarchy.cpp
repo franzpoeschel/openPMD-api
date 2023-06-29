@@ -550,10 +550,10 @@ bool CustomHierarchy::dirtyRecursive() const
     {
         return true;
     }
-    if (particles.dirty() || meshes.dirty())
-    {
-        return true;
-    }
+    /*
+     * No need to check CustomHierarchy::particles or CustomHierarchy::meshes,
+     * since they are just aliases for subgroups.
+     */
     for (auto const &pair : particles)
     {
         if (pair.second.dirtyRecursive())
