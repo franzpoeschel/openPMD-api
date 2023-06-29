@@ -198,12 +198,14 @@ TEST_CASE("custom_hierarchies", "[core]")
     write = Series(filePath, Access::READ_WRITE);
     {
         write.iterations[0]["custom"]["hierarchy"];
-        write.iterations[0]["custom"].datasets()["emptyDataset"].makeEmpty(
-            Datatype::FLOAT, 3);
+        write.iterations[0]["custom"]
+            .asContainerOf<RecordComponent>()["emptyDataset"]
+            .makeEmpty(Datatype::FLOAT, 3);
         write.iterations[0]["custom"]["hierarchy"].setAttribute("number", 3);
         write.iterations[0]["no_attributes"];
         auto iteration_level_ds =
-            write.iterations[0].datasets()["iteration_level_dataset"];
+            write.iterations[0]
+                .asContainerOf<RecordComponent>()["iteration_level_dataset"];
         iteration_level_ds.resetDataset({Datatype::INT, {10}});
         std::vector<int> data(10, 5);
         iteration_level_ds.storeChunk(data);
@@ -220,14 +222,24 @@ TEST_CASE("custom_hierarchies", "[core]")
         REQUIRE(read.iterations[0]["custom"]["hierarchy"].size() == 0);
         REQUIRE(read.iterations[0]["no_attributes"].size() == 0);
 
-        REQUIRE(read.iterations[0].datasets().size() == 1);
-        REQUIRE(read.iterations[0]["custom"].datasets().size() == 1);
         REQUIRE(
-            read.iterations[0]["custom"]["hierarchy"].datasets().size() == 0);
-        REQUIRE(read.iterations[0]["no_attributes"].datasets().size() == 0);
+            read.iterations[0].asContainerOf<RecordComponent>().size() == 1);
+        REQUIRE(
+            read.iterations[0]["custom"]
+                .asContainerOf<RecordComponent>()
+                .size() == 1);
+        REQUIRE(
+            read.iterations[0]["custom"]["hierarchy"]
+                .asContainerOf<RecordComponent>()
+                .size() == 0);
+        REQUIRE(
+            read.iterations[0]["no_attributes"]
+                .asContainerOf<RecordComponent>()
+                .size() == 0);
 
         auto iteration_level_ds =
-            read.iterations[0].datasets()["iteration_level_dataset"];
+            read.iterations[0]
+                .asContainerOf<RecordComponent>()["iteration_level_dataset"];
         REQUIRE(iteration_level_ds.getDatatype() == Datatype::INT);
         REQUIRE(iteration_level_ds.getExtent() == Extent{10});
         auto loaded_chunk = iteration_level_ds.loadChunk<int>();
@@ -238,7 +250,8 @@ TEST_CASE("custom_hierarchies", "[core]")
         }
 
         auto constant_dataset =
-            read.iterations[0]["custom"].datasets()["emptyDataset"];
+            read.iterations[0]["custom"]
+                .asContainerOf<RecordComponent>()["emptyDataset"];
         REQUIRE(constant_dataset.getDatatype() == Datatype::FLOAT);
         REQUIRE(constant_dataset.getExtent() == Extent{0, 0, 0});
     }
@@ -296,12 +309,14 @@ TEST_CASE("custom_hierarchies_no_rw", "[core]")
 
     {
         write.iterations[0]["custom"]["hierarchy"];
-        write.iterations[0]["custom"].datasets()["emptyDataset"].makeEmpty(
-            Datatype::FLOAT, 3);
+        write.iterations[0]["custom"]
+            .asContainerOf<RecordComponent>()["emptyDataset"]
+            .makeEmpty(Datatype::FLOAT, 3);
         write.iterations[0]["custom"]["hierarchy"].setAttribute("number", 3);
         write.iterations[0]["no_attributes"];
         auto iteration_level_ds =
-            write.iterations[0].datasets()["iteration_level_dataset"];
+            write.iterations[0]
+                .asContainerOf<RecordComponent>()["iteration_level_dataset"];
         iteration_level_ds.resetDataset({Datatype::INT, {10}});
         std::vector<int> data(10, 5);
         iteration_level_ds.storeChunk(data);

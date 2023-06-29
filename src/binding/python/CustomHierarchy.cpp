@@ -1,6 +1,8 @@
 
 
 #include "openPMD/CustomHierarchy.hpp"
+#include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include <pybind11/pybind11.h>
 
@@ -11,7 +13,13 @@ void init_CustomHierarchy(py::module &m)
 {
     py::class_<CustomHierarchy, Container<CustomHierarchy>, Attributable>(
         m, "CustomHierarchy")
-        .def("datasets", &CustomHierarchy::datasets)
+        .def(
+            "as_container_of_datasets",
+            &CustomHierarchy::asContainerOf<RecordComponent>)
+        .def("as_container_of_meshes", &CustomHierarchy::asContainerOf<Mesh>)
+        .def(
+            "as_container_of_particles",
+            &CustomHierarchy::asContainerOf<ParticleSpecies>)
 
         .def_readwrite(
             "meshes",

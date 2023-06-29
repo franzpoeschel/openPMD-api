@@ -154,8 +154,6 @@ public:
     mapped_type &operator[](key_type &&key);
     mapped_type &operator[](key_type const &key);
 
-    Container<RecordComponent> &datasets();
-
     template <typename ContainedType>
     auto asContainerOf() -> Container<ContainedType> &;
 

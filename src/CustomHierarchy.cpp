@@ -555,11 +555,6 @@ auto CustomHierarchy::operator[](key_type const &key) -> mapped_type &
     return bracketOperatorImpl(key);
 }
 
-Container<RecordComponent> &CustomHierarchy::datasets()
-{
-    return get().m_embeddedDatasets;
-}
-
 template <typename ContainedType>
 auto CustomHierarchy::asContainerOf() -> Container<ContainedType> &
 {
