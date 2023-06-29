@@ -20,6 +20,7 @@
  */
 
 #include "openPMD/CustomHierarchy.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/IOTask.hpp"
@@ -34,6 +35,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <regex>
 #include <sstream>
 
@@ -143,6 +145,11 @@ namespace internal
 
     CustomHierarchyData::CustomHierarchyData()
     {
+        syncAttributables();
+    }
+
+    void CustomHierarchyData::syncAttributables()
+    {
         /*
          * m_embeddeddatasets and its friends should point to the same instance
          * of Attributable.
@@ -150,10 +157,8 @@ namespace internal
         for (auto p : std::initializer_list<Attributable *>{
                  &m_embeddedDatasets, &m_embeddedMeshes, &m_embeddedParticles})
         {
-            static_cast<std::shared_ptr<internal::SharedAttributableData> &>(
-                *p->m_attri) =
-                static_cast<
-                    std::shared_ptr<internal::SharedAttributableData> &>(*this);
+            p->m_attri->asSharedPtrOfAttributable() =
+                this->asSharedPtrOfAttributable();
         }
     }
 } // namespace internal
@@ -310,20 +315,6 @@ void CustomHierarchy::read(
                 constantComponentsPushback.push_back(path);
                 container().erase(path);
             }
-            else
-            {
-                if (path == defaultMeshesPath)
-                {
-                    synchronizeContainers(
-                        subpath.get().m_embeddedMeshes, meshes);
-                }
-                // no else, they might be the same
-                if (path == defaultParticlesPath)
-                {
-                    synchronizeContainers(
-                        subpath.get().m_embeddedParticles, particles);
-                }
-            }
             break;
         }
         case internal::ContainedType::Mesh: {
@@ -401,33 +392,6 @@ void CustomHierarchy::read(
     }
 }
 
-template <typename T>
-void CustomHierarchy::synchronizeContainers(
-    Container<T> &target, Container<T> &source)
-{
-    if (target.m_containerData.get() == source.m_containerData.get())
-    {
-        return;
-    }
-    auto &target_container = target.container();
-    for (auto &pair : source.container())
-    {
-        pair.second.linkHierarchy(target.writable());
-        target_container.emplace(std::move(pair));
-    }
-    source.container().clear();
-    auto &target_attributes = target.get().m_attributes;
-    for (auto &pair : source.get().m_attributes)
-    {
-        target_attributes.emplace(std::move(pair));
-    }
-    source.get().m_attributes.clear();
-    source.setData(target.m_containerData);
-    // We need to do this since we redirect the Attributable pointers for some
-    // members:
-    source.Attributable::setData(target.m_attri);
-}
-
 void CustomHierarchy::flush_internal(
     internal::FlushParams const &flushParams,
     internal::MeshesParticlesPath &mpp,
@@ -445,16 +409,12 @@ void CustomHierarchy::flush_internal(
     {
         if (!meshes.empty())
         {
-            auto &defaultMeshes =
-                (*this)[defaultMeshesPath].asContainerOf<Mesh>();
-            synchronizeContainers(defaultMeshes, meshes);
+            (*this)[defaultMeshesPath];
         }
 
         if (!particles.empty())
         {
-            auto &defaultParticles =
-                (*this)[defaultParticlesPath].asContainerOf<ParticleSpecies>();
-            synchronizeContainers(defaultParticles, particles);
+            (*this)[defaultParticlesPath];
         }
 
         flushAttributes(flushParams);
@@ -585,6 +545,16 @@ bool CustomHierarchy::dirtyRecursive() const
     return false;
 }
 
+auto CustomHierarchy::operator[](key_type &&key) -> mapped_type &
+{
+    return bracketOperatorImpl(std::move(key));
+}
+
+auto CustomHierarchy::operator[](key_type const &key) -> mapped_type &
+{
+    return bracketOperatorImpl(key);
+}
+
 Container<RecordComponent> &CustomHierarchy::datasets()
 {
     return get().m_embeddedDatasets;
@@ -626,4 +596,95 @@ template auto CustomHierarchy::asContainerOf<RecordComponent>()
 template auto CustomHierarchy::asContainerOf<Mesh>() -> Container<Mesh> &;
 template auto CustomHierarchy::asContainerOf<ParticleSpecies>()
     -> Container<ParticleSpecies> &;
+
+template <typename KeyType>
+auto CustomHierarchy::bracketOperatorImpl(KeyType &&provided_key)
+    -> mapped_type &
+{
+    auto &cont = container();
+    auto find_special_key =
+        [&cont, &provided_key, this](
+            char const *special_key,
+            auto &alias,
+            auto &&embeddedAccessor) -> std::optional<mapped_type *> {
+        if (provided_key == special_key)
+        {
+            if (auto it = cont.find(provided_key); it != cont.end())
+            {
+                if (it->second.m_attri->get() != alias.m_attri->get() ||
+                    embeddedAccessor(it->second)->m_containerData.get() !=
+                        alias.m_containerData.get())
+                {
+                    /*
+                     * This might happen if a user first creates a custom group
+                     * "fields" and sets the default meshes path as "fields"
+                     * only later.
+                     * If the CustomHierarchy::meshes alias carries no data yet,
+                     * we can just redirect it to that group now.
+                     * Otherwise, we need to fail.
+                     */
+                    if (alias.empty() && alias.attributes().empty())
+                    {
+                        alias.m_containerData =
+                            embeddedAccessor(it->second)->m_containerData;
+                        alias.m_attri->asSharedPtrOfAttributable() =
+                            it->second.m_attri->asSharedPtrOfAttributable();
+                        return &it->second;
+                    }
+                    throw error::WrongAPIUsage(
+                        "Found a group '" + provided_key + "' at path '" +
+                        myPath().printGroup() +
+                        "' which is not synchronous with mesh/particles alias "
+                        "despite '" +
+                        special_key +
+                        "' being the default meshes/particles path. This can "
+                        "have happened because setting default "
+                        "meshes/particles path too late (after first flush). "
+                        "If that's not the case, this is likely an internal "
+                        "bug.");
+                }
+                return &it->second;
+            }
+            else
+            {
+                auto *res =
+                    &Container::operator[](std::forward<KeyType>(provided_key));
+                embeddedAccessor(*res)->m_containerData = alias.m_containerData;
+                res->m_attri->asSharedPtrOfAttributable() =
+                    alias.m_attri->asSharedPtrOfAttributable();
+                res->m_customHierarchyData->syncAttributables();
+                return res;
+            }
+        }
+        else
+        {
+            return std::nullopt;
+        }
+    };
+    if (auto res = find_special_key(
+            defaultMeshesPath,
+            meshes,
+            [](auto &group) {
+                return &group.m_customHierarchyData->m_embeddedMeshes;
+            });
+        res.has_value())
+    {
+        return **res;
+    }
+    if (auto res = find_special_key(
+            defaultParticlesPath,
+            particles,
+            [](auto &group) {
+                return &group.m_customHierarchyData->m_embeddedParticles;
+            });
+        res.has_value())
+    {
+        return **res;
+    }
+    else
+    {
+        return (*this).Container::operator[](
+            std::forward<KeyType>(provided_key));
+    }
+}
 } // namespace openPMD

@@ -115,6 +115,17 @@ namespace internal
         AttributableData(AttributableData &&) = delete;
         virtual ~AttributableData() = default;
 
+        inline std::shared_ptr<SharedAttributableData> &
+        asSharedPtrOfAttributable()
+        {
+            return *this;
+        }
+        inline std::shared_ptr<SharedAttributableData> const &
+        asSharedPtrOfAttributable() const
+        {
+            return *this;
+        }
+
         AttributableData &operator=(AttributableData const &) = delete;
         AttributableData &operator=(AttributableData &&) = delete;
     };

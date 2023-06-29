@@ -72,6 +72,8 @@ namespace internal
     {
         explicit CustomHierarchyData();
 
+        void syncAttributables();
+
         Container<RecordComponent> m_embeddedDatasets;
         Container<Mesh> m_embeddedMeshes;
         Container<ParticleSpecies> m_embeddedParticles;
@@ -113,10 +115,6 @@ private:
         internal::MeshesParticlesPath &,
         std::vector<std::string> currentPath);
 
-    template <typename T>
-    static void
-    synchronizeContainers(Container<T> &target, Container<T> &source);
-
 protected:
     CustomHierarchy();
     CustomHierarchy(NoInit);
@@ -153,6 +151,9 @@ public:
     CustomHierarchy &operator=(CustomHierarchy const &) = default;
     CustomHierarchy &operator=(CustomHierarchy &&) = default;
 
+    mapped_type &operator[](key_type &&key);
+    mapped_type &operator[](key_type const &key);
+
     Container<RecordComponent> &datasets();
 
     template <typename ContainedType>
@@ -160,5 +161,9 @@ public:
 
     Container<Mesh> meshes{};
     Container<ParticleSpecies> particles{};
+
+private:
+    template <typename KeyType>
+    mapped_type &bracketOperatorImpl(KeyType &&);
 };
 } // namespace openPMD
