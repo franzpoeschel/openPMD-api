@@ -156,16 +156,24 @@ Series &Series::setBasePath(std::string const &bp)
 
 std::string Series::meshesPath() const
 {
-    return getAttribute("meshesPath").get<std::string>();
+    auto res = meshesPaths();
+    if (res.empty())
+    {
+        throw no_such_attribute_error("meshesPath");
+    }
+    /*
+     * @todo: Verify that meshesPath has canonical form
+     */
+    return res.at(0);
 }
 
 std::vector<std::string> Series::meshesPaths() const
 {
-    try
+    if (containsAttribute("meshesPath"))
     {
         return getAttribute("meshesPath").get<std::vector<std::string>>();
     }
-    catch (no_such_attribute_error const &)
+    else
     {
         return {};
     }
@@ -211,16 +219,24 @@ Series &Series::setMeshesPath(std::vector<std::string> const &mp)
 
 std::string Series::particlesPath() const
 {
-    return getAttribute("particlesPath").get<std::string>();
+    auto res = particlesPaths();
+    if (res.empty())
+    {
+        throw no_such_attribute_error("particlesPath");
+    }
+    /*
+     * @todo: Verify that particlesPath has canonical form
+     */
+    return res.at(0);
 }
 
 std::vector<std::string> Series::particlesPaths() const
 {
-    try
+    if (containsAttribute("particlesPath"))
     {
         return getAttribute("particlesPath").get<std::vector<std::string>>();
     }
-    catch (no_such_attribute_error const &)
+    else
     {
         return {};
     }
