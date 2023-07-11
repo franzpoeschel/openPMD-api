@@ -17,23 +17,23 @@ def main():
     temp[()] = np.zeros((5, 5))
 
     # write NeXus part
-    nxentry = it["Scan:NXentry"]
+    nxentry = it["Scan"]
     nxentry.set_attribute("NX_class", "NXentry")
     nxentry.set_attribute("default", "data")
 
-    data = nxentry["data:Nxdata"]
+    data = nxentry["data"]
     data.set_attribute("NX_class", "NXdata")
     data.set_attribute("signal", "counts")
     data.set_attribute("axes", ["two_theta"])
     data.set_attribute("two_theta_indices", [0])
 
-    counts = data.datasets()["counts"]
+    counts = data.as_container_of_datasets()["counts"]
     counts.set_attribute("units", "counts")
     counts.set_attribute("long_name", "photodiode counts")
     counts.reset_dataset(io.Dataset(np.dtype("int"), [15]))
     counts[()] = np.zeros(15, dtype=np.dtype("int"))
 
-    two_theta = data.datasets()["two_theta"]
+    two_theta = data.as_container_of_datasets()["two_theta"]
     two_theta.set_attribute("units", "degrees")
     two_theta.set_attribute("long_name", "two_theta (degrees)")
     two_theta.reset_dataset(io.Dataset(np.dtype("double"), [15]))
