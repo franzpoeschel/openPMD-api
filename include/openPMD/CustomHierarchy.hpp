@@ -48,8 +48,20 @@ namespace internal
     };
     struct MeshesParticlesPath
     {
+        /*
+         * @todo: When reading, maybe compile all regexes into one big regex
+         * for performance?
+         */
         std::map<std::string, std::regex> meshesPath;
         std::map<std::string, std::regex> particlesPath;
+
+        /*
+         * These values decide which path will be returned upon use of the
+         * shorthand notation s.iterations[0].meshes or .particles.
+         *
+         */
+        std::string m_defaultMeshesPath = "meshes";
+        std::string m_defaultParticlesPath = "particles";
 
         explicit MeshesParticlesPath() = default;
         MeshesParticlesPath(
@@ -77,6 +89,8 @@ namespace internal
         Container<RecordComponent> m_embeddedDatasets;
         Container<Mesh> m_embeddedMeshes;
         Container<ParticleSpecies> m_embeddedParticles;
+        std::string m_defaultMeshesPath;
+        std::string m_defaultParticlesPath;
     };
 } // namespace internal
 

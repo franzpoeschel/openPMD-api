@@ -427,31 +427,11 @@ void Iteration::read_impl(std::string const &groupPath)
     Parameter<Operation::LIST_PATHS> pList;
     IOHandler()->enqueue(IOTask(this, pList));
     std::string version = s.openPMD();
-    bool hasMeshes = false;
-    bool hasParticles = false;
-    if (version == "1.0.0" || version == "1.0.1")
-    {
-        IOHandler()->flush(internal::defaultFlushParams);
-        hasMeshes = std::count(
-                        pList.paths->begin(),
-                        pList.paths->end(),
-                        auxiliary::replace_last(s.meshesPath(), "/", "")) == 1;
-        hasParticles =
-            std::count(
-                pList.paths->begin(),
-                pList.paths->end(),
-                auxiliary::replace_last(s.particlesPath(), "/", "")) == 1;
-        pList.paths->clear();
-    }
-    else
-    {
-        hasMeshes = s.containsAttribute("meshesPath");
-        hasParticles = s.containsAttribute("particlesPath");
-    }
 
-    internal::MeshesParticlesPath mpp(
-        hasMeshes ? s.meshesPaths() : std::vector<std::string>(),
-        hasParticles ? s.particlesPaths() : std::vector<std::string>());
+    // @todo restore compatibility with openPMD 1.0.*:
+    //   hasMeshes <-> meshesPath is defined
+
+    internal::MeshesParticlesPath mpp(s.meshesPaths(), s.particlesPaths());
     CustomHierarchy::read(std::move(mpp));
 
 #ifdef openPMD_USE_INVASIVE_TESTS

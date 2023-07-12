@@ -163,6 +163,7 @@ TEST_CASE("custom_hierarchies", "[core]")
 {
     std::string filePath = "../samples/custom_hierarchies.json";
     Series write(filePath, Access::CREATE);
+    write.setMeshesPath(".*/meshes");
     write.iterations[0];
     write.close();
 

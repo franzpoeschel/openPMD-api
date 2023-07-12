@@ -38,38 +38,80 @@
 #include <optional>
 #include <regex>
 #include <sstream>
+#include <tuple>
 
 namespace openPMD
 {
 
 namespace
 {
+    template <typename Iterator>
+    std::string
+    concatWithSep(Iterator &&begin, Iterator const &end, std::string const &sep)
+    {
+        if (begin == end)
+        {
+            return "";
+        }
+        std::stringstream res;
+        res << *(begin++);
+        for (; begin != end; ++begin)
+        {
+            res << sep << *begin;
+        }
+        return res.str();
+    }
+
     std::string
     concatWithSep(std::vector<std::string> const &v, std::string const &sep)
     {
-        switch (v.size())
-        {
-        case 0:
-            return "";
-        case 1:
-            return *v.begin();
-        default:
-            break;
-        }
-        std::stringstream res;
-        auto it = v.begin();
-        res << *it++;
-        for (; it != v.end(); ++it)
-        {
-            res << sep << *it;
-        }
-        return res.str();
+        return concatWithSep(v.begin(), v.end(), sep);
     }
 
     // Not specifying std::regex_constants::optimize here, only using it where
     // it makes sense to.
     constexpr std::regex_constants::syntax_option_type regex_flags =
         std::regex_constants::egrep;
+
+    template <typename OutParam>
+    void setDefaultMeshesParticlesPath(
+        std::vector<std::string> const &meshes,
+        std::vector<std::string> const &particles,
+        OutParam &writeTarget)
+    {
+        std::regex is_default_path_specification("[[:alnum:]_]+/", regex_flags);
+        constexpr char const *default_default_mesh = "meshes";
+        constexpr char const *default_default_particle = "particles";
+        for (auto [vec, defaultPath, default_default] :
+             {std::make_tuple(
+                  &meshes,
+                  &writeTarget.m_defaultMeshesPath,
+                  default_default_mesh),
+              std::make_tuple(
+                  &particles,
+                  &writeTarget.m_defaultParticlesPath,
+                  default_default_particle)})
+        {
+            bool set_default = true;
+            /*
+             * The first eligible path in meshesPath/particlesPath is used as
+             * the default, "meshes"/"particles" otherwise.
+             */
+            for (auto const &path : *vec)
+            {
+                if (std::regex_match(path, is_default_path_specification))
+                {
+                    *defaultPath = auxiliary::replace_last(path, "/", "");
+                    set_default = false;
+                    break;
+                }
+            }
+            if (set_default)
+            {
+                *defaultPath = default_default;
+            }
+        }
+    }
 } // namespace
 
 namespace internal
@@ -81,15 +123,43 @@ namespace internal
             std::vector<std::string> const &path,
             std::string const &name)
         {
-            std::string parentPath =
-                (path.empty() ? "" : concatWithSep(path, "/")) + "/";
-            std::string fullPath = path.empty() ? name : parentPath + name;
+            /*
+             * /group/meshes/E is a mesh if the meshes path contains:
+             *
+             * 1) '/group/meshes/' (absolute path to mesh container)
+             * 2) '/group/meshes/E' (absolute path to mesh itself)
+             * 3) 'meshes/' (relative path to mesh container)
+             *
+             * The potential fourth option 'E' (relative path to mesh itself)
+             * is not supported. ("Anything that is named 'E' is a mesh" is not
+             * really a semantic that we want to explicitly support.)
+             * '/' is never a valid meshes path.
+             *
+             * All this analogously for particles path.
+             */
+            std::vector<std::string> pathsToMatch = {
+                /* option 2) from above */
+                "/" + (path.empty() ? "" : concatWithSep(path, "/") + "/") +
+                name};
+            if (!path.empty())
+            {
+                // option 1) from above
+                pathsToMatch.emplace_back("/" + concatWithSep(path, "/") + "/");
+
+                // option 3 from above
+                pathsToMatch.emplace_back(*path.rbegin() + "/");
+            }
             return std::any_of(
                 regexes.begin(),
                 regexes.end(),
-                [&parentPath, &fullPath](auto const &regex) {
-                    return std::regex_match(parentPath, regex.second) ||
-                        std::regex_match(fullPath, regex.second);
+                [&pathsToMatch](auto const &regex) {
+                    return std::any_of(
+                        pathsToMatch.begin(),
+                        pathsToMatch.end(),
+                        [&regex](std::string const &candidate_path) {
+                            return std::regex_match(
+                                candidate_path, regex.second);
+                        });
                 });
         }
     } // namespace
@@ -98,9 +168,10 @@ namespace internal
         std::vector<std::string> const &meshes,
         std::vector<std::string> const &particles)
     {
+        std::regex is_default_path_specification("[[:alnum:]_]+/", regex_flags);
         for (auto [deque, vec] :
-             {std::make_pair(&this->meshesPath, &meshes),
-              std::make_pair(&this->particlesPath, &particles)})
+             {std::make_tuple(&this->meshesPath, &meshes),
+              std::make_tuple(&this->particlesPath, &particles)})
         {
             std::transform(
                 vec->begin(),
@@ -113,6 +184,7 @@ namespace internal
                             str, regex_flags | std::regex_constants::optimize));
                 });
         }
+        setDefaultMeshesParticlesPath(meshes, particles, *this);
     }
 
     ContainedType MeshesParticlesPath::determineType(
@@ -262,10 +334,6 @@ void CustomHierarchy::readParticleSpecies(
     }
 }
 
-// @todo make this flexible again
-constexpr char const *defaultMeshesPath = "meshes";
-constexpr char const *defaultParticlesPath = "particles";
-
 void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
 {
     std::vector<std::string> currentPath;
@@ -292,6 +360,8 @@ void CustomHierarchy::read(
 
     std::deque<std::string> constantComponentsPushback;
     auto &data = get();
+    data.m_defaultMeshesPath = mpp.m_defaultMeshesPath;
+    data.m_defaultParticlesPath = mpp.m_defaultParticlesPath;
     EraseStaleMeshes meshesMap(data.m_embeddedMeshes);
     EraseStaleParticles particlesMap(data.m_embeddedParticles);
     for (auto const &path : *pList.paths)
@@ -405,16 +475,19 @@ void CustomHierarchy::flush_internal(
 
     // No need to do anything in access::readOnly since meshes and particles
     // are initialized as aliases for subgroups at parsing time
+    auto &data = get();
+    data.m_defaultMeshesPath = mpp.m_defaultMeshesPath;
+    data.m_defaultParticlesPath = mpp.m_defaultParticlesPath;
     if (access::write(IOHandler()->m_frontendAccess))
     {
         if (!meshes.empty())
         {
-            (*this)[defaultMeshesPath];
+            (*this)[mpp.m_defaultMeshesPath];
         }
 
         if (!particles.empty())
         {
-            (*this)[defaultParticlesPath];
+            (*this)[mpp.m_defaultParticlesPath];
         }
 
         flushAttributes(flushParams);
@@ -432,15 +505,28 @@ void CustomHierarchy::flush_internal(
         subpath.flush_internal(flushParams, mpp, currentPath);
         currentPath.pop_back();
     }
-    auto &data = get();
     for (auto &[name, mesh] : data.m_embeddedMeshes)
     {
         if (!mpp.isMesh(currentPath, name))
         {
-            std::string fullPath = currentPath.empty()
-                ? name
-                : concatWithSep(currentPath, "/") + "/" + name;
-            mpp.meshesPath.emplace(fullPath, std::regex(fullPath, regex_flags));
+            std::string extend_meshes_path;
+            if (!currentPath.empty() &&
+                *currentPath.rbegin() == mpp.m_defaultMeshesPath)
+            {
+                extend_meshes_path = *currentPath.rbegin() + "/";
+            }
+            else
+            {
+
+                extend_meshes_path = "/" +
+                    (currentPath.empty()
+                         ? ""
+                         : concatWithSep(currentPath, "/") + "/") +
+                    name;
+            }
+            mpp.meshesPath.emplace(
+                extend_meshes_path,
+                std::regex(extend_meshes_path, regex_flags));
         }
         mesh.flush(name, flushParams);
     }
@@ -448,11 +534,24 @@ void CustomHierarchy::flush_internal(
     {
         if (!mpp.isParticle(currentPath, name))
         {
-            std::string fullPath = currentPath.empty()
-                ? name
-                : concatWithSep(currentPath, "/") + "/" + name;
+            std::string extend_particles_path;
+            if (!currentPath.empty() &&
+                *currentPath.rbegin() == mpp.m_defaultParticlesPath)
+            {
+                extend_particles_path = *currentPath.rbegin() + "/";
+            }
+            else
+            {
+
+                extend_particles_path = "/" +
+                    (currentPath.empty()
+                         ? ""
+                         : concatWithSep(currentPath, "/") + "/") +
+                    name;
+            }
             mpp.particlesPath.emplace(
-                fullPath, std::regex(fullPath, regex_flags));
+                extend_particles_path,
+                std::regex(extend_particles_path, regex_flags));
         }
         particleSpecies.flush(name, flushParams);
     }
@@ -596,10 +695,11 @@ template <typename KeyType>
 auto CustomHierarchy::bracketOperatorImpl(KeyType &&provided_key)
     -> mapped_type &
 {
-    auto &cont = container();
+    auto &data = get();
+    auto &cont = data.m_container;
     auto find_special_key =
         [&cont, &provided_key, this](
-            char const *special_key,
+            std::string const &special_key,
             auto &alias,
             auto &&embeddedAccessor) -> std::optional<mapped_type *> {
         if (provided_key == special_key)
@@ -656,8 +756,15 @@ auto CustomHierarchy::bracketOperatorImpl(KeyType &&provided_key)
             return std::nullopt;
         }
     };
+    if (data.m_defaultMeshesPath.empty() || data.m_defaultParticlesPath.empty())
+    {
+        auto const &series = retrieveSeries();
+        auto meshes_paths = series.meshesPaths();
+        auto particles_paths = series.particlesPaths();
+        setDefaultMeshesParticlesPath(meshes_paths, particles_paths, data);
+    }
     if (auto res = find_special_key(
-            defaultMeshesPath,
+            data.m_defaultMeshesPath,
             meshes,
             [](auto &group) {
                 return &group.m_customHierarchyData->m_embeddedMeshes;
@@ -667,7 +774,7 @@ auto CustomHierarchy::bracketOperatorImpl(KeyType &&provided_key)
         return **res;
     }
     if (auto res = find_special_key(
-            defaultParticlesPath,
+            data.m_defaultParticlesPath,
             particles,
             [](auto &group) {
                 return &group.m_customHierarchyData->m_embeddedParticles;
