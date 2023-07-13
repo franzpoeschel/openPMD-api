@@ -300,7 +300,7 @@ TEST_CASE("custom_hierarchies", "[core]")
 
 TEST_CASE("custom_hierarchies_no_rw", "[core]")
 {
-    std::string filePath = "../samples/custom_hierarchies.bp";
+    std::string filePath = "../samples/custom_hierarchies.json";
     Series write(filePath, Access::CREATE);
     write.setMeshesPath(std::vector<std::string>{".*/meshes/"});
     write.iterations[0]["custom"]["hierarchy"];
@@ -321,6 +321,7 @@ TEST_CASE("custom_hierarchies_no_rw", "[core]")
         iteration_level_ds.resetDataset({Datatype::INT, {10}});
         std::vector<int> data(10, 5);
         iteration_level_ds.storeChunk(data);
+        write.flush();
     }
 
     {
