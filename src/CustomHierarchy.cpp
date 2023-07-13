@@ -35,6 +35,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <memory>
+#include <numeric>
 #include <optional>
 #include <regex>
 #include <sstream>
@@ -119,7 +120,7 @@ namespace internal
     namespace
     {
         bool anyPathRegexMatches(
-            std::map<std::string, std::regex> regexes,
+            std::regex regex,
             std::vector<std::string> const &path,
             std::string const &name)
         {
@@ -150,16 +151,10 @@ namespace internal
                 pathsToMatch.emplace_back(*path.rbegin() + "/");
             }
             return std::any_of(
-                regexes.begin(),
-                regexes.end(),
-                [&pathsToMatch](auto const &regex) {
-                    return std::any_of(
-                        pathsToMatch.begin(),
-                        pathsToMatch.end(),
-                        [&regex](std::string const &candidate_path) {
-                            return std::regex_match(
-                                candidate_path, regex.second);
-                        });
+                pathsToMatch.begin(),
+                pathsToMatch.end(),
+                [&regex](std::string const &candidate_path) {
+                    return std::regex_match(candidate_path, regex);
                 });
         }
     } // namespace
@@ -169,20 +164,29 @@ namespace internal
         std::vector<std::string> const &particles)
     {
         std::regex is_default_path_specification("[[:alnum:]_]+/", regex_flags);
-        for (auto [deque, vec] :
-             {std::make_tuple(&this->meshesPath, &meshes),
-              std::make_tuple(&this->particlesPath, &particles)})
+        for (auto [target_regex, vec] :
+             {std::make_tuple(&this->meshRegex, &meshes),
+              std::make_tuple(&this->particleRegex, &particles)})
         {
-            std::transform(
-                vec->begin(),
-                vec->end(),
-                std::inserter(*deque, deque->begin()),
-                [](auto const &str) {
-                    return std::make_pair(
-                        str,
-                        std::regex(
-                            str, regex_flags | std::regex_constants::optimize));
-                });
+            if (vec->empty())
+            {
+                *target_regex = std::regex(
+                    /* does not match anything */ "a^",
+                    regex_flags | std::regex_constants::optimize);
+                continue;
+            }
+            auto begin = vec->begin();
+            std::stringstream build_regex;
+            build_regex << '(' << *begin++ << ')';
+            for (; begin != vec->end(); ++begin)
+            {
+                build_regex << "|(" << *begin << ')';
+            }
+            auto regex_string = build_regex.str();
+            // std::cout << "Using regex string: " << regex_string << std::endl;
+            *target_regex = std::regex(
+                std::move(regex_string),
+                regex_flags | std::regex_constants::optimize);
         }
         setDefaultMeshesParticlesPath(meshes, particles, *this);
     }
@@ -207,12 +211,12 @@ namespace internal
     bool MeshesParticlesPath::isParticle(
         std::vector<std::string> const &path, std::string const &name) const
     {
-        return anyPathRegexMatches(particlesPath, path, name);
+        return anyPathRegexMatches(particleRegex, path, name);
     }
     bool MeshesParticlesPath::isMesh(
         std::vector<std::string> const &path, std::string const &name) const
     {
-        return anyPathRegexMatches(meshesPath, path, name);
+        return anyPathRegexMatches(meshRegex, path, name);
     }
 
     CustomHierarchyData::CustomHierarchyData()
@@ -524,9 +528,7 @@ void CustomHierarchy::flush_internal(
                          : concatWithSep(currentPath, "/") + "/") +
                     name;
             }
-            mpp.meshesPath.emplace(
-                extend_meshes_path,
-                std::regex(extend_meshes_path, regex_flags));
+            mpp.collectNewMeshesPaths.emplace(std::move(extend_meshes_path));
         }
         mesh.flush(name, flushParams);
     }
@@ -549,9 +551,8 @@ void CustomHierarchy::flush_internal(
                          : concatWithSep(currentPath, "/") + "/") +
                     name;
             }
-            mpp.particlesPath.emplace(
-                extend_particles_path,
-                std::regex(extend_particles_path, regex_flags));
+            mpp.collectNewParticlesPaths.emplace(
+                std::move(extend_particles_path));
         }
         particleSpecies.flush(name, flushParams);
     }
@@ -570,28 +571,25 @@ void CustomHierarchy::flush(
      */
 
     Series s = this->retrieveSeries();
-    internal::MeshesParticlesPath mpp(s.meshesPaths(), s.particlesPaths());
-    auto num_meshes_paths = mpp.meshesPath.size();
-    auto num_particles_paths = mpp.particlesPath.size();
+    std::vector<std::string> meshesPaths = s.meshesPaths(),
+                             particlesPaths = s.particlesPaths();
+    internal::MeshesParticlesPath mpp(meshesPaths, particlesPaths);
     std::vector<std::string> currentPath;
     flush_internal(flushParams, mpp, currentPath);
-    std::vector<std::string> meshesPaths, particlesPaths;
-    for (auto [map, vec] :
-         {std::make_pair(&mpp.meshesPath, &meshesPaths),
-          std::make_pair(&mpp.particlesPath, &particlesPaths)})
+    if (!mpp.collectNewMeshesPaths.empty() ||
+        !mpp.collectNewParticlesPaths.empty())
     {
-        std::transform(
-            map->begin(),
-            map->end(),
-            std::back_inserter(*vec),
-            [](auto const &pair) { return pair.first; });
-    }
-    if (meshesPaths.size() > num_meshes_paths)
-    {
+        for (auto [newly_added_paths, vec] :
+             {std::make_pair(&mpp.collectNewMeshesPaths, &meshesPaths),
+              std::make_pair(&mpp.collectNewParticlesPaths, &particlesPaths)})
+        {
+            std::transform(
+                newly_added_paths->begin(),
+                newly_added_paths->end(),
+                std::back_inserter(*vec),
+                [](auto const &pair) { return pair; });
+        }
         s.setMeshesPath(meshesPaths);
-    }
-    if (particlesPaths.size() > num_particles_paths)
-    {
         s.setParticlesPath(particlesPaths);
     }
 }

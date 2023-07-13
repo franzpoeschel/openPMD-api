@@ -52,8 +52,10 @@ namespace internal
          * @todo: When reading, maybe compile all regexes into one big regex
          * for performance?
          */
-        std::map<std::string, std::regex> meshesPath;
-        std::map<std::string, std::regex> particlesPath;
+        std::regex meshRegex;
+        std::set<std::string> collectNewMeshesPaths;
+        std::regex particleRegex;
+        std::set<std::string> collectNewParticlesPaths;
 
         /*
          * These values decide which path will be returned upon use of the
