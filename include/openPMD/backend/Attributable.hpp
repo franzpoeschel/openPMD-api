@@ -50,12 +50,14 @@ class AbstractFilePosition;
 class Attributable;
 class Iteration;
 class Series;
+class CustomHierarchy;
 
 namespace internal
 {
     class SharedAttributableData
     {
         friend class openPMD::Attributable;
+        friend class openPMD::CustomHierarchy;
 
     public:
         SharedAttributableData(AttributableData *);
@@ -102,6 +104,7 @@ namespace internal
     class AttributableData : public std::shared_ptr<SharedAttributableData>
     {
         friend class openPMD::Attributable;
+        friend class openPMD::CustomHierarchy;
 
         using SharedData_t = std::shared_ptr<SharedAttributableData>;
 
@@ -144,6 +147,7 @@ class Attributable
     friend class Series;
     friend class Writable;
     friend class WriteIterations;
+    friend class CustomHierarchy;
 
 protected:
     // tag for internal constructor

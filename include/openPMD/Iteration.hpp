@@ -246,9 +246,6 @@ public:
     [[deprecated("This attribute is no longer set by the openPMD-api.")]] bool
     closedByWriter() const;
 
-    Container<Mesh> meshes{};
-    Container<ParticleSpecies> particles{}; // particleSpecies?
-
     virtual ~Iteration() = default;
 
 private:
@@ -402,13 +399,6 @@ private:
      * @return false Otherwise.
      */
     bool dirtyRecursive() const;
-
-    /**
-     * @brief Link with parent.
-     *
-     * @param w The Writable representing the parent.
-     */
-    virtual void linkHierarchy(Writable &w);
 
     /**
      * @brief Access an iteration in read mode that has potentially not been
