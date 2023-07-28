@@ -128,6 +128,7 @@ class RecordComponent : public BaseRecordComponent
     friend class DynamicMemoryView;
     friend class internal::RecordComponentData;
     friend class MeshRecordComponent;
+    friend class CustomHierarchy;
 
 public:
     enum class Allocation
