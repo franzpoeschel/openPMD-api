@@ -281,6 +281,7 @@ public:
 
         /** Reconstructs a path that can be passed to a Series constructor */
         std::string filePath() const;
+        std::string printGroup() const;
     };
 
     /**

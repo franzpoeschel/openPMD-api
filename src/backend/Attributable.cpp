@@ -28,6 +28,7 @@
 #include <complex>
 #include <iostream>
 #include <set>
+#include <sstream>
 
 namespace openPMD
 {
@@ -195,6 +196,21 @@ Iteration &Attributable::containingIteration()
 std::string Attributable::MyPath::filePath() const
 {
     return directory + seriesName + seriesExtension;
+}
+
+std::string Attributable::MyPath::printGroup() const
+{
+    std::stringstream res;
+    if (this->group.empty())
+    {
+        return res.str();
+    }
+    res << *this->group.begin();
+    for (auto it = ++this->group.begin(); it != this->group.end(); ++it)
+    {
+        res << '/' << *it;
+    }
+    return res.str();
 }
 
 auto Attributable::myPath() const -> MyPath
