@@ -75,6 +75,7 @@ namespace internal
     class SeriesData;
     template <typename>
     class EraseStaleEntries;
+    struct CustomHierarchyData;
 
     template <
         typename T,
@@ -127,6 +128,7 @@ class Container : virtual public Attributable
     template <typename>
     friend class internal::EraseStaleEntries;
     friend class SeriesIterator;
+    friend struct internal::CustomHierarchyData;
     friend class CustomHierarchy;
 
 protected:

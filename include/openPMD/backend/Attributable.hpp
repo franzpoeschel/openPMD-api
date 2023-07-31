@@ -115,12 +115,24 @@ namespace internal
         AttributableData(AttributableData &&) = delete;
         virtual ~AttributableData() = default;
 
+        inline std::shared_ptr<SharedAttributableData> &
+        asSharedPtrOfAttributable()
+        {
+            return *this;
+        }
+        inline std::shared_ptr<SharedAttributableData> const &
+        asSharedPtrOfAttributable() const
+        {
+            return *this;
+        }
+
         AttributableData &operator=(AttributableData const &) = delete;
         AttributableData &operator=(AttributableData &&) = delete;
     };
 
     template <typename, typename>
     class BaseRecordData;
+    struct CustomHierarchyData;
 } // namespace internal
 
 /** @brief Layer to manage storage of attributes associated with file objects.
@@ -148,6 +160,7 @@ class Attributable
     friend class Writable;
     friend class WriteIterations;
     friend class CustomHierarchy;
+    friend struct internal::CustomHierarchyData;
 
 protected:
     // tag for internal constructor
