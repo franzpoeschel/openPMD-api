@@ -602,6 +602,7 @@ if(openPMD_HAVE_PYTHON)
         src/binding/python/BaseRecordComponent.cpp
         src/binding/python/ChunkInfo.cpp
         src/binding/python/Container.cpp
+        src/binding/python/CustomHierarchy.cpp
         src/binding/python/Dataset.cpp
         src/binding/python/Datatype.cpp
         src/binding/python/Error.cpp

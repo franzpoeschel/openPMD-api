@@ -21,6 +21,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/Iteration.hpp"
 
 #include <ios>
@@ -32,7 +33,11 @@ using namespace openPMD;
 
 void init_Iteration(py::module &m)
 {
-    py::class_<Iteration, Attributable>(m, "Iteration")
+    py::class_<
+        Iteration,
+        CustomHierarchy,
+        Container<CustomHierarchy>,
+        Attributable>(m, "Iteration")
         .def(py::init<Iteration const &>())
 
         .def(
@@ -83,18 +88,5 @@ void init_Iteration(py::module &m)
         // TODO remove in future versions (deprecated)
         .def("set_time", &Iteration::setTime<double>)
         .def("set_dt", &Iteration::setDt<double>)
-        .def("set_time_unit_SI", &Iteration::setTimeUnitSI)
-
-        .def_readwrite(
-            "meshes",
-            &Iteration::meshes,
-            py::return_value_policy::copy,
-            // garbage collection: return value must be freed before Iteration
-            py::keep_alive<1, 0>())
-        .def_readwrite(
-            "particles",
-            &Iteration::particles,
-            py::return_value_policy::copy,
-            // garbage collection: return value must be freed before Iteration
-            py::keep_alive<1, 0>());
+        .def("set_time_unit_SI", &Iteration::setTimeUnitSI);
 }

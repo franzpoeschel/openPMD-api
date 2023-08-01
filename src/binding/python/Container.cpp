@@ -26,6 +26,7 @@
 
 #include <pybind11/pybind11.h>
 
+#include "openPMD/CustomHierarchy.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticlePatches.hpp"
@@ -52,6 +53,7 @@ using PyPatchRecordContainer = Container<PatchRecord>;
 using PyRecordComponentContainer = Container<RecordComponent>;
 using PyMeshRecordComponentContainer = Container<MeshRecordComponent>;
 using PyPatchRecordComponentContainer = Container<PatchRecordComponent>;
+using PyCustomHierarchyContainer = Container<CustomHierarchy>;
 PYBIND11_MAKE_OPAQUE(PyIterationContainer)
 PYBIND11_MAKE_OPAQUE(PyMeshContainer)
 PYBIND11_MAKE_OPAQUE(PyPartContainer)
@@ -61,6 +63,7 @@ PYBIND11_MAKE_OPAQUE(PyPatchRecordContainer)
 PYBIND11_MAKE_OPAQUE(PyRecordComponentContainer)
 PYBIND11_MAKE_OPAQUE(PyMeshRecordComponentContainer)
 PYBIND11_MAKE_OPAQUE(PyPatchRecordComponentContainer)
+PYBIND11_MAKE_OPAQUE(PyCustomHierarchyContainer)
 
 void init_Container(py::module &m)
 {
@@ -85,4 +88,7 @@ void init_Container(py::module &m)
     ::detail::create_and_bind_container<
         PyPatchRecordComponentContainer,
         Attributable>(m, "Patch_Record_Component_Container");
+    ::detail::
+        create_and_bind_container<PyCustomHierarchyContainer, Attributable>(
+            m, "Custom_Hierarchy_Container");
 }
