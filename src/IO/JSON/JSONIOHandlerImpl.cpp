@@ -59,6 +59,13 @@ namespace openPMD
             throw std::runtime_error((TEXT));                                  \
     }
 
+namespace JSONDefaults
+{
+    using const_str = char const *const;
+    constexpr const_str openpmd_internal = "__openPMD_internal";
+    constexpr const_str IOMode = "IO_mode";
+} // namespace JSONDefaults
+
 namespace
 {
     struct DefaultValue
@@ -146,10 +153,11 @@ namespace
     }
 } // namespace
 
-auto JSONIOHandlerImpl::retrieveDatasetMode(
-    openPMD::json::TracingJSON &config) const -> IOMode
+auto JSONIOHandlerImpl::retrieveDatasetMode(openPMD::json::TracingJSON &config)
+    const -> std::pair<IOMode, SpecificationVia>
 {
     IOMode res = m_mode;
+    SpecificationVia res_2 = SpecificationVia::DefaultValue;
     if (auto [configLocation, maybeConfig] = getBackendConfig(config);
         maybeConfig.has_value())
     {
@@ -172,10 +180,12 @@ auto JSONIOHandlerImpl::retrieveDatasetMode(
                 if (mode == "dataset")
                 {
                     res = IOMode::Dataset;
+                    res_2 = SpecificationVia::Manually;
                 }
                 else if (mode == "template")
                 {
                     res = IOMode::Template;
+                    res_2 = SpecificationVia::Manually;
                 }
                 else
                 {
@@ -187,7 +197,7 @@ auto JSONIOHandlerImpl::retrieveDatasetMode(
             }
         }
     }
-    return res;
+    return std::make_pair(res, res_2);
 }
 
 std::string JSONIOHandlerImpl::backendConfigKey() const
@@ -226,7 +236,7 @@ JSONIOHandlerImpl::JSONIOHandlerImpl(
     , m_fileFormat{format}
     , m_originalExtension{std::move(originalExtension)}
 {
-    m_mode = retrieveDatasetMode(config);
+    std::tie(m_mode, m_IOModeSpecificationVia) = retrieveDatasetMode(config);
 
     if (auto [_, backendConfig] = getBackendConfig(config);
         backendConfig.has_value())
@@ -368,7 +378,7 @@ void JSONIOHandlerImpl::createDataset(
         parameter.options, /* considerFiles = */ false);
     // Retrieves mode from dataset-specific configuration, falls back to global
     // value if not defined
-    IOMode localMode = retrieveDatasetMode(config);
+    IOMode localMode = retrieveDatasetMode(config).first;
 
     parameter.warnUnusedParameters(
         config,
@@ -1462,6 +1472,45 @@ std::shared_ptr<nlohmann::json> JSONIOHandlerImpl::obtainJsonContents(File file)
         break;
     }
     VERIFY(fh->good(), "[JSON] Failed reading from a file.");
+    if (res->contains(JSONDefaults::openpmd_internal))
+    {
+        auto const &openpmd_internal = res->at(JSONDefaults::openpmd_internal);
+        if (openpmd_internal.contains(JSONDefaults::IOMode))
+        {
+            auto modeOption = openPMD::json::asLowerCaseStringDynamic(
+                openpmd_internal.at(JSONDefaults::IOMode));
+            if (!modeOption.has_value())
+            {
+                std::cerr
+                    << "[JSON/TOML backend] Warning: Invalid value of "
+                       "non-string type at internal meta table for entry '"
+                    << JSONDefaults::IOMode << "'. Will ignore and continue."
+                    << std::endl;
+            }
+            else if (modeOption.value() == "dataset")
+            {
+                if (m_IOModeSpecificationVia == SpecificationVia::DefaultValue)
+                {
+                    m_mode = IOMode::Dataset;
+                }
+            }
+            else if (modeOption.value() == "template")
+            {
+                if (m_IOModeSpecificationVia == SpecificationVia::DefaultValue)
+                {
+                    m_mode = IOMode::Template;
+                }
+            }
+            else
+            {
+                std::cerr << "[JSON/TOML backend] Warning: Invalid value '"
+                          << modeOption.value()
+                          << "' at internal meta table for entry '"
+                          << JSONDefaults::IOMode
+                          << "'. Will ignore and continue." << std::endl;
+            }
+        }
+    }
     m_jsonVals.emplace(file, res);
     return res;
 }
@@ -1492,8 +1541,12 @@ void JSONIOHandlerImpl::putJsonContents(
         {
         case IOMode::Dataset:
             (*it->second)["platform_byte_widths"] = platformSpecifics();
+            (*it->second)[JSONDefaults::openpmd_internal]
+                         [JSONDefaults::IOMode] = "dataset";
             break;
         case IOMode::Template:
+            (*it->second)[JSONDefaults::openpmd_internal]
+                         [JSONDefaults::IOMode] = "template";
             break;
         }
 
