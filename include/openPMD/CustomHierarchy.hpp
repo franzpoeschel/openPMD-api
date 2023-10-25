@@ -228,10 +228,21 @@ protected:
     CustomHierarchy();
     CustomHierarchy(NoInit);
 
-    void read(internal::MeshesParticlesPath const &);
+    inline void setData(std::shared_ptr<Data_t> data)
+    {
+        m_customHierarchyData = data;
+        Container_t::setData(std::move(data));
+    }
+
     void read(
         internal::MeshesParticlesPath const &,
-        std::vector<std::string> &currentPath);
+        Container<Mesh> meshes,
+        Container<ParticleSpecies> particles);
+    void read(
+        internal::MeshesParticlesPath const &,
+        std::vector<std::string> &currentPath,
+        Container<Mesh> meshes,
+        Container<ParticleSpecies> particles);
 
     void flush_internal(
         internal::FlushParams const &,
