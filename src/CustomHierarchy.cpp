@@ -376,15 +376,45 @@ void CustomHierarchy::readParticleSpecies(
     }
 }
 
-void CustomHierarchy::read(internal::MeshesParticlesPath const &mpp)
+void CustomHierarchy::read(
+    internal::MeshesParticlesPath const &mpp,
+    Container<Mesh> meshes,
+    Container<ParticleSpecies> particles)
 {
     std::vector<std::string> currentPath;
-    read(mpp, currentPath);
+    read(mpp, currentPath, meshes, particles);
 }
+
+namespace
+{
+    template <typename T>
+    void add_to_meshes_particles_view(
+        std::vector<std::string> const &currentPath,
+        std::string const &defaultMeshesParticlesPath,
+        Container<T> &meshesOrParticles,
+        std::string const &name,
+        T &meshOrParticle)
+    {
+        if (currentPath.empty())
+        {
+            throw std::runtime_error(
+                "Meshes or particles cannot be part of the root group.");
+        }
+        auto concatenatedName = concatWithSep(currentPath, "/");
+        concatenatedName.append(1, '/').append(name);
+        meshesOrParticles[concatenatedName] = meshOrParticle;
+        if (concatenatedName == defaultMeshesParticlesPath + '/' + name)
+        {
+            meshesOrParticles[name] = meshOrParticle;
+        }
+    }
+} // namespace
 
 void CustomHierarchy::read(
     internal::MeshesParticlesPath const &mpp,
-    std::vector<std::string> &currentPath)
+    std::vector<std::string> &currentPath,
+    Container<Mesh> meshes,
+    Container<ParticleSpecies> particles)
 {
     /*
      * Convention for CustomHierarchy::flush and CustomHierarchy::read:
@@ -416,7 +446,7 @@ void CustomHierarchy::read(
             currentPath.emplace_back(path);
             try
             {
-                subpath.read(mpp, currentPath);
+                subpath.read(mpp, currentPath, meshes, particles);
             }
             catch (error::ReadError const &err)
             {
@@ -442,6 +472,12 @@ void CustomHierarchy::read(
             try
             {
                 readNonscalarMesh(meshesMap, path);
+                add_to_meshes_particles_view(
+                    currentPath,
+                    mpp.m_defaultMeshesPath,
+                    meshes,
+                    path,
+                    meshesMap[path]);
             }
             catch (error::ReadError const &err)
             {
@@ -451,12 +487,19 @@ void CustomHierarchy::read(
                           << err.what() << std::endl;
                 meshesMap.forget(path);
             }
+
             break;
         }
         case internal::ContainedType::Particle: {
             try
             {
                 readParticleSpecies(particlesMap, path);
+                add_to_meshes_particles_view(
+                    currentPath,
+                    mpp.m_defaultParticlesPath,
+                    particles,
+                    path,
+                    particlesMap[path]);
             }
             catch (error::ReadError const &err)
             {
@@ -514,12 +557,18 @@ void CustomHierarchy::read(
             try
             {
                 readScalarMesh(meshesMap, path);
+                add_to_meshes_particles_view(
+                    currentPath,
+                    mpp.m_defaultMeshesPath,
+                    meshes,
+                    path,
+                    meshesMap[path]);
             }
             catch (error::ReadError const &err)
             {
-                std::cerr << "Cannot read scalar mesh at location '"
+                std::cerr << "Cannot read mesh at location '"
                           << myPath().openPMDPath() << "/" << path
-                          << "' and will skip it due to read error:\n"
+                          << "' and will skip them due to read error:\n"
                           << err.what() << std::endl;
                 meshesMap.forget(path);
             }

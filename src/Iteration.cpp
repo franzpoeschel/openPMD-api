@@ -395,9 +395,9 @@ void Iteration::sync_meshes_and_particles_from_alias_to_subgroups(
             {
                 if (auxiliary::contains(name, '/'))
                 {
-                    throw std::runtime_error(
-                        "Unimplemented: Multi-level paths in "
-                        "Iteration::meshes/Iteration::particles");
+                    // throw std::runtime_error(
+                    //     "Unimplemented: Multi-level paths in "
+                    //     "Iteration::meshes/Iteration::particles");
                 }
                 if (auto it = container.find(name); it != container.end())
                 {
@@ -570,9 +570,7 @@ void Iteration::read_impl(std::string const &groupPath)
     //   hasMeshes <-> meshesPath is defined
 
     internal::MeshesParticlesPath mpp(s.meshesPaths(), s.particlesPaths());
-    CustomHierarchy::read(mpp);
-
-    sync_meshes_and_particles_from_subgroups_to_alias(mpp);
+    CustomHierarchy::read(mpp, meshes, particles);
 
 #ifdef openPMD_USE_INVASIVE_TESTS
     if (containsAttribute("__openPMD_internal_fail"))
