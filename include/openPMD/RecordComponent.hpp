@@ -488,8 +488,9 @@ public:
     static constexpr char const *const SCALAR = "\vScalar";
 
 protected:
-    void flush(std::string const &, internal::FlushParams const &);
-    void read(bool require_unit_si);
+    void flush(
+        std::string const &, internal::FlushParams const &, bool set_defaults);
+    void read(bool read_defaults);
 
 private:
     /**
@@ -537,7 +538,7 @@ OPENPMD_protected
         BaseRecordComponent::setData(m_recordComponentData);
     }
 
-    void readBase(bool require_unit_si);
+    void readBase(bool read_defaults);
 
     template <typename T>
     void verifyChunk(Offset const &, Extent const &) const;
