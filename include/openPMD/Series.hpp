@@ -189,6 +189,8 @@ namespace internal
          */
         bool m_wroteAtLeastOneIOStep = false;
 
+        bool m_containedAtLeastOneIteration = false;
+
         /**
          * Remember the preference that the backend specified for parsing.
          * Not used in file-based iteration encoding, empty then.
@@ -836,6 +838,10 @@ OPENPMD_private
 
     AbstractIOHandler *IOHandler();
     AbstractIOHandler const *IOHandler() const;
+
+    Iteration resetIteration(IterationIndex_t);
+    std::pair<decltype(iterations)::iterator, Iteration>
+    resetIteration(decltype(iterations)::iterator);
 }; // Series
 
 namespace debug

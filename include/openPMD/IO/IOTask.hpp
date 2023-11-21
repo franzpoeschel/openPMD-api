@@ -30,6 +30,7 @@
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
 
+#include <any>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -185,6 +186,8 @@ struct OPENPMDAPI_EXPORT Parameter<Operation::CLOSE_FILE>
     Parameter(Parameter const &) = default;
     Parameter &operator=(Parameter &&) = default;
     Parameter &operator=(Parameter const &) = default;
+
+    std::any keep_this_data_alive;
 
     std::unique_ptr<AbstractParameter> to_heap() && override
     {

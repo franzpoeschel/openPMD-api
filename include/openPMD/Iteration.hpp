@@ -393,6 +393,8 @@ private:
      *
      */
     void runDeferredParseAccess();
+
+    Iteration resetIteration();
 }; // Iteration
 
 extern template float Iteration::time<float>() const;

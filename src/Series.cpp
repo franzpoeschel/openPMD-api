@@ -1014,7 +1014,7 @@ void Series::flushFileBased(
     bool flushIOHandler)
 {
     auto &series = get();
-    if (end == begin)
+    if (end == begin && !series.m_containedAtLeastOneIteration)
         throw std::runtime_error(
             "fileBased output can not be written with no iterations.");
 
@@ -1045,7 +1045,10 @@ void Series::flushFileBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&it->second, std::move(fClose)));
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
                 it->second.get().m_closed =
                     internal::CloseStatus::ClosedInBackend;
             }
@@ -1103,7 +1106,10 @@ void Series::flushFileBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&it->second, std::move(fClose)));
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
                 it->second.get().m_closed =
                     internal::CloseStatus::ClosedInBackend;
             }
@@ -2135,7 +2141,10 @@ AdvanceStatus Series::advance(
             if (itData.m_closed != internal::CloseStatus::ClosedTemporarily)
             {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&iteration, std::move(fClose)));
+                Iteration resetted = iteration.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
             }
             itData.m_closed = internal::CloseStatus::ClosedInBackend;
             break;
@@ -2719,6 +2728,25 @@ AbstractIOHandler const *Series::IOHandler() const
 {
     auto res = Attributable::IOHandler();
     return res;
+}
+
+Iteration Series::resetIteration(IterationIndex_t idx)
+{
+    auto it = iterations.find(idx);
+    if (it == iterations.end())
+    {
+        return {};
+    }
+    return resetIteration(it).second;
+}
+
+auto Series::resetIteration(decltype(iterations)::iterator it)
+    -> std::pair<decltype(iterations)::iterator, Iteration>
+{
+    auto res = it->second;
+    it = iterations.container().erase(it);
+    get().m_containedAtLeastOneIteration = true;
+    return {it, res};
 }
 
 namespace

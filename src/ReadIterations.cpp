@@ -444,9 +444,12 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
         }
     }
 
+    auto oldIterationIndex = data.currentIteration;
+
     auto guardReturn =
-        [&series, &iterations](
+        [&series, &iterations, oldIterationIndex](
             auto const &option) -> std::optional<openPMD::SeriesIterator *> {
+        series.resetIteration(oldIterationIndex);
         if (!option.has_value() || *option.value() == end())
         {
             return option;
@@ -489,6 +492,7 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
             {
                 // we had this iteration already, skip it
                 iteration.endStep();
+                series.resetIteration(index);
                 return std::nullopt; // empty, go into next iteration
             }
         }
@@ -496,6 +500,7 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
         {
             // we had this iteration already, skip it
             series.advance(AdvanceMode::ENDSTEP);
+            series.resetIteration(index);
             return std::nullopt;
         }
     };
@@ -514,6 +519,7 @@ std::optional<SeriesIterator *> SeriesIterator::loopBody()
     if (series.iterationEncoding() == IterationEncoding::fileBased)
     {
         // this one is handled above, stream is over once it proceeds to here
+        series.resetIteration(oldIterationIndex);
         this->close();
         return {this};
     }
@@ -529,8 +535,10 @@ void SeriesIterator::deactivateDeadIteration(iteration_index_t index)
     {
     case IterationEncoding::fileBased: {
         Parameter<Operation::CLOSE_FILE> param;
-        data.series->IOHandler()->enqueue(
-            IOTask(&data.series->iterations[index], std::move(param)));
+        Iteration resetted = data.series->resetIteration(index);
+        auto writable = &resetted.writable();
+        param.keep_this_data_alive = std::move(resetted);
+        data.series->IOHandler()->enqueue(IOTask(writable, std::move(param)));
         data.series->IOHandler()->flush({FlushLevel::UserFlush});
     }
     break;
