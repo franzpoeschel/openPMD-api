@@ -227,6 +227,9 @@ public:
     using shared_ptr_dataset_types = auxiliary::detail::
         map_variant<auxiliary::detail::as_shared_pointer, dataset_types>::type;
 
+    using raw_ptr_dataset_types = auxiliary::detail::
+        map_variant<auxiliary::detail::as_raw_pointer, dataset_types>::type;
+
     /** std::variant-based version of allocating loadChunk<T>(Offset, Extent)
      *
      * @return The same result that loadChunk() would return, but
@@ -238,6 +241,10 @@ public:
      *     ..., std::shared_ptr<std::complex<long double>>>
      */
     shared_ptr_dataset_types loadChunkVariant(Offset = {0u}, Extent = {-1u});
+
+    template <typename Alloc>
+    raw_ptr_dataset_types
+    loadChunkVariantAllocating(Alloc &&alloc, Offset = {0u}, Extent = {-1u});
 
     /** Load a chunk of data into pre-allocated memory.
      *

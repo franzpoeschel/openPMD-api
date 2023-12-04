@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Span.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
@@ -54,27 +56,59 @@ inline RecordComponent &RecordComponent::makeEmpty(uint8_t dimensions)
     return makeEmpty(Dataset(determineDatatype<T>(), Extent(dimensions, 0)));
 }
 
-template <typename T>
-inline std::shared_ptr<T> RecordComponent::loadChunk(Offset o, Extent e)
+namespace detail
 {
-    uint8_t dim = getDimensionality();
-
-    // default arguments
-    //   offset = {0u}: expand to right dim {0u, 0u, ...}
-    Offset offset = o;
-    if (o.size() == 1u && o.at(0) == 0u && dim > 1u)
-        offset = Offset(dim, 0u);
-
-    //   extent = {-1u}: take full size
-    Extent extent(dim, 1u);
-    if (e.size() == 1u && e.at(0) == -1u)
+    inline void
+    checkOffsetExtentForLoading(RecordComponent &rc, Offset &o, Extent &e)
     {
-        extent = getExtent();
-        for (uint8_t i = 0u; i < dim; ++i)
-            extent[i] -= offset[i];
+        uint8_t dim = rc.getDimensionality();
+
+        // default arguments
+        //   offset = {0u}: expand to right dim {0u, 0u, ...}
+        Offset offset = o;
+        if (o.size() == 1u && o.at(0) == 0u && dim > 1u)
+            offset = Offset(dim, 0u);
+
+        //   extent = {-1u}: take full size
+        Extent extent(dim, 1u);
+        if (e.size() == 1u && e.at(0) == -1u)
+        {
+            extent = rc.getExtent();
+            for (uint8_t i = 0u; i < dim; ++i)
+                extent[i] -= offset[i];
+        }
+        else
+            extent = e;
+
+        if (extent.size() != dim || offset.size() != dim)
+        {
+            std::ostringstream oss;
+            oss << "Dimensionality of chunk ("
+                << "offset=" << offset.size() << "D, "
+                << "extent=" << extent.size() << "D) "
+                << "and record component (" << int(dim) << "D) "
+                << "do not match.";
+            throw std::runtime_error(oss.str());
+        }
+        Extent dse = rc.getExtent();
+        for (uint8_t i = 0; i < dim; ++i)
+            if (dse[i] < offset[i] + extent[i])
+                throw std::runtime_error(
+                    "Chunk does not reside inside dataset (Dimension on "
+                    "index " +
+                    std::to_string(i) + ". DS: " + std::to_string(dse[i]) +
+                    " - Chunk: " + std::to_string(offset[i] + extent[i]) + ")");
+
+        o = offset;
+        e = extent;
     }
-    else
-        extent = e;
+} // namespace detail
+
+template <typename T>
+inline std::shared_ptr<T>
+RecordComponent::loadChunk(Offset offset, Extent extent)
+{
+    detail::checkOffsetExtentForLoading(*this, offset, extent);
 
     uint64_t numPoints = 1u;
     for (auto const &dimensionSize : extent)
@@ -94,8 +128,8 @@ inline std::shared_ptr<T> RecordComponent::loadChunk(Offset o, Extent e)
 }
 
 template <typename T>
-inline void
-RecordComponent::loadChunk(std::shared_ptr<T> data, Offset o, Extent e)
+inline void RecordComponent::loadChunk(
+    std::shared_ptr<T> data, Offset offset, Extent extent)
 {
     Datatype dtype = determineDatatype(data);
     if (dtype != getDatatype())
@@ -113,42 +147,8 @@ RecordComponent::loadChunk(std::shared_ptr<T> data, Offset o, Extent e)
             throw std::runtime_error(err_msg);
         }
 
-    uint8_t dim = getDimensionality();
+    detail::checkOffsetExtentForLoading(*this, offset, extent);
 
-    // default arguments
-    //   offset = {0u}: expand to right dim {0u, 0u, ...}
-    Offset offset = o;
-    if (o.size() == 1u && o.at(0) == 0u && dim > 1u)
-        offset = Offset(dim, 0u);
-
-    //   extent = {-1u}: take full size
-    Extent extent(dim, 1u);
-    if (e.size() == 1u && e.at(0) == -1u)
-    {
-        extent = getExtent();
-        for (uint8_t i = 0u; i < dim; ++i)
-            extent[i] -= offset[i];
-    }
-    else
-        extent = e;
-
-    if (extent.size() != dim || offset.size() != dim)
-    {
-        std::ostringstream oss;
-        oss << "Dimensionality of chunk ("
-            << "offset=" << offset.size() << "D, "
-            << "extent=" << extent.size() << "D) "
-            << "and record component (" << int(dim) << "D) "
-            << "do not match.";
-        throw std::runtime_error(oss.str());
-    }
-    Extent dse = getExtent();
-    for (uint8_t i = 0; i < dim; ++i)
-        if (dse[i] < offset[i] + extent[i])
-            throw std::runtime_error(
-                "Chunk does not reside inside dataset (Dimension on index " +
-                std::to_string(i) + ". DS: " + std::to_string(dse[i]) +
-                " - Chunk: " + std::to_string(offset[i] + extent[i]) + ")");
     if (!data)
         throw std::runtime_error(
             "Unallocated pointer passed during chunk loading.");
@@ -190,6 +190,38 @@ template <typename T>
 inline void RecordComponent::loadChunkRaw(T *ptr, Offset offset, Extent extent)
 {
     loadChunk(auxiliary::shareRaw(ptr), std::move(offset), std::move(extent));
+}
+
+namespace detail
+{
+    template <typename Alloc>
+    struct LoadChunkVariantAllocating
+    {
+        template <typename T>
+        static RecordComponent::raw_ptr_dataset_types
+        call(RecordComponent &self, Alloc &&alloc, Offset offset, Extent extent)
+        {
+            T *res;
+            auto dim = self.getDimensionality();
+            size_t flat_extent = 1;
+            for (uint8_t i = 0; i < dim; ++i)
+            {
+                flat_extent *= extent[i];
+            }
+            std::forward<Alloc>(alloc)(&res, flat_extent);
+            self.loadChunkRaw(res, std::move(offset), std::move(extent));
+            return res;
+        }
+    };
+} // namespace detail
+
+template <typename Alloc>
+auto RecordComponent::loadChunkVariantAllocating(
+    Alloc &&alloc, Offset offset, Extent extent) -> raw_ptr_dataset_types
+{
+    detail::checkOffsetExtentForLoading(*this, offset, extent);
+    return this->visit<detail::LoadChunkVariantAllocating<Alloc>>(
+        std::forward<Alloc>(alloc), std::move(offset), std::move(extent));
 }
 
 template <typename T>

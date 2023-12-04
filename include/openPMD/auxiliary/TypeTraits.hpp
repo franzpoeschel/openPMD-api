@@ -170,6 +170,12 @@ namespace detail
         using type = std::shared_ptr<T>;
     };
 
+    struct as_raw_pointer
+    {
+        template <typename T>
+        using type = T *;
+    };
+
     template <typename...>
     struct append_to_variant;
 

@@ -1,6 +1,7 @@
 // expose private and protected members for invasive testing
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/Access.hpp"
+#include <type_traits>
 #if openPMD_USE_INVASIVE_TESTS
 #define OPENPMD_private public:
 #define OPENPMD_protected public:
@@ -1666,6 +1667,21 @@ inline void write_test(const std::string &backend)
                       << '\'' << std::endl;
         },
         variantTypeDataset);
+
+    std::vector<char> serializationBuffer;
+    auto selfAllocatedVariant = rc.loadChunkVariantAllocating(
+        [&serializationBuffer](auto **ptr, size_t flat_extent) {
+            using type = std::remove_reference_t<decltype(**ptr)>;
+            serializationBuffer.resize(sizeof(type) * flat_extent);
+            *ptr = reinterpret_cast<type *>(serializationBuffer.data());
+        });
+    rc.seriesFlush();
+    std::visit(
+        [](auto *ptr) {
+            std::cout << "First value in loaded chunk: '" << ptr[0] << '\''
+                      << std::endl;
+        },
+        selfAllocatedVariant);
 }
 
 TEST_CASE("write_test", "[serial]")
