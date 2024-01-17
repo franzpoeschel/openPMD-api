@@ -688,19 +688,10 @@ public:
         , parameter{std::move(p).to_heap()}
     {}
 
-    explicit IOTask(IOTask const &other)
-        : writable{other.writable}
-        , operation{other.operation}
-        , parameter{other.parameter}
-    {}
-
-    IOTask &operator=(IOTask const &other)
-    {
-        writable = other.writable;
-        operation = other.operation;
-        parameter = other.parameter;
-        return *this;
-    }
+    IOTask(IOTask const &other);
+    IOTask(IOTask &&other) noexcept;
+    IOTask &operator=(IOTask const &other);
+    IOTask &operator=(IOTask &&other) noexcept;
 
     Writable *writable;
     Operation operation;
