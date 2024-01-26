@@ -2930,7 +2930,7 @@ namespace
 Snapshots Series::snapshots()
 {
     auto &series = get();
-    IteratorKind iterator_kind;
+    IteratorKind iterator_kind{};
     {
         using IK = IteratorKind;
         switch (IOHandler()->m_frontendAccess)
@@ -2941,7 +2941,6 @@ Snapshots Series::snapshots()
         case Access::READ_ONLY:
             switch (series.m_parsePreference.value())
             {
-
             case internal::ParsePreference::UpFront:
                 iterator_kind = IK::RandomAccess;
                 break;
@@ -2961,8 +2960,9 @@ Snapshots Series::snapshots()
 
     switch (iterator_kind)
     {
-
     case IteratorKind::RandomAccess: {
+        return Snapshots(std::shared_ptr<RandomAccessSnapshotsContainer>{
+            new RandomAccessSnapshotsContainer(series.iterations)});
     }
     case IteratorKind::Stateful: {
         // Use private constructor instead of copy constructor to avoid
