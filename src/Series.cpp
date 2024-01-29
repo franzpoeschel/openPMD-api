@@ -26,7 +26,6 @@
 #include "openPMD/IO/DummyIOHandler.hpp"
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/IterationEncoding.hpp"
-#include "openPMD/ReadIterations.hpp"
 #include "openPMD/SeriesIterator.hpp"
 #include "openPMD/Snapshots.hpp"
 #include "openPMD/ThrowError.hpp"
@@ -35,6 +34,7 @@
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
+#include "openPMD/snapshots/StatefulIterator.hpp"
 #include "openPMD/version.hpp"
 
 #include <cctype>
@@ -2598,13 +2598,13 @@ Series::operator bool() const
     return m_attri.operator bool();
 }
 
-ReadIterations Series::readIterations()
+StatefulIterator Series::readIterations()
 {
     // Use private constructor instead of copy constructor to avoid
     // object slicing
     Series res;
     res.setData(std::dynamic_pointer_cast<internal::SeriesData>(this->m_attri));
-    return ReadIterations{
+    return StatefulIterator{
         std::move(res), IOHandler()->m_frontendAccess, get().m_parsePreference};
 }
 
