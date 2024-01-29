@@ -454,7 +454,6 @@ set(CORE_SOURCE
         src/Record.cpp
         src/RecordComponent.cpp
         src/Series.cpp
-        src/SeriesIterator.cpp
         src/Snapshots.cpp
         src/version.cpp
         src/WriteIterations.cpp
@@ -470,6 +469,7 @@ set(CORE_SOURCE
         src/backend/Writable.cpp
         src/benchmark/mpi/OneDimensionalBlockSlicer.cpp
         src/helper/list_series.cpp
+        src/snapshots/IteratorTraits.cpp
         src/snapshots/StatefulIterator.cpp)
 set(IO_SOURCE
         src/IO/AbstractIOHandler.cpp
