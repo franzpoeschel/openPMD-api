@@ -131,6 +131,7 @@ class Iteration : public Attributable
     friend class WriteIterations;
     friend class internal::AttributableData;
     friend class StatefulIterator;
+    friend class StatefulSnapshotsContainer;
 
 public:
     Iteration(Iteration const &) = default;

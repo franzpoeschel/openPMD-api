@@ -192,6 +192,7 @@ class Attributable
     friend class WriteIterations;
     friend class internal::RecordComponentData;
     friend void debug::printDirty(Series const &);
+    friend class StatefulSnapshotsContainer;
 
 protected:
     // tag for internal constructor
