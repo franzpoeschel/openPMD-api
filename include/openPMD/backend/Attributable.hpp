@@ -108,7 +108,6 @@ class Attributable
     friend class Iteration;
     friend class Series;
     friend class Writable;
-    friend class WriteIterations;
     friend class StatefulSnapshotsContainer;
 
 protected:
