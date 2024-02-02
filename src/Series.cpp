@@ -210,15 +210,21 @@ Series::mpiRanksMetaInfo([[maybe_unused]] bool collective)
     }
     if (iterationEncoding() == IterationEncoding::fileBased)
     {
+        std::cerr << "[Series] Use rank table in file-based iteration encoding "
+                     "at your own risk. Make sure to have an iteration open "
+                     "before calling this."
+                  << std::endl;
         if (iterations.empty())
         {
             return {};
         }
+#if 0
         Parameter<Operation::OPEN_FILE> openFile;
         openFile.name = iterationFilename(iterations.begin()->first);
         // @todo: check if the series currently has an open file, check if
         // collective is true
         IOHandler()->enqueue(IOTask(this, openFile));
+#endif
     }
     Parameter<Operation::LIST_DATASETS> listDatasets;
     IOHandler()->enqueue(IOTask(this, listDatasets));
@@ -298,6 +304,7 @@ Series::mpiRanksMetaInfo([[maybe_unused]] bool collective)
     doReadDataset();
 #endif
 
+#if 0
     if (iterationEncoding() == IterationEncoding::fileBased)
     {
         // @todo only do this if the file was previously not open
@@ -307,6 +314,7 @@ Series::mpiRanksMetaInfo([[maybe_unused]] bool collective)
         it.get().m_closed = internal::CloseStatus::ClosedTemporarily;
         IOHandler()->flush(internal::defaultFlushParams);
     }
+#endif
 
     chunk_assignment::RankMeta res;
     for (size_t i = 0; i < writerRanks; ++i)
