@@ -120,6 +120,9 @@ class ADIOS2IOHandlerImpl
 
 public:
     using FilePositionType = ADIOS2FilePosition;
+    // Type for internal::FileState::backendSpecificState
+    // Need a shared pointer since std::any requires copy-constructible types
+    using BackendSpecificFileState = std::shared_ptr<detail::ADIOS2File>;
 
 #if openPMD_HAVE_MPI
 

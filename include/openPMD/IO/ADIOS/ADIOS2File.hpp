@@ -456,10 +456,6 @@ private:
     void configure_IO_Write();
 };
 
-// Type for internal::FileState::backendSpecificState
-// Need a shared pointer since std::any requires copy-constructible types
-using BackendSpecificFileState = std::shared_ptr<ADIOS2File>;
-
 template <typename... Args>
 void ADIOS2File::flush(Args &&...args)
 {

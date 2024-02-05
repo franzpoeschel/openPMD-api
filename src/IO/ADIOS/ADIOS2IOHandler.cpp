@@ -584,9 +584,8 @@ ADIOS2IOHandlerImpl::flush(internal::ParsedFlushParams &flushParams)
     {
         if (p->has_value() && (*p)->backendSpecificState.has_value())
         {
-            auto &adios2_file =
-                std::any_cast<detail::BackendSpecificFileState &>(
-                    (*p)->backendSpecificState);
+            auto &adios2_file = std::any_cast<BackendSpecificFileState &>(
+                (*p)->backendSpecificState);
             adios2_file->flush(adios2FlushParams, /* writeLatePuts = */ false);
         }
         else
@@ -977,8 +976,8 @@ void ADIOS2IOHandlerImpl::closeFile(
     {
         return;
     }
-    auto &adios2_file = std::any_cast<detail::BackendSpecificFileState &>(
-        file.backendSpecificState);
+    auto &adios2_file =
+        std::any_cast<BackendSpecificFileState &>(file.backendSpecificState);
 
     /*
      * No need to finalize unconditionally, destructor will take care
@@ -1737,9 +1736,8 @@ ADIOS2IOHandlerImpl::getFileData(internal::FileState &file, IfFileNotOpen flag)
         switch (flag)
         {
         case IfFileNotOpen::OpenImplicitly: {
-            file.backendSpecificState =
-                std::make_any<detail::BackendSpecificFileState>(
-                    new detail::ADIOS2File(*this, file));
+            file.backendSpecificState = std::make_any<BackendSpecificFileState>(
+                new detail::ADIOS2File(*this, file));
             break;
         }
         case IfFileNotOpen::ThrowError:
@@ -1748,8 +1746,8 @@ ADIOS2IOHandlerImpl::getFileData(internal::FileState &file, IfFileNotOpen flag)
                 file.name);
         }
     }
-    auto &adios2_file = std::any_cast<detail::BackendSpecificFileState &>(
-        file.backendSpecificState);
+    auto &adios2_file =
+        std::any_cast<BackendSpecificFileState &>(file.backendSpecificState);
     return *adios2_file;
 }
 
