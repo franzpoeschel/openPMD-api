@@ -197,8 +197,9 @@ ADIOS2IOHandlerImpl::~ADIOS2IOHandlerImpl()
                       << std::endl;
             continue;
         }
-        sorted.emplace_back(std::make_pair(
-            (*file.second)->name, &(*file.second)->backendSpecificState));
+        sorted.emplace_back(
+            std::make_pair(
+                (*file.second)->name, &(*file.second)->backendSpecificState));
     }
     /*
      * Technically, std::sort() is sufficient here, since file names are unique.
@@ -2029,7 +2030,11 @@ void ADIOS2IOHandlerImpl::deregister(
 void ADIOS2IOHandlerImpl::touch(
     Writable *writable, Parameter<Operation::TOUCH> const &)
 {
-    refreshFileFromParent(writable, false);
+    if (!writable->fileState || !writable->fileState->has_value())
+    {
+        throw error::Internal(
+            "ADIOS2 backend: Tried accessing a file that is not open.");
+    }
     if (access::write(m_handler->m_backendAccess))
     {
         this->m_dirty.emplace(writable->fileState);
