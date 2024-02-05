@@ -90,7 +90,9 @@ namespace detail
 } // namespace detail
 
 class ADIOS2IOHandlerImpl
-    : public AbstractIOHandlerImplCommon<ADIOS2FilePosition>
+    : public AbstractIOHandlerImplCommon<
+          ADIOS2IOHandlerImpl,
+          ADIOS2FilePosition>
 {
     template <typename, typename>
     friend struct detail::DatasetHelper;
@@ -110,11 +112,15 @@ class ADIOS2IOHandlerImpl
     friend class detail::ADIOS2File;
     friend struct detail::BufferedAttributeRead;
     friend struct detail::RunUniquePtrPut;
+    template <typename, typename>
+    friend class AbstractIOHandlerImplCommon;
 
     using UseGroupTable = adios_defs::UseGroupTable;
     using FlushTarget = adios_defs::FlushTarget;
 
 public:
+    using FilePositionType = ADIOS2FilePosition;
+
 #if openPMD_HAVE_MPI
 
     ADIOS2IOHandlerImpl(
@@ -354,26 +360,14 @@ private:
      */
     int nameCounter{0};
 
-    /*
-     * IO-heavy actions are deferred to a later point. This map stores for
-     * each open file (identified by an InvalidatableFile object) an object
-     * that manages IO-heavy actions, as well as its ADIOS2 objects, i.e.
-     * IO and Engine object.
-     * Not to be accessed directly, use getFileData().
-     */
-    std::unordered_map<InvalidatableFile, std::unique_ptr<detail::ADIOS2File>>
-        m_fileData;
-
     std::map<std::string, adios2::Operator> m_operators;
 
     // Overrides from AbstractIOHandlerImplCommon.
 
-    std::string
-        filePositionToString(std::shared_ptr<ADIOS2FilePosition>) override;
+    std::string filePositionToString(ADIOS2FilePosition const &);
 
-    std::shared_ptr<ADIOS2FilePosition> extendFilePosition(
-        std::shared_ptr<ADIOS2FilePosition> const &pos,
-        std::string extend) override;
+    std::shared_ptr<ADIOS2FilePosition>
+    extendFilePosition(ADIOS2FilePosition const &pos, std::string extend);
 
     // Helper methods.
 
@@ -410,9 +404,8 @@ private:
     };
 
     detail::ADIOS2File &
-    getFileData(InvalidatableFile const &file, IfFileNotOpen);
-
-    void dropFileData(InvalidatableFile const &file);
+    getFileData(std::optional<internal::FileState> &file, IfFileNotOpen);
+    detail::ADIOS2File &getFileData(internal::FileState &file, IfFileNotOpen);
 
     /*
      * Prepare a variable that already exists for an IO
@@ -556,7 +549,7 @@ namespace detail
         template <typename T>
         static void call(
             ADIOS2IOHandlerImpl *impl,
-            InvalidatableFile const &,
+            internal::FileState &,
             std::string const &varName,
             Parameter<Operation::OPEN_DATASET> &parameters);
 

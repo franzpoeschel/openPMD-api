@@ -229,7 +229,7 @@ public:
 
     using AttributeMap_t = std::map<std::string, adios2::Params>;
 
-    ADIOS2File(ADIOS2IOHandlerImpl &impl, InvalidatableFile file);
+    ADIOS2File(ADIOS2IOHandlerImpl &impl, internal::FileState const &file);
 
     ~ADIOS2File();
 
@@ -455,6 +455,10 @@ private:
     void configure_IO_Read();
     void configure_IO_Write();
 };
+
+// Type for internal::FileState::backendSpecificState
+// Need a shared pointer since std::any requires copy-constructible types
+using BackendSpecificFileState = std::shared_ptr<ADIOS2File>;
 
 template <typename... Args>
 void ADIOS2File::flush(Args &&...args)

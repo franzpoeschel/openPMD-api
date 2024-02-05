@@ -21,6 +21,7 @@
 #pragma once
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/InvalidatableFile.hpp"
 
 #include <memory>
 #include <string>
@@ -40,7 +41,7 @@ namespace test
 class AbstractFilePosition;
 class AbstractIOHandler;
 struct ADIOS2FilePosition;
-template <typename FilePositionType>
+template <typename, typename>
 class AbstractIOHandlerImplCommon;
 template <typename>
 class Span;
@@ -54,7 +55,8 @@ namespace internal
 namespace detail
 {
     class ADIOS2File;
-}
+    struct AttributeWriter;
+} // namespace detail
 
 namespace debug
 {
@@ -89,10 +91,11 @@ class Writable final
     friend class Record;
     friend class AbstractIOHandlerImpl;
     friend class ADIOS2IOHandlerImpl;
+    friend struct detail::AttributeWriter;
     friend class detail::ADIOS2File;
     friend class HDF5IOHandlerImpl;
     friend class ParallelHDF5IOHandlerImpl;
-    template <typename>
+    template <typename, typename>
     friend class AbstractIOHandlerImplCommon;
     friend class JSONIOHandlerImpl;
     friend struct test::TestHelper;
@@ -127,6 +130,7 @@ OPENPMD_private
     // clang-format on
 
     void seriesFlush(internal::FlushParams const &);
+    internal::SharedFileState fileState;
     /*
      * These members need to be shared pointers since distinct instances of
      * Writable may share them.

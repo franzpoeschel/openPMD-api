@@ -23,6 +23,7 @@
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 
@@ -159,10 +160,9 @@ void BufferedUniquePtrPut::run(ADIOS2File &ba)
     switchAdios2VariableType<RunUniquePtrPut>(dtype, *this, ba);
 }
 
-ADIOS2File::ADIOS2File(ADIOS2IOHandlerImpl &impl, InvalidatableFile file)
-    : m_file(impl.fullPath(std::move(file)))
-    , m_ADIOS(impl.m_ADIOS)
-    , m_impl(&impl)
+ADIOS2File::ADIOS2File(
+    ADIOS2IOHandlerImpl &impl, internal::FileState const &file)
+    : m_file(impl.fullPath(file)), m_ADIOS(impl.m_ADIOS), m_impl(&impl)
 {
     // Declaring these members in the constructor body to avoid
     // initialization order hazards. Need the IO_ prefix since in some
@@ -1325,8 +1325,7 @@ void ADIOS2File::markActive(Writable *writable)
             do
             {
                 using attr_t = unsigned long long;
-                auto filePos = m_impl->setAndGetFilePosition(
-                    writable, /* write = */ false);
+                auto filePos = m_impl->setAndGetFilePosition(writable);
                 auto fullPath =
                     adios_defaults::str_activeTablePrefix + filePos->location;
                 m_IO.DefineAttribute<attr_t>(
