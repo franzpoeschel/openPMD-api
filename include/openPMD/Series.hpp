@@ -34,8 +34,6 @@
 #include "openPMD/config.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
 #include "openPMD/version.hpp"
-#include <memory>
-#include <stdexcept>
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
@@ -44,9 +42,12 @@
 #include <cstdint> // uint64_t
 #include <deque>
 #include <map>
+#include <memory>
 #include <optional>
 #include <set>
+#include <stdexcept>
 #include <string>
+#include <vector>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private
@@ -751,7 +752,7 @@ OPENPMD_private
      * ReadIterations since those methods should be aware when the current
      * step is broken).
      */
-    std::deque<IterationIndex_t> readGorVBased(
+    std::vector<IterationIndex_t> readGorVBased(
         bool do_always_throw_errors,
         bool init,
         std::set<IterationIndex_t> const &ignoreIterations = {});
