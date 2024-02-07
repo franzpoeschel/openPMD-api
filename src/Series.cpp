@@ -57,6 +57,7 @@
 #include <string>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 namespace openPMD
 {
@@ -1863,7 +1864,7 @@ auto Series::readGorVBased(
     bool do_always_throw_errors,
     bool do_init,
     std::set<IterationIndex_t> const &ignoreIterations)
-    -> std::deque<IterationIndex_t>
+    -> std::vector<IterationIndex_t>
 {
     auto &series = get();
     Parameter<Operation::OPEN_FILE> fOpen;
@@ -2061,8 +2062,9 @@ creating new iterations.
      * Sic! This happens when a file-based Series is opened in group-based mode.
      */
     case IterationEncoding::fileBased: {
-        std::deque<IterationIndex_t> unreadableIterations;
-        std::deque<IterationIndex_t> readableIterations;
+        std::vector<IterationIndex_t> unreadableIterations;
+        std::vector<IterationIndex_t> readableIterations;
+        readableIterations.reserve(pList.paths->size());
         for (auto const &it : *pList.paths)
         {
             IterationIndex_t index = std::stoull(it);
@@ -2095,7 +2097,7 @@ creating new iterations.
         {
             auto &vec = currentSteps.value();
             vectorDifference(vec, unreadableIterations);
-            return std::deque<IterationIndex_t>{vec.begin(), vec.end()};
+            return vec;
         }
         else
         {
@@ -2103,22 +2105,15 @@ creating new iterations.
         }
     }
     case IterationEncoding::variableBased: {
-        std::deque<IterationIndex_t> res{};
         if (currentSteps.has_value() && !currentSteps.value().empty())
         {
-            for (auto index : currentSteps.value())
-            {
-                if (ignoreIterations.find(index) == ignoreIterations.end())
-                {
-                    res.push_back(index);
-                }
-            }
+            vectorDifference(*currentSteps, ignoreIterations);
         }
         else
         {
-            res = {0};
+            currentSteps = std::vector<IterationIndex_t>{0};
         }
-        for (auto it : res)
+        for (auto it : *currentSteps)
         {
             /*
              * Variable-based iteration encoding relies on steps, so parsing
@@ -2140,7 +2135,7 @@ creating new iterations.
                 throw *err;
             }
         }
-        return res;
+        return *currentSteps;
     }
     }
     throw std::runtime_error("Unreachable!");
