@@ -2058,13 +2058,14 @@ Series::iterations_iterator Series::indexOf(Iteration const &iteration)
 AdvanceStatus Series::advance(
     AdvanceMode mode,
     internal::AttributableData &file,
-    iterations_iterator begin,
-    Iteration &iteration)
+    iterations_iterator begin)
 {
     internal::FlushParams const flushParams = {FlushLevel::UserFlush};
     auto &series = get();
     auto end = begin;
     ++end;
+
+    auto &iteration = begin->second;
     /*
      * We call flush_impl() with flushIOHandler = false, meaning that tasks are
      * not yet propagated to the backend.
@@ -2079,6 +2080,9 @@ AdvanceStatus Series::advance(
     {
         itData.m_closed = internal::CloseStatus::Open;
     }
+
+    bool old_dirty = iteration.dirty();
+    iteration.dirty() = true; // force flush() to open this
 
     switch (mode)
     {
@@ -2096,6 +2100,7 @@ AdvanceStatus Series::advance(
             end,
             {FlushLevel::CreateOrOpenFiles},
             /* flushIOHandler = */ false);
+        iteration.dirty() = old_dirty;
         break;
     }
 
