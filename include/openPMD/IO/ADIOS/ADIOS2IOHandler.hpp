@@ -380,6 +380,7 @@ private:
 
     enum class IfFileNotOpen : char
     {
+        ReopenImplicitly,
         OpenImplicitly,
         CreateImplicitly,
         ThrowError
