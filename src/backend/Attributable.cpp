@@ -58,7 +58,7 @@ Attributable::Attributable()
     }
 }
 
-Attributable::Attributable(NoInit)
+Attributable::Attributable(NoInit) noexcept
 {}
 
 Attribute Attributable::getAttribute(std::string const &key) const
