@@ -1523,7 +1523,6 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(
         if (auxiliary::directory_exists(fullPath) ||
             auxiliary::file_exists(fullPath))
         {
-#if openPMD_HAS_ADIOS_2_8
             switch (m_handler->m_encoding)
             {
 
@@ -1534,7 +1533,11 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(
                 case adios_defs::OpenFileAs::Create:
                     return adios2::Mode::Write;
                 case adios_defs::OpenFileAs::Open:
+#if openPMD_HAS_ADIOS_2_8
                     return adios2::Mode::ReadRandomAccess;
+#else
+                    return adios2::Mode::Read;
+#endif
                 case adios_defs::OpenFileAs::Reopen:
                     return adios2::Mode::Append;
                 }
@@ -1544,9 +1547,6 @@ adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(
                 return adios2::Mode::Read;
             }
             break;
-#else
-            return adios2::Mode::Read;
-#endif
         }
         else
         {
