@@ -81,6 +81,12 @@ namespace adios_defs
         Open,
         ReopenFileThatWeCreated
     };
+
+    struct ParameterizedOperator
+    {
+        adios2::Operator op;
+        adios2::Params params;
+    };
 } // namespace adios_defs
 
 /*

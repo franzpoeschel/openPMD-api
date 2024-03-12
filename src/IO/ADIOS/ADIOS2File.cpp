@@ -226,7 +226,20 @@ ADIOS2File::ADIOS2File(
     InvalidatableFile file,
     adios_defs::OpenFileAs openFileAs)
     : m_file(impl.fullPath(std::move(file)))
-    , m_ADIOS(impl.m_ADIOS)
+#if openPMD_HAVE_MPI
+    , m_ADIOS([&]() {
+        if (impl.m_communicator.has_value())
+        {
+            return adios2::ADIOS(*impl.m_communicator);
+        }
+        else
+        {
+            return adios2::ADIOS();
+        }
+    }())
+#else
+    , m_ADIOS2()
+#endif
     , m_impl(&impl)
 {
     // Declaring these members in the constructor body to avoid
@@ -234,6 +247,7 @@ ADIOS2File::ADIOS2File(
     // situation there seems to be trouble with number-only IO names
     m_mode = impl.adios2AccessMode(m_file, openFileAs);
     create_IO();
+
     if (!m_IO)
     {
         throw std::runtime_error(
@@ -241,10 +255,14 @@ ADIOS2File::ADIOS2File(
             "for file " +
             m_file);
     }
-    else
+
+    auto operators = impl.getOperators(*this);
+    if (operators)
     {
-        configure_IO();
+        readOperators = std::move(operators.value());
     }
+
+    configure_IO();
 }
 
 auto ADIOS2File::useGroupTable() const -> UseGroupTable
@@ -255,7 +273,7 @@ auto ADIOS2File::useGroupTable() const -> UseGroupTable
 void ADIOS2File::create_IO()
 {
     m_IOName = std::to_string(m_impl->nameCounter++);
-    m_IO = m_impl->m_ADIOS.DeclareIO("IO_" + m_IOName);
+    m_IO = m_ADIOS.DeclareIO("IO_" + m_IOName);
 }
 
 ADIOS2File::~ADIOS2File()
@@ -417,6 +435,42 @@ void ADIOS2File::setStepSelection(std::optional<size_t> step)
 std::optional<size_t> const &ADIOS2File::stepSelection() const
 {
     return m_stepSelection;
+}
+
+std::optional<adios2::Operator>
+ADIOS2File::getCompressionOperator(std::string const &compression)
+{
+    adios2::Operator res;
+    auto it = m_operators.find(compression);
+    if (it == m_operators.end())
+    {
+        try
+        {
+            res = m_ADIOS.DefineOperator(compression, compression);
+        }
+        catch (std::invalid_argument const &e)
+        {
+            std::cerr << "Warning: ADIOS2 backend does not support compression "
+                         "method "
+                      << compression << ". Continuing without compression."
+                      << "\nOriginal error: " << e.what() << std::endl;
+            return std::optional<adios2::Operator>();
+        }
+        catch (std::string const &s)
+        {
+            std::cerr << "Warning: ADIOS2 backend does not support compression "
+                         "method "
+                      << compression << ". Continuing without compression."
+                      << "\nOriginal error: " << s << std::endl;
+            return std::optional<adios2::Operator>();
+        }
+        m_operators.emplace(compression, res);
+    }
+    else
+    {
+        res = it->second;
+    }
+    return std::make_optional(adios2::Operator(res));
 }
 
 void ADIOS2File::configure_IO_Read()
