@@ -90,8 +90,7 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     std::string engineType,
     std::string specifiedExtension)
     : AbstractIOHandlerImplCommon(handler)
-    , m_ADIOS{communicator}
-    , m_communicator{communicator}
+    , m_communicator(communicator)
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension{std::move(specifiedExtension)}
 {
@@ -142,7 +141,6 @@ ADIOS2IOHandlerImpl::ADIOS2IOHandlerImpl(
     std::string engineType,
     std::string specifiedExtension)
     : AbstractIOHandlerImplCommon(handler)
-    , m_ADIOS{}
     , m_engineType(std::move(engineType))
     , m_userSpecifiedExtension(std::move(specifiedExtension))
 {
@@ -278,11 +276,6 @@ void ADIOS2IOHandlerImpl::init(
                 }
             }
         }
-        auto operators = getOperators();
-        if (operators)
-        {
-            readOperators = std::move(operators.value());
-        }
     }
 #if !openPMD_HAS_ADIOS_2_9
     if (m_modifiableAttributes == ModifiableAttributes::Yes)
@@ -301,11 +294,12 @@ void ADIOS2IOHandlerImpl::init(
 #endif
 }
 
-std::optional<std::vector<ADIOS2IOHandlerImpl::ParameterizedOperator>>
-ADIOS2IOHandlerImpl::getOperators(json::TracingJSON cfg)
+std::optional<std::vector<adios_defs::ParameterizedOperator>>
+ADIOS2IOHandlerImpl::getOperators(
+    detail::ADIOS2File &file, json::TracingJSON cfg)
 {
-    using ret_t = std::optional<std::vector<ParameterizedOperator>>;
-    std::vector<ParameterizedOperator> res;
+    using ret_t = std::optional<std::vector<adios_defs::ParameterizedOperator>>;
+    std::vector<adios_defs::ParameterizedOperator> res;
     if (!cfg.json().contains("dataset"))
     {
         return ret_t();
@@ -346,10 +340,10 @@ ADIOS2IOHandlerImpl::getOperators(json::TracingJSON cfg)
             }
         }
         std::optional<adios2::Operator> adiosOperator =
-            getCompressionOperator(type);
+            file.getCompressionOperator(type);
         if (adiosOperator)
         {
-            res.emplace_back(ParameterizedOperator{
+            res.emplace_back(adios_defs::ParameterizedOperator{
                 adiosOperator.value(), std::move(adiosParams)});
         }
     }
@@ -357,10 +351,10 @@ ADIOS2IOHandlerImpl::getOperators(json::TracingJSON cfg)
     return std::make_optional(std::move(res));
 }
 
-std::optional<std::vector<ADIOS2IOHandlerImpl::ParameterizedOperator>>
-ADIOS2IOHandlerImpl::getOperators()
+std::optional<std::vector<adios_defs::ParameterizedOperator>>
+ADIOS2IOHandlerImpl::getOperators(detail::ADIOS2File &file)
 {
-    return getOperators(m_config);
+    return getOperators(file, m_config);
 }
 
 using AcceptedEndingsForEngine = std::map<std::string, std::string>;
@@ -772,6 +766,7 @@ void ADIOS2IOHandlerImpl::createDataset(
 
         auto const file =
             refreshFileFromParent(writable, /* preferParentFile = */ true);
+        auto &fileData = getFileData(file, IfFileNotOpen::ThrowError);
         writable->abstractFilePosition.reset();
         auto filePos = setAndGetFilePosition(writable, name);
         filePos->gd = GroupOrDataset::DATASET;
@@ -811,7 +806,7 @@ void ADIOS2IOHandlerImpl::createDataset(
             return parsed_config;
         }();
 
-        std::vector<ParameterizedOperator> operators;
+        std::vector<adios_defs::ParameterizedOperator> operators;
 
         Shape arrayShape = Shape::GlobalArray;
         [&]() {
@@ -820,7 +815,7 @@ void ADIOS2IOHandlerImpl::createDataset(
                 return;
             };
             json::TracingJSON adios2Config(parsedConfig["adios2"]);
-            auto datasetOperators = getOperators(adios2Config);
+            auto datasetOperators = getOperators(fileData, adios2Config);
             if (datasetOperators.has_value())
             {
                 operators = std::move(*datasetOperators);
@@ -913,8 +908,6 @@ void ADIOS2IOHandlerImpl::createDataset(
             }
             throw std::runtime_error("Unreachable!");
         }();
-
-        auto &fileData = getFileData(file, IfFileNotOpen::ThrowError);
 
 #define HAS_BP5_BLOSC2_BUG                                                     \
     (ADIOS2_VERSION_MAJOR * 100 + ADIOS2_VERSION_MINOR == 209 &&               \
@@ -1687,42 +1680,6 @@ std::shared_ptr<ADIOS2FilePosition> ADIOS2IOHandlerImpl::extendFilePosition(
         path + std::move(s), oldPos->gd);
 }
 
-std::optional<adios2::Operator>
-ADIOS2IOHandlerImpl::getCompressionOperator(std::string const &compression)
-{
-    adios2::Operator res;
-    auto it = m_operators.find(compression);
-    if (it == m_operators.end())
-    {
-        try
-        {
-            res = m_ADIOS.DefineOperator(compression, compression);
-        }
-        catch (std::invalid_argument const &e)
-        {
-            std::cerr << "Warning: ADIOS2 backend does not support compression "
-                         "method "
-                      << compression << ". Continuing without compression."
-                      << "\nOriginal error: " << e.what() << std::endl;
-            return std::optional<adios2::Operator>();
-        }
-        catch (std::string const &s)
-        {
-            std::cerr << "Warning: ADIOS2 backend does not support compression "
-                         "method "
-                      << compression << ". Continuing without compression."
-                      << "\nOriginal error: " << s << std::endl;
-            return std::optional<adios2::Operator>();
-        }
-        m_operators.emplace(compression, res);
-    }
-    else
-    {
-        res = it->second;
-    }
-    return std::make_optional(adios2::Operator(res));
-}
-
 std::string ADIOS2IOHandlerImpl::nameOfVariable(Writable *writable)
 {
     auto filepos = setAndGetFilePosition(writable);
@@ -2081,7 +2038,7 @@ namespace detail
         }
 
         // Operators in reading needed e.g. for setting decompression threads
-        for (auto const &operation : impl->readOperators)
+        for (auto const &operation : fileData.readOperators)
         {
             if (operation.op)
             {
@@ -2103,8 +2060,7 @@ namespace detail
     void VariableDefiner::call(
         adios2::IO &IO,
         std::string const &name,
-        std::vector<ADIOS2IOHandlerImpl::ParameterizedOperator> const
-            &compressions,
+        std::vector<adios_defs::ParameterizedOperator> const &compressions,
         adios2::Dims const &shape,
         adios2::Dims const &start,
         adios2::Dims const &count,

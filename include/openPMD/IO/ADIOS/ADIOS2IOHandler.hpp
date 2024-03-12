@@ -216,7 +216,6 @@ public:
     FlushTarget m_flushTarget = FlushTarget::Disk;
 
 private:
-    adios2::ADIOS m_ADIOS;
 #if openPMD_HAVE_MPI
     std::optional<MPI_Comm> m_communicator;
 #endif
@@ -265,16 +264,6 @@ private:
 
     bool m_writeAttributesFromThisRank = true;
 
-    struct ParameterizedOperator
-    {
-        adios2::Operator op;
-        adios2::Params params;
-    };
-
-    // read operators can (currently) not be specified per dataset, so parse
-    // them once and then buffer them
-    std::vector<ParameterizedOperator> readOperators;
-
     json::TracingJSON m_config;
     std::optional<nlohmann::json> m_buffered_dataset_config;
     static json::TracingJSON nullvalue;
@@ -309,11 +298,12 @@ private:
      * @return first parameter: the operators, second parameters: whether
      * operators have been configured
      */
-    std::optional<std::vector<ParameterizedOperator>>
-    getOperators(json::TracingJSON config);
+    std::optional<std::vector<adios_defs::ParameterizedOperator>>
+    getOperators(detail::ADIOS2File &, json::TracingJSON config);
 
     // use m_config
-    std::optional<std::vector<ParameterizedOperator>> getOperators();
+    std::optional<std::vector<adios_defs::ParameterizedOperator>>
+    getOperators(detail::ADIOS2File &);
 
     std::string fileSuffix(bool verbose = true) const;
 
@@ -340,8 +330,6 @@ private:
     std::unordered_map<InvalidatableFile, std::unique_ptr<detail::ADIOS2File>>
         m_fileData;
 
-    std::map<std::string, adios2::Operator> m_operators;
-
     // Overrides from AbstractIOHandlerImplCommon.
 
     std::string
@@ -352,9 +340,6 @@ private:
         std::string extend) override;
 
     // Helper methods.
-
-    std::optional<adios2::Operator>
-    getCompressionOperator(std::string const &compression);
 
     /*
      * The name of the ADIOS2 variable associated with this Writable.
@@ -564,8 +549,7 @@ namespace detail
         static void call(
             adios2::IO &IO,
             std::string const &name,
-            std::vector<ADIOS2IOHandlerImpl::ParameterizedOperator> const
-                &compressions,
+            std::vector<adios_defs::ParameterizedOperator> const &compressions,
             adios2::Dims const &shape = adios2::Dims(),
             adios2::Dims const &start = adios2::Dims(),
             adios2::Dims const &count = adios2::Dims(),

@@ -173,7 +173,7 @@ public:
      * IO.
      */
     std::string m_IOName;
-    adios2::ADIOS &m_ADIOS;
+    adios2::ADIOS m_ADIOS;
     adios2::IO m_IO;
     /**
      * The default queue for deferred actions.
@@ -409,6 +409,14 @@ public:
     StreamStatus streamStatus = StreamStatus::OutsideOfStep;
 
     size_t currentStep();
+
+    // read operators can (currently) not be specified per dataset, so parse
+    // them once and then buffer them
+    std::vector<adios_defs::ParameterizedOperator> readOperators;
+    std::map<std::string, adios2::Operator> m_operators;
+
+    std::optional<adios2::Operator>
+    getCompressionOperator(std::string const &compression);
 
 private:
     ADIOS2IOHandlerImpl *m_impl;

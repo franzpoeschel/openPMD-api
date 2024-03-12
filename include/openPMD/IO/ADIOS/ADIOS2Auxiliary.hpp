@@ -64,6 +64,12 @@ namespace adios_defs
         Yes,
         No
     };
+
+    struct ParameterizedOperator
+    {
+        adios2::Operator op;
+        adios2::Params params;
+    };
 } // namespace adios_defs
 
 /*
