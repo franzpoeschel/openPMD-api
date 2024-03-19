@@ -889,6 +889,23 @@ void Iteration::linkHierarchy(Writable &w)
     Attributable::linkHierarchy(w);
     meshes.linkHierarchy(this->writable());
     particles.linkHierarchy(this->writable());
+    meshes.writable().ownKeyWithinParent = {"meshes"};
+    particles.writable().ownKeyWithinParent = {"particles"};
+}
+
+Iteration Iteration::resetIteration()
+{
+    Iteration copied = *this;
+    auto parent = writable().parent;
+
+    setData(std::make_shared<internal::IterationData>());
+    meshes = {};
+    particles = {};
+    writable().written = true;
+    dirty() = false;
+
+    this->linkHierarchy(*parent);
+    return copied;
 }
 
 void Iteration::runDeferredParseAccess()

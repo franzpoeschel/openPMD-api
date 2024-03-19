@@ -1419,38 +1419,6 @@ void ADIOS2IOHandlerImpl::advance(
     *parameters.status = ba.advance(parameters.mode);
 }
 
-void ADIOS2IOHandlerImpl::closePath(
-    Writable *writable, Parameter<Operation::CLOSE_PATH> const &)
-{
-    VERIFY_ALWAYS(
-        writable->written,
-        "[ADIOS2] Cannot close a path that has not been written yet.");
-    if (access::readOnly(m_handler->m_backendAccess))
-    {
-        // nothing to do
-        return;
-    }
-    auto file = refreshFileFromParent(writable, /* preferParentFile = */ false);
-    auto &fileData = getFileData(file, IfFileNotOpen::ThrowError);
-    if (!fileData.optimizeAttributesStreaming)
-    {
-        return;
-    }
-    auto position = setAndGetFilePosition(writable);
-    auto positionString = filePositionToString(position);
-    VERIFY(
-        !auxiliary::ends_with(positionString, '/'),
-        "[ADIOS2] Position string has unexpected format. This is a bug "
-        "in the openPMD API.");
-
-    for (auto const &attr :
-         fileData.availableAttributesPrefixed(positionString))
-    {
-        fileData.m_IO.RemoveAttribute(
-            std::string(positionString).append("/").append(attr));
-    }
-}
-
 void ADIOS2IOHandlerImpl::availableChunks(
     Writable *writable, Parameter<Operation::AVAILABLE_CHUNKS> &parameters)
 {

@@ -1295,7 +1295,7 @@ void Series::flushFileBased(
     bool flushIOHandler)
 {
     auto &series = get();
-    if (end == begin)
+    if (end == begin && !series.m_containedAtLeastOneIteration)
         throw std::runtime_error(
             "fileBased output can not be written with no iterations.");
 
@@ -1326,7 +1326,10 @@ void Series::flushFileBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&it->second, std::move(fClose)));
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
                 it->second.get().m_closed = internal::CloseStatus::Closed;
             }
         }
@@ -1385,7 +1388,10 @@ void Series::flushFileBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&it->second, std::move(fClose)));
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
                 it->second.get().m_closed = internal::CloseStatus::Closed;
             }
             /* reset the dirty bit for every iteration (i.e. file)
@@ -1437,6 +1443,11 @@ void Series::flushGorVBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 // the iteration has no dedicated file in group-based mode
+                Parameter<Operation::CLOSE_PATH> pClose;
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                pClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(pClose)));
                 it->second.get().m_closed = internal::CloseStatus::Closed;
             }
         }
@@ -1515,6 +1526,11 @@ void Series::flushGorVBased(
                 internal::CloseStatus::ClosedInFrontend)
             {
                 // the iteration has no dedicated file in group-based mode
+                Parameter<Operation::CLOSE_PATH> pClose;
+                Iteration resetted = it->second.resetIteration();
+                auto writable = &resetted.writable();
+                pClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(pClose)));
                 it->second.get().m_closed = internal::CloseStatus::Closed;
             }
         }
@@ -2476,30 +2492,30 @@ AdvanceStatus Series::advance(
         mode == AdvanceMode::ENDSTEP)
     {
         using IE = IterationEncoding;
-        switch (series.m_iterationEncoding)
+        if (itData.m_closed != internal::CloseStatus::Closed)
         {
-        case IE::fileBased: {
-            if (itData.m_closed != internal::CloseStatus::Closed)
+            switch (series.m_iterationEncoding)
             {
+            case IE::fileBased: {
                 Parameter<Operation::CLOSE_FILE> fClose;
-                IOHandler()->enqueue(IOTask(&iteration, std::move(fClose)));
+                Iteration resetted = iteration.resetIteration();
+                auto writable = &resetted.writable();
+                fClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
+                break;
             }
-            itData.m_closed = internal::CloseStatus::Closed;
-            break;
+            case IE::groupBased:
+            case IE::variableBased: {
+                Parameter<Operation::CLOSE_PATH> pClose;
+                Iteration resetted = iteration.resetIteration();
+                auto writable = &resetted.writable();
+                pClose.keep_this_data_alive = std::move(resetted);
+                IOHandler()->enqueue(IOTask(writable, std::move(pClose)));
+                break;
+            }
+            }
         }
-        case IE::groupBased: {
-            // We can now put some groups to rest
-            Parameter<Operation::CLOSE_PATH> fClose;
-            IOHandler()->enqueue(IOTask(&iteration, std::move(fClose)));
-            // In group-based iteration layout, files are
-            // not closed on a per-iteration basis
-            // We will treat it as such nonetheless
-            itData.m_closed = internal::CloseStatus::Closed;
-            break;
-        }
-        case IE::variableBased: // no action necessary
-            break;
-        }
+        itData.m_closed = internal::CloseStatus::Closed;
     }
 
     // We cannot call Series::flush now, since the IO handler is still filled
@@ -3244,6 +3260,25 @@ AbstractIOHandler const *Series::IOHandler() const
 {
     auto res = Attributable::IOHandler();
     return res;
+}
+
+Iteration Series::resetIteration(IterationIndex_t idx)
+{
+    auto it = iterations.find(idx);
+    if (it == iterations.end())
+    {
+        return {};
+    }
+    return resetIteration(it).second;
+}
+
+auto Series::resetIteration(decltype(iterations)::iterator it)
+    -> std::pair<decltype(iterations)::iterator, Iteration>
+{
+    auto res = it->second;
+    it = iterations.container().erase(it);
+    get().m_containedAtLeastOneIteration = true;
+    return {it, res};
 }
 
 namespace
