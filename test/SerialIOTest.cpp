@@ -225,6 +225,8 @@ void write_and_read_many_iterations(
         // std::cout << "READ " << filename << std::endl;
         Series read(
             filename, Access::READ_ONLY, "{\"defer_iteration_parsing\": true}");
+        std::cout << "BEFORE: " << read.iterations.size() << " ITERATIONS"
+                  << std::endl;
         for (auto iteration : read.iterations)
         {
             iteration.second.open();
@@ -244,10 +246,15 @@ void write_and_read_many_iterations(
                 REQUIRE(array[i] == float(i));
             }
         }
+        std::cout << "AFTER: " << read.iterations.size() << " ITERATIONS"
+                  << std::endl;
+        REQUIRE(read.iterations.size() == 10);
     }
 
     Series list(filename, Access::READ_ONLY);
     helper::listSeries(list);
+    REQUIRE(list.iterations.size() == 0);
+
 #ifdef __unix__
     rlim.rlim_cur = old_soft_limit;
     setrlimit(RLIMIT_NOFILE, &rlim);
@@ -7128,13 +7135,13 @@ void varying_pattern(std::string const &file_ending)
             REQUIRE(it.getAttribute("my_step").get<int>() == int(step));
         }
 
-        helper::listSeries(series, true, std::cout);
-
         for (auto i : {0, 8000, 10000, 100000, 2000000})
         {
             auto it = series.iterations[i];
             REQUIRE(it.getAttribute("my_step").get<int>() == i);
         }
+
+        helper::listSeries(series, true, std::cout);
     }
 }
 
