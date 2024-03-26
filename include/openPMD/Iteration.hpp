@@ -396,6 +396,8 @@ private:
     void runDeferredParseAccess();
 
     Iteration resetIteration();
+    template <Operation op>
+    void resetIterationAndFlush();
 }; // Iteration
 
 extern template float Iteration::time<float>() const;

@@ -234,7 +234,7 @@ void write_and_read_many_iterations(
 
     Series list(filename, Access::READ_ONLY);
     helper::listSeries(list);
-    REQUIRE(list.iterations.size() == 0);
+    REQUIRE(list.iterations.size() == 10);
 
 #ifdef __unix__
     rlim.rlim_cur = old_soft_limit;

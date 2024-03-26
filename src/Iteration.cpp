@@ -889,24 +889,56 @@ void Iteration::linkHierarchy(Writable &w)
     Attributable::linkHierarchy(w);
     meshes.linkHierarchy(this->writable());
     particles.linkHierarchy(this->writable());
-    meshes.writable().ownKeyWithinParent = {"meshes"};
-    particles.writable().ownKeyWithinParent = {"particles"};
+    meshes.writable().ownKeyWithinParent = "meshes";
+    particles.writable().ownKeyWithinParent = "particles";
 }
 
 Iteration Iteration::resetIteration()
 {
-    Iteration copied = *this;
+    Iteration copied_iteration = *this;
+    auto s = retrieveSeries();
+    auto iterator_in_series = s.indexOf(*this);
+    auto &iteration_in_series = iterator_in_series->second;
     auto parent = writable().parent;
 
-    setData(std::make_shared<internal::IterationData>());
-    meshes = {};
-    particles = {};
-    writable().written = true;
-    dirty() = false;
+    iteration_in_series.setData(std::make_shared<internal::IterationData>());
+    iteration_in_series.meshes = {};
+    iteration_in_series.particles = {};
+    iteration_in_series.writable().written = true;
+    iteration_in_series.linkHierarchy(*parent);
+    iteration_in_series.setDirty(false); // must come after linkHierarchy
+    iteration_in_series.get().m_closed = internal::CloseStatus::Closed;
 
-    this->linkHierarchy(*parent);
-    return copied;
+    // We leave *this untouched for now because users might wish to access
+    // metadata after closing an Iteration. But we point it to the new
+    // Attributable internally, so that methods such as `Series::indexOf()` know
+    // what this is.
+    this->Attributable::setData(iteration_in_series.m_attri);
+
+    // now:
+    //   Series.iterations[i]: new data, new Attributable
+    //   *this:                old data, new Attributable
+    //   copied:               old data, old Attributable
+
+    std::cout << "Series.iterations[" << iterator_in_series->first
+              << "]: " << s.iterations[iterator_in_series->first].m_attri.get()
+              << "\n*this: " << this->m_attri.get()
+              << "\nres: " << copied_iteration.m_attri.get() << std::endl;
+
+    return copied_iteration;
 }
+
+template <Operation op>
+void Iteration::resetIterationAndFlush()
+{
+    Parameter<op> fClose; // might also be close_path
+    Iteration iteration = this->resetIteration();
+    auto writable = &iteration.writable();
+    fClose.keep_this_data_alive = std::move(iteration);
+    IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
+}
+template void Iteration::resetIterationAndFlush<Operation::CLOSE_FILE>();
+template void Iteration::resetIterationAndFlush<Operation::CLOSE_PATH>();
 
 void Iteration::runDeferredParseAccess()
 {
