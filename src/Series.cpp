@@ -2401,7 +2401,7 @@ AdvanceStatus Series::advance(
     }
 
     bool old_dirty = iteration.dirty();
-    iteration.dirty() = true; // force flush() to open this
+    iteration.setDirty(true); // force flush() to open this
 
     switch (mode)
     {
@@ -2419,7 +2419,7 @@ AdvanceStatus Series::advance(
             end,
             {FlushLevel::CreateOrOpenFiles},
             /* flushIOHandler = */ false);
-        iteration.dirty() = old_dirty;
+        iteration.setDirty(old_dirty);
         break;
     }
 
