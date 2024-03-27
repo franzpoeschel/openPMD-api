@@ -24,6 +24,7 @@
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
+#include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
@@ -44,7 +45,6 @@
 namespace openPMD
 {
 using internal::CloseStatus;
-using internal::DeferredParseAccess;
 
 Iteration::Iteration() : Attributable(NoInit())
 {
@@ -102,7 +102,6 @@ Iteration &Iteration::close(bool _flush)
     case CloseStatus::ClosedInFrontend:
         it.m_closed = CloseStatus::ClosedInFrontend;
         break;
-    case CloseStatus::ParseAccessDeferred:
     case CloseStatus::Closed:
         // just keep it like it is
         // (this means that closing an iteration that has not been parsed
@@ -154,10 +153,10 @@ Iteration &Iteration::open()
     auto &it = get();
     // ensure that files are accessed
     s.openIteration(begin->first, *this);
-    if (it.m_closed == CloseStatus::ParseAccessDeferred)
+    if (it.need_to_parse)
     {
-        it.m_closed = CloseStatus::Open;
         runDeferredParseAccess();
+        it.m_closed = CloseStatus::Open;
     }
     if (getStepStatus() == StepStatus::OutOfStep)
     {
@@ -172,8 +171,8 @@ bool Iteration::closed() const
 {
     switch (get().m_closed)
     {
-    case CloseStatus::ParseAccessDeferred:
     case CloseStatus::Open:
+        // std::cout << "Open" << std::endl;
         return false;
     /*
      * Temporarily closing a file is something that the openPMD API
@@ -181,7 +180,10 @@ bool Iteration::closed() const
      * Logically to the user, it is still open.
      */
     case CloseStatus::ClosedInFrontend:
+        // std::cout << "ClosedInFrontend" << std::endl;
+        return true;
     case CloseStatus::Closed:
+        // std::cout << "Closed" << std::endl;
         return true;
     }
     throw std::runtime_error("Unreachable!");
@@ -189,16 +191,7 @@ bool Iteration::closed() const
 
 bool Iteration::parsed() const
 {
-    switch (get().m_closed)
-    {
-    case CloseStatus::ParseAccessDeferred:
-        return false;
-    case CloseStatus::Open:
-    case CloseStatus::ClosedInFrontend:
-    case CloseStatus::Closed:
-        return true;
-    }
-    throw std::runtime_error("Unreachable!");
+    return !get().need_to_parse;
 }
 
 bool Iteration::closedByWriter() const
@@ -395,21 +388,22 @@ void Iteration::flush(internal::FlushParams const &flushParams)
     }
 }
 
-void Iteration::deferParseAccess(DeferredParseAccess dr)
+void Iteration::deferParseAccess()
 {
-    get().m_deferredParseAccess =
-        std::make_optional<DeferredParseAccess>(std::move(dr));
+    get().need_to_parse = true;
+    get().m_closed = CloseStatus::Closed;
 }
 
 void Iteration::reread(std::string const &path)
 {
-    if (get().m_deferredParseAccess.has_value())
-    {
-        throw std::runtime_error(
-            "[Iteration] Internal control flow error: Trying to reread an "
-            "iteration that has not yet been read for its first time.");
-    }
-    read_impl(path);
+    throw std::runtime_error("Iteration::reread kapier ich ned");
+    // if (get().m_deferredParseAccess.has_value())
+    // {
+    //     throw std::runtime_error(
+    //         "[Iteration] Internal control flow error: Trying to reread an "
+    //         "iteration that has not yet been read for its first time.");
+    // }
+    // read_impl(path);
 }
 
 void Iteration::readFileBased(
@@ -418,13 +412,13 @@ void Iteration::readFileBased(
     std::string const &groupPath,
     bool doBeginStep)
 {
-    if (doBeginStep)
-    {
-        /*
-         * beginStep() must take care to open files
-         */
-        beginStep(/* reread = */ false);
-    }
+    // if (doBeginStep)
+    // {
+    //     /*
+    //      * beginStep() must take care to open files
+    //      */
+    //     beginStep(/* reread = */ false);
+    // }
     auto series = retrieveSeries();
 
     series.readOneIterationFileBased(filePath);
@@ -909,11 +903,18 @@ Iteration::resetIteration()
     auto parent = writable().parent;
     auto old_iteration = *this;
 
+    auto s = retrieveSeries();
+    if (&s.indexOf(*this)->second != this)
+    {
+        throw std::runtime_error("AAAAAAAAAAAAAAAAAAAAAAAAAA");
+    }
+
     // old value
     auto old_attributable = std::move(this->m_attri);
     res_t res{std::move(old_iteration), std::move(*old_attributable)};
 
     this->setData(std::make_shared<internal::IterationData>());
+    Attributable::get().m_attributes = std::move(res.second->m_attributes);
 
     static_cast<attr_t &>(*old_attributable) =
         static_cast<attr_t const &>(*this->m_attri);
@@ -949,41 +950,36 @@ void Iteration::runDeferredParseAccess()
     if (access::read(IOHandler()->m_frontendAccess))
     {
         auto &it = get();
-        if (!it.m_deferredParseAccess.has_value())
-        {
-            return;
-        }
-        auto const &deferred = it.m_deferredParseAccess.value();
+        auto s = retrieveSeries();
+        auto myself = s.indexOf(*this);
+        it.need_to_parse = false;
 
         auto oldStatus = IOHandler()->m_seriesStatus;
         IOHandler()->m_seriesStatus = internal::SeriesStatus::Parsing;
         try
         {
-            if (deferred.fileBased)
+            if (s.iterationEncoding() == IterationEncoding::fileBased)
             {
                 auto const &filename =
-                    retrieveSeries().get().m_iterationFilenames.at(
-                        deferred.iteration);
+                    s.get().m_iterationFilenames.at(myself->first);
                 readFileBased(
-                    deferred.iteration,
+                    myself->first,
                     filename,
-                    deferred.path,
-                    deferred.beginStep);
+                    it->m_writable.ownKeyWithinParent,
+                    written());
             }
             else
             {
-                readGorVBased(deferred.path, deferred.beginStep);
+                readGorVBased(it->m_writable.ownKeyWithinParent, written());
             }
         }
         catch (...)
         {
             // reset this thing
-            it.m_deferredParseAccess = std::optional<DeferredParseAccess>();
             IOHandler()->m_seriesStatus = oldStatus;
             throw;
         }
         // reset this thing
-        it.m_deferredParseAccess = std::optional<DeferredParseAccess>();
         IOHandler()->m_seriesStatus = oldStatus;
     }
 }

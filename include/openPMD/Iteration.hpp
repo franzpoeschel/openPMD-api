@@ -45,32 +45,11 @@ namespace internal
      */
     enum class CloseStatus
     {
-        ParseAccessDeferred, //!< The reader has not yet parsed this iteration
         Open, //!< Iteration has not been closed
         ClosedInFrontend, /*!< Iteration has been closed, but task has not yet
                                been propagated to the backend */
         Closed, /*!< Iteration has been closed and task has been
                               propagated to the backend */
-    };
-
-    struct DeferredParseAccess
-    {
-        /**
-         * The group path within /data containing this iteration.
-         * Example: "1" for iteration 1, "" in variable-based iteration
-         * encoding.
-         */
-        std::string path;
-        /**
-         * The iteration index as accessed by the user in series.iterations[i]
-         */
-        uint64_t iteration = 0;
-        /**
-         * If this iteration is part of a Series with file-based layout.
-         * (Group- and variable-based parsing shares the same code logic.)
-         */
-        bool fileBased = false;
-        bool beginStep = false;
     };
 
     class IterationData : public AttributableData
@@ -104,11 +83,7 @@ namespace internal
          */
         StepStatus m_stepStatus = StepStatus::NoStep;
 
-        /**
-         * Information on a parsing request that has not yet been executed.
-         * Otherwise empty.
-         */
-        std::optional<DeferredParseAccess> m_deferredParseAccess{};
+        bool need_to_parse = false;
     };
 } // namespace internal
 /** @brief  Logical compilation of data from one snapshot (e.g. a single
@@ -272,7 +247,7 @@ private:
     void flushGroupBased(IterationIndex_t, internal::FlushParams const &);
     void flushVariableBased(IterationIndex_t, internal::FlushParams const &);
     void flush(internal::FlushParams const &);
-    void deferParseAccess(internal::DeferredParseAccess);
+    void deferParseAccess();
     /*
      * Control flow for runDeferredParseAccess(), readFileBased(),
      * readGroupBased() and read_impl():
