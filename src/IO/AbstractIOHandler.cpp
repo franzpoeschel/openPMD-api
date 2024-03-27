@@ -98,6 +98,14 @@ void AbstractIOHandler::setIterationEncoding(IterationEncoding encoding)
     m_encoding = encoding;
 }
 
+void AbstractIOHandler::enqueue(IOTask const &iotask)
+{
+    // std::cout << "\tEnqueueing " << iotask.operation << "["
+    //           << iotask.writable->parent << "->" << iotask.writable << "]"
+    //           << std::endl;
+    m_work.push(iotask);
+}
+
 std::future<void> AbstractIOHandler::flush(internal::FlushParams const &params)
 {
     internal::ParsedFlushParams parsedParams{params};

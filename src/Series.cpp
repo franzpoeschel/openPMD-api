@@ -2384,8 +2384,6 @@ std::string Series::iterationFilename(IterationIndex_t i)
 Series::iterations_iterator Series::indexOf(Iteration const &iteration)
 {
     auto &series = get();
-    std::cout << "SEARCHING FOR ITERATION " << iteration.m_attri.get()
-              << std::endl;
     for (auto it = series.iterations.begin(); it != series.iterations.end();
          ++it)
     {
@@ -3431,6 +3429,8 @@ namespace debug
             make_indent();
             std::cout << "Self: " << w.dirtySelf
                       << "\tRec: " << w.dirtyRecursive << '\n';
+            make_indent();
+            std::cout << "Parent: " << w.parent << "\tSelf: " << &w << '\n';
             std::cout << std::endl;
         };
         print(series);

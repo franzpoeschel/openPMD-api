@@ -83,6 +83,8 @@ OPENPMDAPI_EXPORT_ENUM_CLASS(Operation){
 }; // note: if you change the enum members here, please update
    // docs/source/dev/design.rst
 
+std::ostream &operator<<(std::ostream &os, Operation const &op);
+
 namespace internal
 {
     /*
