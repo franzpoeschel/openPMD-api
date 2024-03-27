@@ -143,7 +143,6 @@ Iteration &Iteration::close(bool _flush)
 Iteration &Iteration::open()
 {
     Series s = retrieveSeries();
-    auto &it = get();
     // figure out my iteration number
     auto begin = s.indexOf(*this);
     if (it.m_closed == internal::CloseStatus::ClosedInFrontend)
@@ -155,8 +154,9 @@ Iteration &Iteration::open()
     // previously closed Iteration
     if (&begin->second != this)
     {
-        this->setData(begin->second.m_iterationData);
+        *this = begin->second;
     }
+    auto &it = get();
     // Ensure that files are accessed.
     // If the close status was Closed, this will open it.
     s.openIteration(begin->first, *this);
