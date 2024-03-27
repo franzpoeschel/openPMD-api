@@ -143,15 +143,15 @@ Iteration &Iteration::close(bool _flush)
 Iteration &Iteration::open()
 {
     Series s = retrieveSeries();
-    auto &it = get();
     // figure out my iteration number
     auto begin = s.indexOf(*this);
     // The current Iteration handle could be stale because it referred to a
     // previously closed Iteration
     if (&begin->second != this)
     {
-        this->setData(begin->second.m_iterationData);
+        *this = begin->second;
     }
+    auto &it = get();
     // ensure that files are accessed
     s.openIteration(begin->first, *this);
     if (it.m_closed == CloseStatus::ParseAccessDeferred)
