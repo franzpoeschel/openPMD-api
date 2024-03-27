@@ -1566,8 +1566,6 @@ void Series::readFileBased(
     std::optional<IterationIndex_t> read_only_this_single_iteration)
 {
     auto &series = get();
-    Parameter<Operation::OPEN_FILE> fOpen;
-    Parameter<Operation::READ_ATT> aRead;
 
     // Tell the backend that we are parsing file-based iteration encoding.
     // This especially means that READ_RANDOM_ACCESS will be used instead of
@@ -1604,7 +1602,7 @@ void Series::readFileBased(
             Iteration &i = series.iterations[index];
             series.m_iterationFilenames[index] =
                 cleanFilename(filename, series.m_filenameExtension).body;
-            i.deferParseAccess({std::to_string(index), index, true});
+            i.deferParseAccess();
         });
 
     if (series.iterations.empty())
@@ -1654,8 +1652,7 @@ void Series::readFileBased(
     {
         for (auto &iteration : series.iterations)
         {
-            iteration.second.get().m_closed =
-                internal::CloseStatus::ParseAccessDeferred;
+            iteration.second.get().m_closed = internal::CloseStatus::Closed;
         }
         // open the first iteration, just to parse Series attributes
         bool atLeastOneIterationSuccessful = false;
@@ -2055,8 +2052,7 @@ creating new iterations.
     auto readSingleIteration =
         [&series, &pOpen, this](
             IterationIndex_t index,
-            std::string const &path,
-            bool beginStep) -> std::optional<error::ReadError> {
+            std::string const &path) -> std::optional<error::ReadError> {
         if (series.iterations.contains(index))
         {
             // maybe re-read
@@ -2067,7 +2063,8 @@ creating new iterations.
             {
                 return {};
             }
-            if (i.get().m_closed != internal::CloseStatus::ParseAccessDeferred)
+            throw std::runtime_error("kapier ich ned");
+            if (!i.get().need_to_parse)
             {
                 pOpen.path = path;
                 IOHandler()->enqueue(IOTask(&i, pOpen));
@@ -2081,7 +2078,7 @@ creating new iterations.
         {
             // parse for the first time, resp. delay the parsing process
             Iteration &i = series.iterations[index];
-            i.deferParseAccess({path, index, false, beginStep});
+            i.deferParseAccess();
             if (!series.m_parseLazily)
             {
                 try
@@ -2100,7 +2097,7 @@ creating new iterations.
             }
             else
             {
-                i.get().m_closed = internal::CloseStatus::ParseAccessDeferred;
+                i.get().m_closed = internal::CloseStatus::Closed;
             }
         }
         return std::nullopt;
@@ -2128,7 +2125,7 @@ creating new iterations.
             }
             if (auto err = internal::withRWAccess(
                     IOHandler()->m_seriesStatus,
-                    [&]() { return readSingleIteration(index, it, false); });
+                    [&]() { return readSingleIteration(index, it); });
                 err)
             {
                 std::cerr << "Cannot read iteration " << index
@@ -2188,7 +2185,7 @@ creating new iterations.
             if (auto err = internal::withRWAccess(
                     IOHandler()->m_seriesStatus,
                     [&readSingleIteration, it]() {
-                        return readSingleIteration(it, "", true);
+                        return readSingleIteration(it, "");
                     });
                 err)
             {
@@ -2630,7 +2627,7 @@ auto Series::openIterationIfDirty(IterationIndex_t index, Iteration &iteration)
      * Check side conditions on accessing iterations, and if they are fulfilled,
      * forward function params to openIteration().
      */
-    if (data.m_closed == internal::CloseStatus::ParseAccessDeferred)
+    if (data.need_to_parse)
     {
         return IterationOpened::RemainsClosed;
     }
@@ -2721,7 +2718,6 @@ void Series::openIteration(IterationIndex_t index, Iteration &iteration)
     case CL::Open:
         iteration.get().m_closed = CL::Open;
         break;
-    case CL::ParseAccessDeferred:
     case CL::ClosedInFrontend:
         // just keep it like it is
         break;
@@ -2747,8 +2743,7 @@ void Series::openIteration(IterationIndex_t index, Iteration &iteration)
          * before it is possible to open it.
          */
         if (!iteration.written() &&
-            (IOHandler()->m_frontendAccess == Access::CREATE ||
-             oldStatus != internal::CloseStatus::ParseAccessDeferred))
+            (IOHandler()->m_frontendAccess == Access::CREATE))
         {
             // nothing to do, file will be opened by writing routines
             break;

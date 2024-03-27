@@ -386,7 +386,8 @@ auto StatefulIterator::reparse_possibly_deleted_iteration(iteration_index_t idx)
     -> void
 {
     auto &data = get();
-    if (!data.series.iterations.contains(idx))
+    if (auto it = data.series.iterations.find(idx);
+        it == data.series.iterations.end() || !it->second.m_iterationData)
     {
         withRWAccess(data.series.IOHandler()->m_seriesStatus, [&]() {
             switch (data.series.iterationEncoding())
@@ -694,9 +695,8 @@ std::optional<StatefulIterator *> StatefulIterator::loopBody(Seek const &seek)
         }
 
         auto iteration = iterations.at(current_iteration);
-        switch (iteration.get().m_closed)
+        if (!iteration.parsed())
         {
-        case internal::CloseStatus::ParseAccessDeferred:
             try
             {
                 iterations.at(current_iteration).open();
@@ -709,16 +709,14 @@ std::optional<StatefulIterator *> StatefulIterator::loopBody(Seek const &seek)
                 option.value()->deactivateDeadIteration(current_iteration);
                 return std::nullopt;
             }
-            [[fallthrough]];
-        case internal::CloseStatus::Open:
-            return option;
-        case internal::CloseStatus::Closed:
-        case internal::CloseStatus::ClosedInFrontend:
+        }
+        if (iteration.closed())
+        {
             throw error::Internal(
                 "[StatefulIterator] Next step returned an iteration that "
                 "is already closed, should have opened it.");
         }
-        throw std::runtime_error("Unreachable!");
+        return option;
     };
 
     /*
