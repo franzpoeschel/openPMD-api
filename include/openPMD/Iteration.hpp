@@ -30,6 +30,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <memory>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -395,7 +396,8 @@ private:
      */
     void runDeferredParseAccess();
 
-    Iteration resetIteration();
+    std::pair<Iteration, std::shared_ptr<internal::SharedAttributableData>>
+    resetIteration();
     template <Operation op>
     void resetIterationAndFlush();
 }; // Iteration

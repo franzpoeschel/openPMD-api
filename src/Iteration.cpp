@@ -36,6 +36,7 @@
 #include <exception>
 #include <iostream>
 #include <iterator>
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <tuple>
@@ -145,6 +146,12 @@ Iteration &Iteration::open()
     auto &it = get();
     // figure out my iteration number
     auto begin = s.indexOf(*this);
+    // The current Iteration handle could be stale because it referred to a
+    // previously closed Iteration
+    if (&begin->second != this)
+    {
+        this->setData(begin->second.m_iterationData);
+    }
     // ensure that files are accessed
     s.openIteration(begin->first, *this);
     if (it.m_closed == CloseStatus::ParseAccessDeferred)
@@ -893,48 +900,45 @@ void Iteration::linkHierarchy(Writable &w)
     particles.writable().ownKeyWithinParent = "particles";
 }
 
-Iteration Iteration::resetIteration()
+std::pair<Iteration, std::shared_ptr<internal::SharedAttributableData>>
+Iteration::resetIteration()
 {
-    Iteration copied_iteration = *this;
-    auto s = retrieveSeries();
-    auto iterator_in_series = s.indexOf(*this);
-    auto &iteration_in_series = iterator_in_series->second;
+    using attr_t = std::shared_ptr<internal::SharedAttributableData>;
+    using res_t = std::pair<Iteration, attr_t>;
+
     auto parent = writable().parent;
+    auto old_iteration = *this;
 
-    iteration_in_series.setData(std::make_shared<internal::IterationData>());
-    iteration_in_series.meshes = {};
-    iteration_in_series.particles = {};
-    iteration_in_series.writable().written = true;
-    iteration_in_series.linkHierarchy(*parent);
-    iteration_in_series.setDirty(false); // must come after linkHierarchy
-    iteration_in_series.get().m_closed = internal::CloseStatus::Closed;
+    // old value
+    auto old_attributable = std::move(this->m_attri);
+    res_t res{std::move(old_iteration), std::move(*old_attributable)};
 
-    // We leave *this untouched for now because users might wish to access
-    // metadata after closing an Iteration. But we point it to the new
-    // Attributable internally, so that methods such as `Series::indexOf()` know
-    // what this is.
-    this->Attributable::setData(iteration_in_series.m_attri);
+    this->setData(std::make_shared<internal::IterationData>());
 
-    // now:
-    //   Series.iterations[i]: new data, new Attributable
-    //   *this:                old data, new Attributable
-    //   copied:               old data, old Attributable
+    static_cast<attr_t &>(*old_attributable) =
+        static_cast<attr_t const &>(*this->m_attri);
 
-    std::cout << "Series.iterations[" << iterator_in_series->first
-              << "]: " << s.iterations[iterator_in_series->first].m_attri.get()
-              << "\n*this: " << this->m_attri.get()
-              << "\nres: " << copied_iteration.m_attri.get() << std::endl;
+    this->meshes = {};
+    this->particles = {};
+    this->writable().written = true;
+    this->linkHierarchy(*parent);
+    this->setDirty(false); // must come after linkHierarchy
+    this->get().m_closed = internal::CloseStatus::Closed;
 
-    return copied_iteration;
+    // std::cout << "Resetting '" << res->m_writable.parent << "->"
+    //           << &res->m_writable << "'\tto '" << writable().parent << "->"
+    //           << &writable() << "'" << std::endl;
+
+    return res;
 }
 
 template <Operation op>
 void Iteration::resetIterationAndFlush()
 {
     Parameter<op> fClose; // might also be close_path
-    Iteration iteration = this->resetIteration();
-    auto writable = &iteration.writable();
-    fClose.keep_this_data_alive = std::move(iteration);
+    auto old_data = this->resetIteration();
+    auto writable = &old_data.second->m_writable;
+    fClose.keep_this_data_alive = std::move(old_data);
     IOHandler()->enqueue(IOTask(writable, std::move(fClose)));
 }
 template void Iteration::resetIterationAndFlush<Operation::CLOSE_FILE>();

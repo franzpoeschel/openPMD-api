@@ -63,13 +63,19 @@ auto run_test_filebased(
         E_x.resetDataset({Datatype::INT, {5}});
         std::vector<int> data{0, 1, 2, 3, 4};
         E_x.storeChunk(data, {0}, {5});
+        std::cout << "CLOSE ITERATION\n";
+        openPMD::debug::printDirty(series);
         it.close();
 
 #if !openPMD_HAS_ADIOS_2_8
         if (series.backend() != "ADIOS2")
         {
 #endif
+            std::cout << "OPEN ITERATION\n";
+            openPMD::debug::printDirty(series);
             it.open();
+            std::cout << "OPENED ITERATION\n";
+            openPMD::debug::printDirty(series);
             it.setTimeUnitSI(2.0);
             it.close();
 #if !openPMD_HAS_ADIOS_2_8

@@ -22,9 +22,18 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 
 #include "openPMD/IO/FlushParametersInternal.hpp"
+// #include "openPMD/backend/Writable.hpp"
 
 namespace openPMD
 {
+void AbstractIOHandler::enqueue(IOTask const &iotask)
+{
+    // std::cout << "\tEnqueueing " << iotask.operation << "["
+    //           << iotask.writable->parent << "->" << iotask.writable << "]"
+    //           << std::endl;
+    m_work.push(iotask);
+}
+
 std::future<void> AbstractIOHandler::flush(internal::FlushParams const &params)
 {
     internal::ParsedFlushParams parsedParams{params};

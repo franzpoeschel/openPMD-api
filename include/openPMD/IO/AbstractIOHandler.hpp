@@ -246,10 +246,7 @@ public:
      * @param   iotask  Task to be executed after all previously enqueued
      * IOTasks complete.
      */
-    virtual void enqueue(IOTask const &iotask)
-    {
-        m_work.push(iotask);
-    }
+    virtual void enqueue(IOTask const &iotask);
 
     /** Process operations in queue according to FIFO.
      *
