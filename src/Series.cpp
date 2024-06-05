@@ -25,6 +25,7 @@
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/DummyIOHandler.hpp"
 #include "openPMD/IO/Format.hpp"
+#include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/ReadIterations.hpp"
 #include "openPMD/ThrowError.hpp"
@@ -1131,6 +1132,7 @@ void Series::flushGorVBased(
     bool flushIOHandler)
 {
     auto &series = get();
+
     if (access::readOnly(IOHandler()->m_frontendAccess))
     {
         for (auto it = begin; it != end; ++it)
@@ -1160,6 +1162,8 @@ void Series::flushGorVBased(
             }
 
             // Phase 3
+            Parameter<Operation::TOUCH> touch;
+            IOHandler()->enqueue(IOTask(&writable(), touch));
             if (flushIOHandler)
             {
                 IOHandler()->flush(flushParams);
@@ -1236,6 +1240,8 @@ void Series::flushGorVBased(
         }
 
         flushAttributes(flushParams);
+        Parameter<Operation::TOUCH> touch;
+        IOHandler()->enqueue(IOTask(&writable(), touch));
         if (flushIOHandler)
         {
             IOHandler()->flush(flushParams);
