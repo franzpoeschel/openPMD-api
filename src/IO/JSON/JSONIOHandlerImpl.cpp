@@ -1637,6 +1637,7 @@ void JSONIOHandlerImpl::deregister(
 void JSONIOHandlerImpl::touch(
     Writable *writable, Parameter<Operation::TOUCH> const &)
 {
+    refreshFileFromParent(writable, false);
     this->m_dirty.emplace(writable->fileState);
 }
 
