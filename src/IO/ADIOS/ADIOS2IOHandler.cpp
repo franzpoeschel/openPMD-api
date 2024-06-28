@@ -1070,7 +1070,7 @@ void ADIOS2IOHandlerImpl::openFile(
     // lazy opening is deathly in parallel situations
     auto &fileData = getFileData(**file, how_to_open);
     *parameters.out_parsePreference = fileData.parsePreference;
-    m_dirty.emplace(std::move(file));
+    m_dirty.emplace(file);
 }
 
 void ADIOS2IOHandlerImpl::closeFile(
