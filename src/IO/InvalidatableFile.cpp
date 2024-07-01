@@ -22,6 +22,9 @@
 #include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 
+#include <iostream>
+#include <stdexcept>
+
 namespace openPMD::internal
 {
 
@@ -41,6 +44,12 @@ MaybeOwning<T>::operator bool() const
             [](T const &) { return true; },
             [](T const *val) { return static_cast<bool>(val); }},
         as_base());
+}
+
+template <typename T>
+auto MaybeOwning<T>::operator==(MaybeOwning<T> const &other) const -> bool
+{
+    return (**this).operator==(*other);
 }
 
 template <typename T>
@@ -85,13 +94,30 @@ auto MaybeOwning<T>::operator->() const -> T const *
 }
 
 template <typename T>
-auto MaybeOwning<T>::derive_nonowning() -> MaybeOwning<T>
+auto MaybeOwning<T>::derive_from(MaybeOwning<T> &other) -> MaybeOwning<T> &
 {
-    return MaybeOwning<T> { &operator*() };
+    auto other_ptr = &*other;
+    auto myself = &**this;
+    if (myself != other_ptr)
+    {
+        as_base().template emplace<T *>(other_ptr);
+    }
+    return *this;
 }
 
-template struct MaybeOwning<std::optional<FileState>>;
+template struct MaybeOwning<MaybeFileState>;
 
 FileState::FileState(std::string name_in) : name(std::move(name_in))
 {}
+
+auto MaybeFileState::operator==(MaybeFileState const &other) const -> bool
+{
+    return this == &other;
+}
+
+auto HashSharedFileState::operator()(SharedFileState const &val) const -> size_t
+{
+    constexpr std::hash<MaybeFileState const *> hash;
+    return hash(&*val);
+}
 } // namespace openPMD::internal

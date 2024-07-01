@@ -651,7 +651,7 @@ ADIOS2IOHandlerImpl::flush(internal::ParsedFlushParams &flushParams)
     {
         if (p->has_value() && (*p)->backendSpecificState.has_value())
         {
-            auto &adios2_file = std::any_cast<BackendSpecificFileState &>(
+            auto &adios2_file = std::any_cast<BackendSpecificFileState const &>(
                 (*p)->backendSpecificState);
             adios2_file->flush(adios2FlushParams, /* writeLatePuts = */ false);
         }
@@ -735,7 +735,7 @@ void ADIOS2IOHandlerImpl::createFile(
         // lazy opening is deathly in parallel situations
         auto &fileData =
             getFileData(file_state, IfFileNotOpen::CreateImplicitly);
-        this->m_dirty.emplace(writable->fileState);
+        this->setDirty(writable);
 
         writable->written = true;
         writable->abstractFilePosition = std::make_shared<ADIOS2FilePosition>();
@@ -918,7 +918,7 @@ https://github.com/ornladios/ADIOS2/issues/3504.
         switchAdios2VariableType<detail::VariableDefiner>(
             parameters.dtype, fileData.m_IO, varName, operators, shape);
         writable->written = true;
-        m_dirty.emplace(writable->fileState);
+        setDirty(writable);
     }
 }
 
@@ -1070,7 +1070,7 @@ void ADIOS2IOHandlerImpl::openFile(
     // lazy opening is deathly in parallel situations
     auto &fileData = getFileData(**file, how_to_open);
     *parameters.out_parsePreference = fileData.parsePreference;
-    m_dirty.emplace(file);
+    setDirty(writable);
 }
 
 void ADIOS2IOHandlerImpl::closeFile(
@@ -1103,7 +1103,7 @@ void ADIOS2IOHandlerImpl::closeFile(
         /* writeLatePuts = */ true,
         /* flushUnconditionally = */ false);
     file.backendSpecificState.reset();
-    *maybe_file = std::nullopt;
+    maybe_file->reset();
 }
 
 void ADIOS2IOHandlerImpl::openPath(
@@ -1208,7 +1208,7 @@ void ADIOS2IOHandlerImpl::writeDataset(
     bp.name = nameOfVariable(writable);
     bp.param = std::move(parameters);
     ba.enqueue(std::move(bp));
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
     writable->written = true; // TODO erst nach dem Schreiben?
 }
 
@@ -1237,7 +1237,7 @@ void ADIOS2IOHandlerImpl::readDataset(
     // selection might change again before flushing
     bg.stepSelection = ba.stepSelection();
     ba.enqueue(std::move(bg));
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
 }
 
 namespace detail
@@ -2033,7 +2033,7 @@ void ADIOS2IOHandlerImpl::touch(
     refreshFileFromParent(writable, false);
     if (access::write(m_handler->m_backendAccess))
     {
-        this->m_dirty.emplace(writable->fileState);
+        this->setDirty(writable);
     }
 }
 
@@ -2315,7 +2315,7 @@ namespace detail
         auto &filedata = impl->getFileData(
             file, ADIOS2IOHandlerImpl::IfFileNotOpen::ThrowError);
         adios2::IO IO = filedata.m_IO;
-        impl->m_dirty.emplace(writable->fileState);
+        impl->setDirty(writable);
 
         if (impl->m_modifiableAttributes ==
                 ADIOS2IOHandlerImpl::ModifiableAttributes::No &&

@@ -53,13 +53,16 @@ protected:
      * map each Writable to its associated file contains only the filename,
      * without the OS path
      */
-    std::unordered_set<internal::SharedFileState> m_dirty;
+    std::unordered_set<internal::SharedFileState, internal::HashSharedFileState>
+        m_dirty;
     std::unordered_map<std::string, internal::SharedFileState> m_files;
 
     internal::SharedFileState &
     makeFile(Writable *, std::string fileName, bool consider_open_files);
 
-    void associateWithFile(Writable *writable, internal::SharedFileState file);
+    void associateWithFile(Writable *writable, internal::SharedFileState &file);
+
+    void setDirty(Writable *);
 
     /**
      *
@@ -67,7 +70,7 @@ protected:
      */
     std::string fullPath(internal::FileState const &);
 
-    std::string fullPath(std::string);
+    std::string fullPath(std::string const &);
 
     /**
      * Get the writable's containing file.
@@ -135,16 +138,16 @@ AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::makeFile(
     Writable *writable, std::string file, bool consider_open_files)
 {
     auto make_new = [&]() {
-        writable->fileState =
-            std::make_shared<std::optional<internal::FileState>>(file);
-        m_files[std::move(file)] = writable->fileState;
+        new (&writable->fileState)
+            internal::SharedFileState(std::in_place, file);
+        m_files[std::move(file)].derive_from(writable->fileState);
     };
     if (consider_open_files)
     {
         if (auto it = m_files.find(file);
             it != m_files.end() && it->second->has_value())
         {
-            writable->fileState = it->second;
+            writable->fileState.derive_from(it->second);
         }
         else
         {
@@ -161,10 +164,17 @@ AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::makeFile(
 }
 
 template <typename IOHandler_t, typename FilePositionType>
-void AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::
-    associateWithFile(Writable *writable, internal::SharedFileState file)
+void AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::setDirty(
+    Writable *writable)
 {
-    writable->fileState = std::move(file);
+    m_dirty.emplace(&*writable->fileState);
+}
+
+template <typename IOHandler_t, typename FilePositionType>
+void AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::
+    associateWithFile(Writable *writable, internal::SharedFileState &file)
+{
+    writable->fileState.derive_from(file);
 }
 
 template <typename IOHandler_t, typename FilePositionType>
@@ -178,7 +188,7 @@ AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::fullPath(
 template <typename IOHandler_t, typename FilePositionType>
 std::string
 AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::fullPath(
-    std::string fileName)
+    std::string const &fileName)
 {
     if (auxiliary::ends_with(m_handler->directory, "/"))
     {
@@ -215,7 +225,7 @@ AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::
         search = writable->parent;
         while (!search->fileState->has_value())
         {
-            search->fileState = file;
+            search->fileState.derive_from(file);
             search = search->parent;
         }
         associateWithFile(writable, file);
