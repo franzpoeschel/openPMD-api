@@ -24,9 +24,35 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
+#include <variant>
 
 namespace openPMD::internal
 {
+
+template <typename T>
+struct MaybeOwning : std::variant<T, T *>
+{
+    using variant_t = std::variant<T, T *>;
+
+    explicit MaybeOwning();
+    template <typename... Args>
+    explicit MaybeOwning(std::in_place_t, Args &&...);
+    explicit MaybeOwning(T *);
+
+    operator bool() const;
+
+    auto as_base() -> variant_t &;
+    auto as_base() const -> variant_t const &;
+
+    auto operator*() -> T &;
+    auto operator*() const -> T const &;
+
+    auto operator->() -> T *;
+    auto operator->() const -> T const *;
+
+    auto derive_nonowning() -> MaybeOwning<T>;
+};
 
 struct FileState
 {
@@ -42,4 +68,11 @@ struct FileState
     FileState &operator=(FileState &&other) = delete;
 };
 using SharedFileState = std::shared_ptr<std::optional<FileState>>;
+// using SharedFileState = MaybeOwning<std::optional<FileState>>;
+
+template <typename T>
+template <typename... Args>
+MaybeOwning<T>::MaybeOwning(std::in_place_t, Args &&...args)
+    : variant_t(std::in_place_type<T>, std::forward<Args>(args)...)
+{}
 } // namespace openPMD::internal

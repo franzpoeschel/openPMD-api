@@ -20,9 +20,78 @@
  */
 
 #include "openPMD/IO/InvalidatableFile.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 
 namespace openPMD::internal
 {
+
+template <typename T>
+MaybeOwning<T>::MaybeOwning() : MaybeOwning(static_cast<T *>(nullptr))
+{}
+
+template <typename T>
+MaybeOwning<T>::MaybeOwning(T *val) : variant_t(std::move(val))
+{}
+
+template <typename T>
+MaybeOwning<T>::operator bool() const
+{
+    return std::visit(
+        auxiliary::overloaded{
+            [](T const &) { return true; },
+            [](T const *val) { return static_cast<bool>(val); }},
+        as_base());
+}
+
+template <typename T>
+auto MaybeOwning<T>::as_base() -> variant_t &
+{
+    return *this;
+}
+
+template <typename T>
+auto MaybeOwning<T>::as_base() const -> variant_t const &
+{
+    return *this;
+}
+
+template <typename T>
+auto MaybeOwning<T>::operator*() const -> T const &
+{
+    return std::visit(
+        auxiliary::overloaded{
+            [](T const &val) -> T const & { return val; },
+            [](T const *val) -> T const & { return *val; }},
+        as_base());
+}
+
+template <typename T>
+auto MaybeOwning<T>::operator*() -> T &
+{
+    return const_cast<T &>(
+        static_cast<MaybeOwning<T> const *>(this)->operator*());
+}
+
+template <typename T>
+auto MaybeOwning<T>::operator->() -> T *
+{
+    return &operator*();
+}
+
+template <typename T>
+auto MaybeOwning<T>::operator->() const -> T const *
+{
+    return &operator*();
+}
+
+template <typename T>
+auto MaybeOwning<T>::derive_nonowning() -> MaybeOwning<T>
+{
+    return MaybeOwning<T> { &operator*() };
+}
+
+template struct MaybeOwning<std::optional<FileState>>;
+
 FileState::FileState(std::string name_in) : name(std::move(name_in))
 {}
 } // namespace openPMD::internal
