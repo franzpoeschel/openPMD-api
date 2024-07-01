@@ -461,10 +461,14 @@ JSONIOHandlerImpl::~JSONIOHandlerImpl() = default;
 std::future<void> JSONIOHandlerImpl::flush()
 {
     AbstractIOHandlerImpl::flush();
-    for (auto const &file : m_dirty)
+    for (auto it = m_dirty.begin(); it != m_dirty.end(); it = m_dirty.begin())
     {
+        auto node = m_dirty.extract(it);
+        auto &file = node.value();
         if (file->has_value())
+        {
             putJsonContents(**file);
+        }
     }
     m_dirty.clear();
     return std::future<void>();
@@ -497,7 +501,8 @@ void JSONIOHandlerImpl::createFile(
     {
         std::string name = parameters.name + m_originalExtension;
 
-        auto file = makeFile(writable, name, /* consider_open_files = */ false);
+        auto &file =
+            makeFile(writable, name, /* consider_open_files = */ false);
         auto &file_state = **file;
         auto file_exists = auxiliary::file_exists(fullPath(file_state));
 
@@ -515,7 +520,7 @@ void JSONIOHandlerImpl::createFile(
             VERIFY(success, "[JSON] Could not create directory.");
         }
 
-        this->m_dirty.emplace(writable->fileState);
+        this->setDirty(writable);
 
         if (m_handler->m_backendAccess != Access::APPEND || !file_exists)
         {
@@ -577,7 +582,7 @@ void JSONIOHandlerImpl::createPath(
         writable->abstractFilePosition = std::move(new_filepos);
     }
     ensurePath(jsonVal, filepos->id.to_string());
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
     writable->written = true;
 }
 
@@ -661,7 +666,7 @@ void JSONIOHandlerImpl::createDataset(
             break;
         }
         writable->written = true;
-        m_dirty.emplace(writable->fileState);
+        setDirty(writable);
     }
 }
 
@@ -991,19 +996,15 @@ void JSONIOHandlerImpl::closeFile(
     Writable *writable, Parameter<Operation::CLOSE_FILE> const &)
 {
     auto &maybe_file = writable->fileState;
-    if (!maybe_file)
+    if (!maybe_file || !maybe_file->has_value())
     {
         return;
-    }
-    else if (!maybe_file->has_value())
-    {
-        *maybe_file = std::nullopt;
     }
     auto &file = **maybe_file;
     putJsonContents(file);
     m_dirty.erase(maybe_file);
     m_files.erase(file.name);
-    *maybe_file = std::nullopt;
+    maybe_file->reset();
 }
 
 void JSONIOHandlerImpl::openPath(
@@ -1280,7 +1281,7 @@ void JSONIOHandlerImpl::writeAttribute(
         break;
     }
     writable->written = true;
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
 }
 
 namespace
@@ -1638,7 +1639,7 @@ void JSONIOHandlerImpl::touch(
     Writable *writable, Parameter<Operation::TOUCH> const &)
 {
     refreshFileFromParent(writable, false);
-    this->m_dirty.emplace(writable->fileState);
+    this->setDirty(writable);
 }
 
 auto JSONIOHandlerImpl::getFilehandle(

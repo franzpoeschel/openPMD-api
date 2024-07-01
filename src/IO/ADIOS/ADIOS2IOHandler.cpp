@@ -584,7 +584,7 @@ ADIOS2IOHandlerImpl::flush(internal::ParsedFlushParams &flushParams)
     {
         if (p->has_value() && (*p)->backendSpecificState.has_value())
         {
-            auto &adios2_file = std::any_cast<BackendSpecificFileState &>(
+            auto &adios2_file = std::any_cast<BackendSpecificFileState const &>(
                 (*p)->backendSpecificState);
             adios2_file->flush(adios2FlushParams, /* writeLatePuts = */ false);
         }
@@ -665,7 +665,7 @@ void ADIOS2IOHandlerImpl::createFile(
         }
 
         auto &fileData = getFileData(file_state, IfFileNotOpen::OpenImplicitly);
-        this->m_dirty.emplace(writable->fileState);
+        this->setDirty(writable);
 
         writable->written = true;
         writable->abstractFilePosition = std::make_shared<ADIOS2FilePosition>();
@@ -877,7 +877,7 @@ https://github.com/ornladios/ADIOS2/issues/3504.
             parameters.dtype, fileData.m_IO, varName, operators, shape);
         fileData.invalidateVariablesMap();
         writable->written = true;
-        m_dirty.emplace(writable->fileState);
+        setDirty(writable);
     }
 }
 
@@ -956,7 +956,7 @@ void ADIOS2IOHandlerImpl::openFile(
     // lazy opening is deathly in parallel situations
     auto &fileData = getFileData(**file, IfFileNotOpen::OpenImplicitly);
     *parameters.out_parsePreference = fileData.parsePreference;
-    m_dirty.emplace(file);
+    setDirty(writable);
 }
 
 void ADIOS2IOHandlerImpl::closeFile(
@@ -989,7 +989,7 @@ void ADIOS2IOHandlerImpl::closeFile(
         /* writeLatePuts = */ true,
         /* flushUnconditionally = */ false);
     file.backendSpecificState.reset();
-    *maybe_file = std::nullopt;
+    maybe_file->reset();
 }
 
 void ADIOS2IOHandlerImpl::openPath(
@@ -1077,7 +1077,7 @@ void ADIOS2IOHandlerImpl::writeDataset(
     bp.name = nameOfVariable(writable);
     bp.param = std::move(parameters);
     ba.enqueue(std::move(bp));
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
     writable->written = true; // TODO erst nach dem Schreiben?
 }
 
@@ -1129,7 +1129,7 @@ void ADIOS2IOHandlerImpl::readDataset(
     bg.name = nameOfVariable(writable);
     bg.param = parameters;
     ba.enqueue(std::move(bg));
-    m_dirty.emplace(writable->fileState);
+    setDirty(writable);
 }
 
 namespace detail
@@ -1561,7 +1561,7 @@ void ADIOS2IOHandlerImpl::touch(
     Writable *writable, Parameter<Operation::TOUCH> const &)
 {
     refreshFileFromParent(writable, false);
-    this->m_dirty.emplace(writable->fileState);
+    this->setDirty(writable);
 }
 
 adios2::Mode ADIOS2IOHandlerImpl::adios2AccessMode(std::string const &fullPath)
@@ -1884,7 +1884,7 @@ namespace detail
             file, ADIOS2IOHandlerImpl::IfFileNotOpen::ThrowError);
         filedata.invalidateAttributesMap();
         adios2::IO IO = filedata.m_IO;
-        impl->m_dirty.emplace(writable->fileState);
+        impl->setDirty(writable);
 
 #if openPMD_HAS_ADIOS_2_9
         if (impl->m_modifiableAttributes ==
