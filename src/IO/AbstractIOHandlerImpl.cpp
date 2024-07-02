@@ -125,7 +125,19 @@ std::future<void> AbstractIOHandlerImpl::flush()
                     "->",
                     i.writable,
                     "] CREATE_FILE: ",
-                    parameter.name);
+                    parameter.name,
+                    [ptr = parameter.storageLocation]() {
+                        if (ptr)
+                        {
+                            std::stringstream s;
+                            s << " into " << ptr;
+                            return s.str();
+                        }
+                        else
+                        {
+                            return std::string();
+                        }
+                    });
                 createFile(i.writable, parameter);
                 break;
             }
@@ -193,7 +205,19 @@ std::future<void> AbstractIOHandlerImpl::flush()
                     "->",
                     i.writable,
                     "] OPEN_FILE: ",
-                    parameter.name);
+                    parameter.name,
+                    [ptr = parameter.storageLocation]() {
+                        if (ptr)
+                        {
+                            std::stringstream s;
+                            s << " into " << ptr;
+                            return s.str();
+                        }
+                        else
+                        {
+                            return std::string();
+                        }
+                    });
                 openFile(i.writable, parameter);
                 break;
             }

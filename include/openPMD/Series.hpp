@@ -805,7 +805,7 @@ OPENPMD_private
     void flushParticlesPath();
     void flushRankTable();
     void readFileBased();
-    void readOneIterationFileBased(std::string const &filePath);
+    void readOneIterationFileBased(std::string const &filePath, Iteration &it);
     /**
      * Note on re-parsing of a Series:
      * If init == false, the parsing process will seek for new

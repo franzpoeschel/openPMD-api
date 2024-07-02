@@ -501,8 +501,11 @@ void JSONIOHandlerImpl::createFile(
     {
         std::string name = parameters.name + m_originalExtension;
 
+        auto storageLocation =
+            parameters.storageLocation ? parameters.storageLocation : writable;
         auto &file =
-            makeFile(writable, name, /* consider_open_files = */ false);
+            makeFile(storageLocation, name, /* consider_open_files = */ false);
+        propagateFilestateToRoot(storageLocation);
         auto &file_state = **file;
         auto file_exists = auxiliary::file_exists(fullPath(file_state));
 
@@ -984,7 +987,11 @@ void JSONIOHandlerImpl::openFile(
 
     std::string name = parameter.name + m_originalExtension;
 
-    auto &file = makeFile(writable, name, /* consider_open_files = */ true);
+    auto storageLocation =
+        parameter.storageLocation ? parameter.storageLocation : writable;
+    auto &file =
+        makeFile(storageLocation, name, /* consider_open_files = */ true);
+    propagateFilestateToRoot(storageLocation);
 
     associateWithFile(writable, file);
 

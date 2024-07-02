@@ -208,6 +208,7 @@ void Iteration::flushFileBased(
         /* create file */
         Parameter<Operation::CREATE_FILE> fCreate;
         fCreate.name = filename;
+        fCreate.storageLocation = &this->writable();
         IOHandler()->enqueue(IOTask(&s.writable(), fCreate));
 
         /*
@@ -403,7 +404,7 @@ void Iteration::readFileBased(
     }
     auto series = retrieveSeries();
 
-    series.readOneIterationFileBased(filePath);
+    series.readOneIterationFileBased(filePath, *this);
     get().m_overrideFilebasedFilename = filePath;
 
     read_impl(groupPath);

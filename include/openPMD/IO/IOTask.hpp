@@ -141,6 +141,7 @@ struct OPENPMDAPI_EXPORT Parameter<Operation::CREATE_FILE>
             new Parameter<Operation::CREATE_FILE>(std::move(*this)));
     }
 
+    Writable *storageLocation = nullptr;
     std::string name = "";
 };
 
@@ -187,6 +188,7 @@ struct OPENPMDAPI_EXPORT Parameter<Operation::OPEN_FILE>
             new Parameter<Operation::OPEN_FILE>(std::move(*this)));
     }
 
+    Writable *storageLocation = nullptr;
     std::string name = "";
     using ParsePreference = internal::ParsePreference;
     std::shared_ptr<ParsePreference> out_parsePreference =

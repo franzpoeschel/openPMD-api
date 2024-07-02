@@ -645,8 +645,11 @@ void ADIOS2IOHandlerImpl::createFile(
     {
         std::string name = parameters.name + fileSuffix();
 
+        auto storageLocation =
+            parameters.storageLocation ? parameters.storageLocation : writable;
         auto &file =
-            makeFile(writable, name, /* consider_open_files = */ false);
+            makeFile(storageLocation, name, /* consider_open_files = */ false);
+        propagateFilestateToRoot(storageLocation);
         auto &file_state = **file;
         if (m_handler->m_backendAccess != Access::CREATE &&
             m_handler->m_backendAccess != Access::APPEND &&
@@ -945,9 +948,11 @@ void ADIOS2IOHandlerImpl::openFile(
 
     std::string name = parameters.name + fileSuffix();
 
-    auto &file = makeFile(writable, name, /* consider_open_files = */ true);
-
-    associateWithFile(writable, file);
+    auto storageLocation =
+        parameters.storageLocation ? parameters.storageLocation : writable;
+    auto &file =
+        makeFile(storageLocation, name, /* consider_open_files = */ true);
+    propagateFilestateToRoot(storageLocation);
 
     writable->written = true;
     writable->abstractFilePosition = std::make_shared<ADIOS2FilePosition>();
