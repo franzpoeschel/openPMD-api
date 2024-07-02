@@ -1608,7 +1608,6 @@ void Series::readFileBased(
     std::optional<IterationIndex_t> read_only_this_single_iteration)
 {
     auto &series = get();
-    Parameter<Operation::OPEN_FILE> fOpen;
     Parameter<Operation::READ_ATT> aRead;
 
     // Tell the backend that we are parsing file-based iteration encoding.
@@ -1822,7 +1821,8 @@ void Series::readFileBased(
             "Please specify '%0<N>T' or open as read-only.");
 }
 
-void Series::readOneIterationFileBased(std::string const &filePath)
+void Series::readOneIterationFileBased(
+    std::string const &filePath, Iteration &it)
 {
     auto &series = get();
 
@@ -1836,6 +1836,7 @@ void Series::readOneIterationFileBased(std::string const &filePath)
     Parameter<Operation::READ_ATT> aRead;
 
     fOpen.name = filePath;
+    fOpen.storageLocation = &it.writable();
     IOHandler()->enqueue(IOTask(this, fOpen));
     IOHandler()->flush(internal::defaultFlushParams);
     series.iterations.parent() = getWritable(this);
@@ -2955,6 +2956,7 @@ void Series::openIteration(IterationIndex_t index, Iteration &iteration)
         {
             fOpen.reopen = R::WasFoundOnDisk;
         }
+        fOpen.storageLocation = &iteration.writable();
         IOHandler()->enqueue(IOTask(this, fOpen));
 
         /* open base path */

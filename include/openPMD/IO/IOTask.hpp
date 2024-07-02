@@ -166,6 +166,7 @@ struct OPENPMDAPI_EXPORT
             new Parameter<Operation::CREATE_FILE>(std::move(*this)));
     }
 
+    Writable *storageLocation = nullptr;
     std::string name = "";
 };
 
@@ -225,6 +226,7 @@ struct OPENPMDAPI_EXPORT
         NoReopen
     };
 
+    Writable *storageLocation = nullptr;
     std::string name = "";
     Reopen reopen = Reopen::NoReopen;
     using ParsePreference = internal::ParsePreference;

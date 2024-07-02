@@ -103,6 +103,8 @@ protected:
     FilePositionType *
     setAndGetFilePosition(Writable *writable, std::string extend);
 
+    void propagateFilestateToRoot(Writable *writable);
+
     /*
      * The "virtual" methods here must be implemented by the child class,
      * but the references are resolved at compile time, hence not really
@@ -138,8 +140,9 @@ AbstractIOHandlerImplCommon<IOHandler_t, FilePositionType>::makeFile(
     Writable *writable, std::string file, bool consider_open_files)
 {
     auto make_new = [&]() {
-        new (&writable->fileState)
-            internal::SharedFileState(std::in_place, file);
+        using SharedFileState = internal::SharedFileState;
+        writable->fileState.~SharedFileState();
+        new (&writable->fileState) SharedFileState(std::in_place, file);
         m_files[std::move(file)].derive_from(writable->fileState);
     };
     if (consider_open_files)
@@ -310,5 +313,17 @@ auto AbstractIOHandlerImplCommon<IOHandlerImpl_t, FilePositionType>::
     auto res = new_pos.get();
     writable->abstractFilePosition = std::move(new_pos);
     return dynamic_cast<FilePositionType *>(res);
+}
+
+template <typename IOHandlerImpl_t, typename FilePositionType>
+void AbstractIOHandlerImplCommon<IOHandlerImpl_t, FilePositionType>::
+    propagateFilestateToRoot(Writable *const writable)
+{
+    auto ancestor = writable;
+    while (ancestor->parent)
+    {
+        ancestor = ancestor->parent;
+        ancestor->fileState.derive_from(writable->fileState);
+    }
 }
 } // namespace openPMD

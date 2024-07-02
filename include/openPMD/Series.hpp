@@ -905,7 +905,7 @@ OPENPMD_private
      */
     void readFileBased(
         std::optional<IterationIndex_t> read_only_this_single_iteration);
-    void readOneIterationFileBased(std::string const &filePath);
+    void readOneIterationFileBased(std::string const &filePath, Iteration &it);
     /**
      * Note on re-parsing of a Series:
      * If init == false, the parsing process will seek for new
