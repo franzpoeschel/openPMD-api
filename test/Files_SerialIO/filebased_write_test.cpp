@@ -1,5 +1,6 @@
 #include "SerialIOTests.hpp"
 #include "openPMD/IO/Access.hpp"
+#include "openPMD/auxiliary/Export.hpp"
 
 namespace filebased_write_test
 {
@@ -77,6 +78,7 @@ void close_and_reopen_iterations(
     }
 }
 
+OPENPMDAPI_EXPORT
 void close_and_reopen_iterations(std::string const &filename)
 {
     close_and_reopen_iterations(

@@ -1,6 +1,7 @@
 #include "SerialIOTests.hpp"
 #include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/IO/Access.hpp"
+#include "openPMD/auxiliary/Export.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 
 #include <catch2/catch.hpp>
@@ -269,6 +270,7 @@ auto run_test_groupbased(
     }
 }
 
+OPENPMDAPI_EXPORT
 auto close_and_reopen_test() -> void
 {
     run_test_filebased([](Series &s) { return s.iterations; }, "bp");
