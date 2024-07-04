@@ -640,13 +640,54 @@ public:
      */
     ReadIterations readIterations();
 
-    enum class SnapshotAccess
+    enum class SnapshotWorkflow
     {
         RandomAccess,
-        Linear
+        Synchronous
     };
-    Snapshots snapshots(
-        std::optional<SnapshotAccess> access_synchronously = std::nullopt);
+    /** @brief Preferred way to access Iterations/Snapshots. Single API for all
+     *         workflows and access modi.
+     *
+     * Two fundamental workflows for Iteration/Snapshot processing exist:
+     *
+     * 1. Random-access workflow: Iterations/Snapshots are accessed
+     *    independently from one another. Users must take care to open()
+     *    and close() them as needed.
+     *    More than one Iteration can be open at the same time.
+     * 2. Linear/Synchronous workflow:
+     *    The (parallel) Series has one shared state. The effect is twofold:
+     *      (a) Advancing one iterator, e.g. via `operator++()` will advance all
+     *          other iterators as well.
+     *      (b) Advancing an iterator is collective, all MPI ranks must
+                participate.
+     *    The workflow is generally managed more automatically,
+     *    `Iteration::open()` is not needed, `Iteration::close()` is
+     *    recommended, but not needed. In READ_LINEAR mode, parsed Iteration
+     *    data is deleted upon closing (and will be reparsed upon reopening)
+     *    for a better support of datasets with many Snapshots/Iterations.
+     *    This mode generally brings better performance than random access mode
+     *    due to the more restricted workflow.
+     *    For accessing some kinds of Series, Synchronous access is even
+     *    necessary, e.g. for Streaming workflows or variable-based encoding.
+     *    (In future, random-access of Series with variable-based encoding will
+     *    be possible under the condition that each Iteration/Snapshot has the
+     *    same internal structure).
+     *
+     * Random-vs.-Synchronous access is determined automatically
+     * in READ workflows: Access::READ_LINEAR uses the synchronous workflow,
+     * while Access::READ_ONLY and Access::READ_WRITE use the random-access
+     * workflow.
+     *
+     * Conversely, the Access::CREATE and Access::APPEND access modes both
+     * resolve to random-access by default, but can be specified to use
+     * Synchronous workflow if needed.
+     *
+     * @param snapshot_workflow Specify the intended workflow
+     *            in Access::CREATE and Access::APPEND. Leave unspecified in
+     *            other access modes as those support only one workflow each.
+     */
+    Snapshots
+    snapshots(std::optional<SnapshotWorkflow> snapshot_workflow = std::nullopt);
 
     /**
      * @brief Parse the Series.
@@ -899,7 +940,7 @@ OPENPMD_private
     AbstractIOHandler const *IOHandler() const;
 }; // Series
 
-using SnapshotAccess = Series::SnapshotAccess;
+using SnapshotWorkflow = Series::SnapshotWorkflow;
 
 namespace debug
 {
