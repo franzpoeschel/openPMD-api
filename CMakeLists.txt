@@ -458,6 +458,7 @@ set(CORE_SOURCE
         src/ParticlePatches.cpp
         src/ParticleSpecies.cpp
         src/Record.cpp
+        src/ReadIterations.cpp
         src/RecordComponent.cpp
         src/Series.cpp
         src/version.cpp
@@ -475,6 +476,7 @@ set(CORE_SOURCE
         src/helper/list_series.cpp
         src/snapshots/ContainerImpls.cpp
         src/snapshots/ContainerTraits.cpp
+        src/snapshots/IteratorHelpers.cpp
         src/snapshots/IteratorTraits.cpp
         src/snapshots/RandomAccessIterator.cpp
         src/snapshots/Snapshots.cpp
