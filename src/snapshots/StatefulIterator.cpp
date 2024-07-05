@@ -26,6 +26,7 @@
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
+#include "openPMD/backend/ParsePreference.hpp"
 
 #include <iostream>
 #include <iterator>
@@ -40,11 +41,11 @@ namespace openPMD
 namespace detail
 {
     step_status_types::During_t::During_t(
-        size_t idx_in,
+        size_t step_count_in,
         std::optional<Iteration::IterationIndex_t> iteration_idx_in,
         std::vector<Iteration::IterationIndex_t>
             available_iterations_in_step_in)
-        : idx(idx_in)
+        : step_count(step_count_in)
         , iteration_idx(iteration_idx_in)
         , available_iterations_in_step(
               std::move(available_iterations_in_step_in))
@@ -330,9 +331,9 @@ auto StatefulIterator::resetCurrentIterationToBegin(
     auto &data = get();
     data.currentStep.map_during_t(
         [&](CurrentStep::During_t &during) {
-            during.idx += num_skipped_iterations;
+            during.step_count += num_skipped_iterations;
             restrict_to_unseen_iterations(
-                indexes, data.seen_iterations, during.idx);
+                indexes, data.seen_iterations, during.step_count);
             during.available_iterations_in_step = std::move(indexes);
             if (during.available_iterations_in_step.empty())
             {
@@ -635,7 +636,7 @@ StatefulIterator::nextStep(size_t recursion_depth)
         if (auto during = data.currentStep.get_variant<CurrentStep::During_t>();
             during.has_value())
         {
-            ++(*during)->idx;
+            ++(*during)->step_count;
         }
         resetCurrentIterationToBegin(
             recursion_depth, std::move(current_iterations));
@@ -763,7 +764,10 @@ std::optional<StatefulIterator *> StatefulIterator::loopBody(Seek const &seek)
     // The currently active iterations have been exhausted.
     // Now see if there are further iterations to be found.
 
-    if (series.iterationEncoding() == IterationEncoding::fileBased)
+    if (series.iterationEncoding() == IterationEncoding::fileBased ||
+        (data.parsePreference == internal::ParsePreference::UpFront &&
+         std::holds_alternative<detail::step_status_types::During_t>(
+             data.currentStep.as_base())))
     {
         // this one is handled above, stream is over once it proceeds to here
         this->turn_into_end_iterator(TypeOfEndIterator::NoMoreIterationsInStep);

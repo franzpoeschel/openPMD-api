@@ -37,7 +37,7 @@ public:
     operator=(StatefulSnapshotsContainer &&other) noexcept(noexcept(
         std::declval<Members>().operator=(std::declval<Members &&>())));
 
-    auto currentIteration() -> std::optional<value_type *> override;
+    using AbstractSnapshotsContainer::currentIteration;
     auto currentIteration() const -> std::optional<value_type const *> override;
 
     auto begin() -> iterator override;
@@ -83,6 +83,9 @@ public:
     operator=(RandomAccessIteratorContainer const &other);
     RandomAccessIteratorContainer &
     operator=(RandomAccessIteratorContainer &&other) noexcept;
+
+    using AbstractSnapshotsContainer::currentIteration;
+    auto currentIteration() const -> std::optional<value_type const *> override;
 
     auto begin() -> iterator override;
     auto end() -> iterator override;

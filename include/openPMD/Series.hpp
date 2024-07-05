@@ -640,11 +640,14 @@ public:
      */
     ReadIterations readIterations();
 
+    /** Parameter for Series::snapshots(), see there.
+     */
     enum class SnapshotWorkflow
     {
         RandomAccess,
         Synchronous
     };
+
     /** @brief Preferred way to access Iterations/Snapshots. Single API for all
      *         workflows and access modi.
      *
@@ -672,6 +675,10 @@ public:
      *    (In future, random-access of Series with variable-based encoding will
      *    be possible under the condition that each Iteration/Snapshot has the
      *    same internal structure).
+     *
+     * As a rule of thumb, the synchronous workflow should be preferred as long
+     * as possible. The random-access workflow should be chosen when more
+     * flexible interaction with Snapshots is needed.
      *
      * Random-vs.-Synchronous access is determined automatically
      * in READ workflows: Access::READ_LINEAR uses the synchronous workflow,
@@ -848,6 +855,9 @@ OPENPMD_private
     void flushMeshesPath();
     void flushParticlesPath();
     void flushRankTable();
+    /* Parameter `read_only_this_single_iteration` used for reopening an
+     * Iteration after closing it.
+     */
     void readFileBased(
         std::optional<IterationIndex_t> read_only_this_single_iteration);
     void readOneIterationFileBased(std::string const &filePath);
@@ -861,8 +871,10 @@ OPENPMD_private
      * and turn them into a warning (useful when parsing a Series, since parsing
      * should succeed without issue).
      * If true, the error will always be re-thrown (useful when using
-     * ReadIterations since those methods should be aware when the current
-     * step is broken).
+     * ReadIterations since those methods should be aware when the current step
+     * is broken).
+     * Parameter `read_only_this_single_iteration` used for reopening an
+     * Iteration after closing it.
      */
     std::vector<IterationIndex_t> readGorVBased(
         bool do_always_throw_errors,

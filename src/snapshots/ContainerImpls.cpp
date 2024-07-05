@@ -39,18 +39,7 @@ auto StatefulSnapshotsContainer::get() const -> StatefulIterator const *
 {
     return members.m_bufferedIterator.value_or(nullptr);
 }
-auto StatefulSnapshotsContainer::currentIteration()
-    -> std::optional<value_type *>
-{
-    if (auto it = get(); it)
-    {
-        return it->peekCurrentlyOpenIteration();
-    }
-    else
-    {
-        return nullptr;
-    }
-}
+
 auto StatefulSnapshotsContainer::currentIteration() const
     -> std::optional<value_type const *>
 {
@@ -198,8 +187,9 @@ auto StatefulSnapshotsContainer::operator[](key_type const &key)
         {
             s.currentStep.map_during_t(
                 [&](detail::CurrentStep::During_t &during) {
-                    ++during.idx;
-                    base_iterator->get().seen_iterations[key] = during.idx;
+                    ++during.step_count;
+                    base_iterator->get().seen_iterations[key] =
+                        during.step_count;
                     during.iteration_idx = key;
                     during.available_iterations_in_step = {key};
                 },
@@ -293,6 +283,19 @@ RandomAccessIteratorContainer &RandomAccessIteratorContainer::operator=(
     RandomAccessIteratorContainer const &other) = default;
 RandomAccessIteratorContainer &RandomAccessIteratorContainer::operator=(
     RandomAccessIteratorContainer &&other) noexcept = default;
+
+auto RandomAccessIteratorContainer::currentIteration() const
+    -> std::optional<value_type const *>
+{
+    if (auto begin = m_cont.begin(); begin != m_cont.end())
+    {
+        return std::make_optional<value_type const *>(&*begin);
+    }
+    else
+    {
+        return std::nullopt;
+    }
+}
 
 auto RandomAccessIteratorContainer::begin() -> iterator
 {

@@ -36,6 +36,9 @@
 #include <variant>
 #include <vector>
 
+/* Internal header not included into user code.
+ */
+
 namespace openPMD
 {
 namespace internal
@@ -45,26 +48,46 @@ namespace internal
 
 namespace detail
 {
+    /* The iterator status is either of the following:
+     */
     namespace step_status_types
     {
+        /* No step was opened yet, the Series was just opened.
+         */
         struct Before_t
         {};
+        /* A step is currently active
+         */
         struct During_t
         {
-            size_t idx;
+            // The index of the current Step.
+            size_t step_count;
+            // The current Iteration within the Step.
+            // Empty optional indicates that no Iteration is left in the current
+            // step for processing, i.e. a new step must be opened or the Series
+            // is over.
             std::optional<Iteration::IterationIndex_t> iteration_idx;
+            // Iteration indexes that are accessible within the current step.
+            // These are not modified when closing an Iteration as long as the
+            // current IO step stays active.
             std::vector<Iteration::IterationIndex_t>
                 available_iterations_in_step;
 
             During_t(
-                size_t idx,
+                size_t step_count,
                 std::optional<Iteration::IterationIndex_t> iteration_idx,
                 std::vector<Iteration::IterationIndex_t>
                     available_iterations_in_step);
         };
+        /* No further data available in the Series.
+         */
         struct After_t
         {};
     } // namespace step_status_types
+
+    /* This class unifies the current step status as described above into a
+     * std::variant with some helper functions.
+     */
     struct CurrentStep
         : std::variant<
               step_status_types::Before_t,
@@ -94,6 +117,9 @@ namespace detail
         auto
         get_iteration_index() -> std::optional<Iteration::IterationIndex_t *>;
 
+        /* Passed as first param of create_new lambda in map_during_t, so the
+         * lambda can make an appropriate case distinction.
+         */
         enum class AtTheEdge : bool
         {
             Begin,
@@ -149,6 +175,9 @@ namespace detail
     };
 } // namespace detail
 
+/** Based on the logic of the former class ReadIterations, integrating into
+ *  itself the logic of former WriteIterations.
+ */
 class StatefulIterator
     : public AbstractSeriesIterator<
           StatefulIterator,
@@ -287,6 +316,11 @@ private:
     void initSeriesInLinearReadMode();
 
     void close();
+
+    /* When not using IO steps, the status should not be set to After_t, but be
+     * kept as During_t. This way, Iterations can still be opened without the
+     * Iterator thinking it's from a past step.
+     */
     enum class TypeOfEndIterator : char
     {
         NoMoreSteps,
