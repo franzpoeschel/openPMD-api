@@ -2909,9 +2909,9 @@ namespace internal
     void SeriesData::close()
     {
         // WriteIterations gets the first shot at flushing
-        if (this->m_sharedReadIterations)
+        if (this->m_sharedStatefulIterator)
         {
-            this->m_sharedReadIterations->close();
+            this->m_sharedStatefulIterator->close();
         }
         /*
          * Scenario: A user calls `Series::flush()` but does not check for
@@ -2984,10 +2984,11 @@ ReadIterations Series::readIterations()
 {
     // Use private constructor instead of copy constructor to avoid
     // object slicing
-    Series res;
-    res.setData(std::dynamic_pointer_cast<internal::SeriesData>(this->m_attri));
+    auto series = m_attri->asInternalCopyOf<Series>();
     return ReadIterations{
-        std::move(res), IOHandler()->m_frontendAccess, get().m_parsePreference};
+        std::move(series),
+        IOHandler()->m_frontendAccess,
+        get().m_parsePreference};
 }
 
 namespace
@@ -2996,28 +2997,29 @@ namespace
         Series const &copied_series,
         internal::SeriesData &series) -> std::function<StatefulIterator *()>
     {
-        if (!series.m_sharedReadIterations)
+        if (!series.m_sharedStatefulIterator)
         {
-            series.m_sharedReadIterations = std::make_unique<StatefulIterator>(
-                StatefulIterator::tag_write, copied_series);
+            series.m_sharedStatefulIterator =
+                std::make_unique<StatefulIterator>(
+                    StatefulIterator::tag_write, copied_series);
         }
-        return [ptr = series.m_sharedReadIterations.get()]() { return ptr; };
+        return [ptr = series.m_sharedStatefulIterator.get()]() { return ptr; };
     }
     auto make_reading_stateful_iterator(
         Series copied_series,
         internal::SeriesData &series) -> std::function<StatefulIterator *()>
     {
         return [s = std::move(copied_series), &series]() mutable {
-            if (!series.m_sharedReadIterations)
+            if (!series.m_sharedStatefulIterator)
             {
                 auto parse_preference = series.m_parsePreference;
-                series.m_sharedReadIterations =
+                series.m_sharedStatefulIterator =
                     std::make_unique<StatefulIterator>(
                         StatefulIterator::tag_read,
                         std::move(s),
                         parse_preference);
             }
-            return series.m_sharedReadIterations.get();
+            return series.m_sharedStatefulIterator.get();
         };
     }
 } // namespace

@@ -3,7 +3,12 @@
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
+
 #include <optional>
+
+/*
+ * Private header, not included in user code.
+ */
 
 namespace openPMD
 {
@@ -14,6 +19,21 @@ private:
 
     struct Members
     {
+        /*
+         * Consider the following user code:
+         * > auto iterations = series.snapshots();
+         * > for (auto & iteration : iterations) { ... }
+         *
+         * Here, only the for loop should actually wait for Iteration data. For
+         * ensuring that Iterations are not waited for too early, the
+         * initialization procedures are stored as a `std::function` in here and
+         * only called upon the right moment. Until then, m_bufferedIterator
+         * stays empty.
+         * Compare the implementation of Series::snapshots(). In there, m_begin
+         * is defined either by make_writing_stateful_iterator or
+         * make_reading_stateful_iterator.
+         * The iterator is resolved upon calling get() below.
+         */
         std::function<StatefulIterator *()> m_begin;
         std::optional<StatefulIterator *> m_bufferedIterator = std::nullopt;
     };

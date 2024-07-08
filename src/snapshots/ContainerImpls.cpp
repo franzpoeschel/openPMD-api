@@ -139,15 +139,15 @@ auto StatefulSnapshotsContainer::at(key_type const &key) const
 auto StatefulSnapshotsContainer::at(key_type const &key) -> mapped_type &
 {
     auto base_iterator = get();
-    auto result =
+    auto &result =
         base_iterator->seek({StatefulIterator::Seek::Seek_Iteration_t{key}});
-    if (result->is_end())
+    if (result.is_end())
     {
         throw std::out_of_range(
             "[StatefulSnapshotsContainer::at()] Cannot (yet) skip to "
             "a Snapshot from an I/O step that is not active.");
     }
-    return (*result)->second;
+    return result->second;
 }
 
 auto StatefulSnapshotsContainer::operator[](key_type const &key)
@@ -229,15 +229,15 @@ auto StatefulSnapshotsContainer::operator[](key_type const &key)
     }
     else if (access::read(access))
     {
-        auto result = base_iterator->seek(
+        auto &result = base_iterator->seek(
             {StatefulIterator::Seek::Seek_Iteration_t{key}});
-        if (result->is_end())
+        if (result.is_end())
         {
             throw std::out_of_range(
                 "[StatefulSnapshotsContainer::operator[]()] Cannot (yet) skip "
                 "to a Snapshot from an I/O step that is not active.");
         }
-        return (*result)->second;
+        return result->second;
     }
     throw error::Internal("Control flow error: This should be unreachable.");
 }

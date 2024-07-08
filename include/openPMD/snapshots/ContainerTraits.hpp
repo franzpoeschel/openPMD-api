@@ -2,6 +2,12 @@
 
 #include "openPMD/Iteration.hpp"
 #include "openPMD/snapshots/IteratorTraits.hpp"
+
+/* Public header due to use of AbstractSnapshotsContainer and its iterator type
+ * OpaqueSeriesIterator in Snapshots class header. No direct user interaction
+ * required with this header.
+ */
+
 namespace openPMD
 {
 /** Counterpart to Snapshots class:
@@ -59,6 +65,8 @@ public:
 };
 
 // Internal interface used by Snapshots class for interacting with containers.
+// This needs to be in a public header since the type definition is used in
+// private members of the Snapshots class which itself is a public class.
 class AbstractSnapshotsContainer
 {
 public:

@@ -110,7 +110,7 @@ namespace internal
          * Due to include order, this member needs to be a pointer instead of
          * an optional.
          */
-        std::unique_ptr<StatefulIterator> m_sharedReadIterations;
+        std::unique_ptr<StatefulIterator> m_sharedStatefulIterator;
         /**
          * For writing: Remember which iterations have been written in the
          * currently active output step. Use this later when writing the
@@ -667,7 +667,8 @@ public:
      *    `Iteration::open()` is not needed, `Iteration::close()` is
      *    recommended, but not needed. In READ_LINEAR mode, parsed Iteration
      *    data is deleted upon closing (and will be reparsed upon reopening)
-     *    for a better support of datasets with many Snapshots/Iterations.
+     *    for a better support of datasets with many Snapshots/Iterations. This
+     *    happens only if user code explicitly calls Iteration::close().
      *    This mode generally brings better performance than random access mode
      *    due to the more restricted workflow.
      *    For accessing some kinds of Series, Synchronous access is even

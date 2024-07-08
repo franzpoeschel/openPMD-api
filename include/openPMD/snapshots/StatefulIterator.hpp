@@ -36,7 +36,9 @@
 #include <variant>
 #include <vector>
 
-/* Internal header not included into user code.
+/*
+ * Private header not included in user code.
+ * Implements the Iterator interface for the stateful/synchronous workflow.
  */
 
 namespace openPMD
@@ -113,9 +115,7 @@ namespace detail
         auto get_variant() const -> std::optional<V const *>;
 
         auto get_iteration_index() const
-            -> std::optional<Iteration::IterationIndex_t const *>;
-        auto
-        get_iteration_index() -> std::optional<Iteration::IterationIndex_t *>;
+            -> std::optional<Iteration::IterationIndex_t>;
 
         /* Passed as first param of create_new lambda in map_during_t, so the
          * lambda can make an appropriate case distinction.
@@ -126,8 +126,22 @@ namespace detail
             End
         };
 
+        /*
+         * Helper for a common way to access the underlying variant.
+         * `map` has type `auto (During_t &) -> void`, i.e. it can modify the
+         * `During_t` struct if the variant holds it. In other cases,
+         * `create_new` is called, it has the type
+         * `auto (AtTheEdge) -> std::optional<T>`.
+         * `AtTheEdge` is used for specifying if the variant status is Begin or
+         * End. If the returned optional contains a value, that value is swapped
+         * with the current variant.
+         */
         template <typename F, typename G>
         void map_during_t(F &&map, G &&create_new);
+
+        /*
+         * Overload where `create_new` is a no-op.
+         */
         template <typename F>
         void map_during_t(F &&map);
 
@@ -143,10 +157,15 @@ namespace detail
         }
     };
 
+    /*
+     * Types for telling the Iterator where to go next.
+     */
     namespace seek_types
     {
+        /* Just give me the next Iteration */
         struct Next_t
         {};
+        /* Give me some specific Iteration */
         struct Seek_Iteration_t
         {
             Iteration::IterationIndex_t iteration_idx;
@@ -189,8 +208,6 @@ class StatefulIterator
 
     using iteration_index_t = IndexedIteration::index_t;
 
-    using maybe_series_t = std::optional<Series>;
-
     using CurrentStep = detail::CurrentStep;
 
     struct SharedData
@@ -205,18 +222,50 @@ class StatefulIterator
 
         using step_index = size_t;
 
+        /*
+         * This must be a non-owning internal handle to break reference cycles.
+         * A non-owning handle is fine due to the usual semantics for iterator
+         * invalidation.
+         */
         Series series;
+        /*
+         * No step opened yet, so initialize this with CurrentStep::Before. Look
+         * to the documentation of Before_t, During_t, After_t and CurrentStep
+         * classes above for more info.
+         */
         CurrentStep currentStep = {CurrentStep::Before};
+        /*
+         * Stores the parse preference optionally passed in the constructor.
+         * Decides if IO step logic is actually used.
+         */
         std::optional<internal::ParsePreference> parsePreference;
+        /*
+         * Store which Iterations we already saw and in which IO step we did.
+         * Currently used for eliminating repetitions when (e.g. due to
+         * checkpoint-restart workflows) Iterations repeat in different steps.
+         *
+         * Possible future uses:
+         *
+         * 1. Support jumping back to a previous step in order to reopen an
+         *    Iteration previously seen. (Would require reopening files in
+         *    ADIOS2, but so be it.)
+         * 2. Pre-parsing a variable-based file for repeating Iterations and
+         *    eliminating the earlier instances of repeated Iterations (instead
+         *    of the later instances as is done now).
+         */
         std::unordered_map<iteration_index_t, step_index> seen_iterations;
 
-        auto currentIteration() -> std::optional<Iteration::IterationIndex_t *>;
-        auto currentIteration() const
-            -> std::optional<Iteration::IterationIndex_t const *>;
+        /*
+         * This returns the current value of `During_t::iteration_idx` if that
+         * exists.
+         */
+        auto
+        currentIteration() const -> std::optional<Iteration::IterationIndex_t>;
     };
 
     /*
-     * The shared data is never empty, emptiness is indicated by std::optional
+     * The shared pointer is never empty,
+     * emptiness is indicated by std::optional.
      */
     std::shared_ptr<std::optional<SharedData>> m_data =
         std::make_shared<std::optional<SharedData>>(std::nullopt);
@@ -288,8 +337,15 @@ public:
 
     operator bool() const;
 
-    // Custom non-iterator methods
-    auto seek(Seek const &) -> StatefulIterator *;
+    /*
+     * Try moving this Iterator to the location specified by Seek, i.e.:
+     *
+     * 1. Either the next available Iteration
+     * 2. Or a specific Iteration specified by an index.
+     *
+     * A new step will be opened for this purpose if needed.
+     */
+    auto seek(Seek const &) -> StatefulIterator &;
 
 private:
     std::optional<StatefulIterator *> nextIterationInStep();
@@ -311,6 +367,9 @@ private:
 
     void initIteratorFilebased();
 
+    /*
+     * Called when an Iteration was just opened but entirely fails parsing.
+     */
     void deactivateDeadIteration(iteration_index_t);
 
     void initSeriesInLinearReadMode();
