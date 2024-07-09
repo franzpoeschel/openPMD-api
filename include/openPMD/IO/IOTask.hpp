@@ -42,6 +42,10 @@ namespace openPMD
 {
 class Attributable;
 class Writable;
+namespace json
+{
+    class JsonMatcher;
+}
 
 Writable *getWritable(Attributable *);
 
@@ -355,6 +359,10 @@ struct OPENPMDAPI_EXPORT Parameter<Operation::CREATE_DATASET>
         TracingJSON &,
         std::string const &currentBackendName,
         std::string const &warningMessage);
+
+    template <typename TracingJSON>
+    TracingJSON
+    compileJSONConfig(Writable const *writable, json::JsonMatcher &) const;
 };
 
 template <>

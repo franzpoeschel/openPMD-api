@@ -496,8 +496,9 @@ void HDF5IOHandlerImpl::createDataset(
                     nlohmann::json::parse(mask_for_global_conf));
             }
             auto const &buffered_config = *m_buffered_dataset_config;
-            auto parsed_config = json::parseOptions(
-                parameters.options, /* considerFiles = */ false);
+            auto parsed_config =
+                parameters.compileJSONConfig<json::ParsedConfig>(
+                    writable, *m_handler->jsonMatcher);
             if (auto hdf5_config_it = parsed_config.config.find("hdf5");
                 hdf5_config_it != parsed_config.config.end())
             {

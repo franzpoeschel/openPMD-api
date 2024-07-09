@@ -31,6 +31,7 @@
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
@@ -755,7 +756,8 @@ void ADIOS2IOHandlerImpl::createDataset(
 
         std::vector<ParameterizedOperator> operators;
         json::TracingJSON options =
-            json::parseOptions(parameters.options, /* considerFiles = */ false);
+            parameters.compileJSONConfig<json::ParsedConfig>(
+                writable, *m_handler->jsonMatcher);
         if (options.json().contains("adios2"))
         {
             json::TracingJSON datasetConfig(options["adios2"]);
