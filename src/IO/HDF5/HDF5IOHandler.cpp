@@ -34,6 +34,7 @@
 #include "openPMD/IO/HDF5/HDF5FilePosition.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
@@ -71,9 +72,7 @@ namespace openPMD
 #endif
 
 HDF5IOHandlerImpl::HDF5IOHandlerImpl(
-    AbstractIOHandler *handler,
-    json::TracingJSON config,
-    bool do_warn_unused_params)
+    AbstractIOHandler *handler, bool do_warn_unused_params)
     : AbstractIOHandlerImpl(handler)
     , m_datasetTransferProperty{H5P_DEFAULT}
     , m_fileAccessProperty{H5P_DEFAULT}
@@ -138,6 +137,8 @@ HDF5IOHandlerImpl::HDF5IOHandlerImpl(
     VERIFY(
         m_H5T_LONG_DOUBLE_80_LE >= 0,
         "[HDF5] Internal error: Failed to create 128-bit complex long double");
+
+    auto config = handler->jsonMatcher->getDefault();
 
     // JSON option can overwrite env option:
     if (config.json().contains("hdf5"))
@@ -2938,8 +2939,8 @@ HDF5IOHandlerImpl::getFile(Writable *writable)
 #if openPMD_HAVE_HDF5
 HDF5IOHandler::HDF5IOHandler(
     std::string path, Access at, json::TracingJSON config)
-    : AbstractIOHandler(std::move(path), at)
-    , m_impl{new HDF5IOHandlerImpl(this, std::move(config))}
+    : AbstractIOHandler(std::move(path), at, std::move(config))
+    , m_impl{new HDF5IOHandlerImpl(this)}
 {}
 
 HDF5IOHandler::~HDF5IOHandler() = default;

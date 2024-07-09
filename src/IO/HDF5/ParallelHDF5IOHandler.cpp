@@ -57,8 +57,8 @@ namespace openPMD
 
 ParallelHDF5IOHandler::ParallelHDF5IOHandler(
     std::string path, Access at, MPI_Comm comm, json::TracingJSON config)
-    : AbstractIOHandler(std::move(path), at, comm)
-    , m_impl{new ParallelHDF5IOHandlerImpl(this, comm, std::move(config))}
+    : AbstractIOHandler(std::move(path), at, std::move(config), comm)
+    , m_impl{new ParallelHDF5IOHandlerImpl(this, comm)}
 {}
 
 ParallelHDF5IOHandler::~ParallelHDF5IOHandler() = default;
@@ -69,8 +69,8 @@ std::future<void> ParallelHDF5IOHandler::flush(internal::ParsedFlushParams &)
 }
 
 ParallelHDF5IOHandlerImpl::ParallelHDF5IOHandlerImpl(
-    AbstractIOHandler *handler, MPI_Comm comm, json::TracingJSON config)
-    : HDF5IOHandlerImpl{handler, std::move(config), /* do_warn_unused_params = */ false}
+    AbstractIOHandler *handler, MPI_Comm comm)
+    : HDF5IOHandlerImpl{handler, /* do_warn_unused_params = */ false}
     , m_mpiComm{comm}
     , m_mpiInfo{MPI_INFO_NULL} /* MPI 3.0+: MPI_INFO_ENV */
 {
