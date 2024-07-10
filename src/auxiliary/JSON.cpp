@@ -586,11 +586,22 @@ merge(nlohmann::json &defaultVal, nlohmann::json const &overwrite)
     return defaultVal;
 }
 
-std::string merge(std::string const &defaultValue, std::string const &overwrite)
+template <typename... MPI_Comm_t>
+std::string merge_impl(
+    std::string const &defaultValue,
+    std::string const &overwrite,
+    MPI_Comm_t &&...comm)
 {
-    auto [res, returnFormat] =
-        parseOptions(defaultValue, /* considerFiles = */ false);
-    merge(res, parseOptions(overwrite, /* considerFiles = */ false).config);
+    auto res = parseOptions(
+                   defaultValue,
+                   std::forward<MPI_Comm_t>(comm)...,
+                   /* considerFiles = */ true)
+                   .config;
+    auto [second, returnFormat] = parseOptions(
+        overwrite,
+        std::forward<MPI_Comm_t>(comm)...,
+        /* considerFiles = */ true);
+    merge(res, second);
     switch (returnFormat)
     {
     case SupportedLanguages::JSON:
@@ -604,6 +615,19 @@ std::string merge(std::string const &defaultValue, std::string const &overwrite)
     }
     }
     throw std::runtime_error("Unreachable!");
+}
+
+std::string merge(std::string const &defaultValue, std::string const &overwrite)
+{
+    return merge_impl(defaultValue, overwrite);
+}
+
+std::string merge(
+    std::string const &defaultValue,
+    std::string const &overwrite,
+    MPI_Comm comm)
+{
+    return merge_impl(defaultValue, overwrite, comm);
 }
 
 nlohmann::json &
