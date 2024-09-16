@@ -2,6 +2,7 @@
 import json
 import sys
 
+from mpi4py import MPI
 import numpy as np
 import openpmd_api as io
 
@@ -19,10 +20,13 @@ if __name__ == "__main__":
         print("SST engine not available in ADIOS2.")
         sys.exit(0)
 
+    comm = MPI.COMM_WORLD
+
     # create a series and specify some global metadata
     # change the file extension to .json, .h5 or .bp for regular file writing
-    series = io.Series("simData.sst", io.Access_Type.create,
-                       json.dumps(config))
+    series = io.Series(
+        "simData.bp5", io.Access_Type.create, comm, json.dumps(config)
+    )
     series.set_author("Franz Poeschel <f.poeschel@hzdr.de>")
     series.set_software("openPMD-api-python-examples")
 
@@ -54,8 +58,10 @@ if __name__ == "__main__":
                                dtype=np.dtype("double"))
         for dim in ["x", "y", "z"]:
             pos = electronPositions[dim]
-            pos.reset_dataset(io.Dataset(local_data.dtype, [length]))
-            pos[()] = local_data
+            pos.reset_dataset(
+                io.Dataset(local_data.dtype, [comm.size * length])
+            )
+            pos[comm.rank * length : (comm.rank + 1) * length] = local_data
 
         # optionally: flush now to clear buffers
         iteration.series_flush()  # this is a shortcut for `series.flush()`
