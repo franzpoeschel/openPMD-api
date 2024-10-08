@@ -40,6 +40,7 @@ SUFFIX = input("SUFFIX? (e.g., dev) ")
 
 VERSION_STR = f"{MAJOR}.{MINOR}.{PATCH}"
 VERSION_STR_SUFFIX = VERSION_STR + (f"-{SUFFIX}" if SUFFIX else "")
+VERSION_STR_SUFFIX_WITH_DOT = VERSION_STR + (f".{SUFFIX}" if SUFFIX else "")
 
 print()
 print(f"Your new version is: {VERSION_STR_SUFFIX}")
@@ -51,8 +52,26 @@ with open(str(REPO_DIR.joinpath("README.md")), encoding="utf-8") as f:
     for line in f:
         match = re.search(r"find_package.*openPMD *([^ ]*) *CONFIG\).*", line)
         if match:
-            OLD_VERSION_STR = match.group(1)
+            OLD_VERSION_STR_README = match.group(1)
             break
+
+with open(str(REPO_DIR.joinpath("CMakeLists.txt")), encoding="utf-8") as f:
+    for line in f:
+        match = re.search(r"project\(openPMD *VERSION *(.*)\)", line)
+        if match:
+            OLD_VERSION_STR_CMAKE = match.group(1)
+            break
+
+OLD_VERSION_TAG=""
+with open(str(REPO_DIR.joinpath("include/openPMD/version.hpp")), encoding="utf-8") as f:
+    for line in f:
+        match = re.search(r'#define OPENPMDAPI_VERSION_LABEL "([^"]+)"', line)
+        if match:
+            OLD_VERSION_TAG = match.group(1)
+            break
+
+OLD_VERSION_SUFFIX = f"(-{OLD_VERSION_TAG})?" if OLD_VERSION_TAG else ""
+OLD_VERSION_STR = f"({re.escape(OLD_VERSION_STR_README)})|({re.escape(OLD_VERSION_STR_CMAKE)}{OLD_VERSION_SUFFIX})"
 
 print(f"The old version is: {OLD_VERSION_STR}")
 print()
@@ -86,18 +105,32 @@ with open(cmakelists_path, "w", encoding="utf-8") as f:
     f.write(cmakelists_content)
 
 
-def generic_replace(filename):
+def generic_replace(filename, previous, after):
     filename = str(REPO_DIR.joinpath(filename))
     with open(filename, encoding="utf-8") as f:
         content = f.read()
-        content = re.sub(re.escape(OLD_VERSION_STR), VERSION_STR, content)
+        content = re.sub(previous, after, content, flags=re.MULTILINE)
 
     with open(filename, "w", encoding="utf-8") as f:
         f.write(content)
 
 
-for file in ["docs/source/dev/linking.rst", "README.md"]:
-    generic_replace(file)
+for file in [
+    "docs/source/dev/linking.rst",
+    "README.md",
+]:
+    generic_replace(file, previous=OLD_VERSION_STR, after=VERSION_STR)
+
+for file in [
+    "CITATION.cff",
+    "test/SerialIOTest.cpp"
+]:
+    generic_replace(file, previous=OLD_VERSION_STR, after=VERSION_STR_SUFFIX)
+
+generic_replace("docs/source/index.rst", previous=r"``0.13.1-[^`]*``", after=f"``0.13.1-{VERSION_STR}``")
+generic_replace("setup.py", previous=r"version='.*',", after=f"version='{VERSION_STR_SUFFIX_WITH_DOT}',")
+generic_replace("docs/source/conf.py", previous=r"^version.*=.*", after=f"version = u'{VERSION_STR}'")
+generic_replace("docs/source/conf.py", previous=r"^release.*=.*", after=f"release = u'{VERSION_STR_SUFFIX}'")
 
 version_hpp_path = str(REPO_DIR.joinpath("include/openPMD/version.hpp"))
 with open(version_hpp_path, encoding="utf-8") as f:
