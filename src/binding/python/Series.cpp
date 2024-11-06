@@ -23,6 +23,7 @@
 #include "openPMD/Iteration.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/binding/python/Pickle.hpp"
 #include "openPMD/config.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
@@ -30,6 +31,7 @@
 
 #include "openPMD/binding/python/Common.hpp"
 #include <optional>
+#include <variant>
 
 #if openPMD_HAVE_MPI
 //  re-implemented signatures:
@@ -297,26 +299,60 @@ this method.
             &Series::openPMDextension,
             &Series::setOpenPMDextension)
         .def_property("base_path", &Series::basePath, &Series::setBasePath)
-        .def_property(
-            "meshes_path",
-            &Series::meshesPath,
-            py::overload_cast<std::string const &>(&Series::setMeshesPath))
         .def("get_rank_table", &Series::rankTable, py::arg("collective"))
         .def("set_rank_table", &Series::setRankTable, py::arg("my_rank_info"))
         .def_property(
+            "meshes_path",
+            [](Series &self)
+                -> std::variant<std::string, std::vector<std::string>> {
+                using res_t =
+                    std::variant<std::string, std::vector<std::string>>;
+                auto res = self.meshesPaths();
+                if (res.size() == 1)
+                {
+                    return res_t{std::move(res[0])};
+                }
+                else
+                {
+                    return res_t{std::move(res)};
+                }
+            },
+            [](Series &self,
+               std::variant<std::string, std::vector<std::string>> const &arg)
+                -> Series & {
+                std::visit(
+                    [&](auto const &arg_resolved) {
+                        self.setMeshesPath(arg_resolved);
+                    },
+                    arg);
+                return self;
+            })
+        .def_property(
             "particles_path",
-            &Series::particlesPath,
-            py::overload_cast<std::string const &>(&Series::setParticlesPath))
-        .def_property(
-            "meshes_paths",
-            &Series::meshesPath,
-            py::overload_cast<std::vector<std::string> const &>(
-                &Series::setMeshesPath))
-        .def_property(
-            "particles_paths",
-            &Series::particlesPath,
-            py::overload_cast<std::vector<std::string> const &>(
-                &Series::setParticlesPath))
+            [](Series &self)
+                -> std::variant<std::string, std::vector<std::string>> {
+                using res_t =
+                    std::variant<std::string, std::vector<std::string>>;
+                auto res = self.particlesPaths();
+                if (res.size() == 1)
+                {
+                    return res_t{std::move(res[0])};
+                }
+                else
+                {
+                    return res_t{std::move(res)};
+                }
+            },
+            [](Series &self,
+               std::variant<std::string, std::vector<std::string>> const &arg)
+                -> Series & {
+                std::visit(
+                    [&](auto const &arg_resolved) {
+                        self.setParticlesPath(arg_resolved);
+                    },
+                    arg);
+                return self;
+            })
         .def_property("author", &Series::author, &Series::setAuthor)
         .def_property(
             "machine",
