@@ -604,29 +604,6 @@ void Iteration::read_impl(std::string const &groupPath)
 
     Parameter<Operation::LIST_PATHS> pList;
     IOHandler()->enqueue(IOTask(this, pList));
-    auto version = IOHandler()->m_standard;
-    bool hasMeshes = false;
-    bool hasParticles = false;
-    if (version <= OpenpmdStandard::v_1_0_1)
-    {
-        IOHandler()->enqueue(IOTask(this, pList));
-        IOHandler()->flush(internal::defaultFlushParams);
-        hasMeshes = std::count(
-                        pList.paths->begin(),
-                        pList.paths->end(),
-                        auxiliary::replace_last(s.meshesPath(), "/", "")) == 1;
-        hasParticles =
-            std::count(
-                pList.paths->begin(),
-                pList.paths->end(),
-                auxiliary::replace_last(s.particlesPath(), "/", "")) == 1;
-        pList.paths->clear();
-    }
-    else
-    {
-        hasMeshes = s.containsAttribute("meshesPath");
-        hasParticles = s.containsAttribute("particlesPath");
-    }
 
     // @todo restore compatibility with openPMD 1.0.*:
     //   hasMeshes <-> meshesPath is defined
