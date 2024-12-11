@@ -144,11 +144,6 @@ Iteration &Iteration::open()
     Series s = retrieveSeries();
     // figure out my iteration number
     auto begin = s.indexOf(*this);
-    if (it.m_closed == internal::CloseStatus::ClosedInFrontend)
-    {
-        // Iteration is only logically closed, we can simply unmark it
-        it.m_closed = internal::CloseStatus::Open;
-    }
     // The current Iteration handle could be stale because it referred to a
     // previously closed Iteration
     if (&begin->second != this)
@@ -156,6 +151,12 @@ Iteration &Iteration::open()
         *this = begin->second;
     }
     auto &it = get();
+
+    if (it.m_closed == internal::CloseStatus::ClosedInFrontend)
+    {
+        // Iteration is only logically closed, we can simply unmark it
+        it.m_closed = internal::CloseStatus::Open;
+    }
     // Ensure that files are accessed.
     // If the close status was Closed, this will open it.
     s.openIteration(begin->first, *this);
