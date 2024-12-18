@@ -1635,11 +1635,7 @@ void JSONIOHandlerImpl::deregister(
 void JSONIOHandlerImpl::touch(
     Writable *writable, Parameter<Operation::TOUCH> const &)
 {
-    if (!writable->fileState || !writable->fileState->has_value())
-    {
-        throw error::Internal(
-            "JSON/TOML backend: Tried accessing a file that is not open.");
-    }
+    refreshFileFromParent(writable, false);
     if (access::write(m_handler->m_backendAccess))
     {
         this->m_dirty.emplace(writable->fileState);
