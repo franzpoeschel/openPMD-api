@@ -1995,8 +1995,6 @@ void joined_dim(std::string const &ext)
             patchExtent.store<type>(10);
         }
         writeFrom.clear();
-        // There seems to be a bug making this flush call necessary, need to fix
-        it.seriesFlush();
         it.close();
 
         it = s.writeIterations()[200];
