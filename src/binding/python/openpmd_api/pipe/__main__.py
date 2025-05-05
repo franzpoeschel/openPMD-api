@@ -118,7 +118,7 @@ if io.variants['mpi'] and (args.mpi is None or args.mpi):
 else:
     HAVE_MPI = False
 
-debug = False
+debug = True
 
 
 class FallbackMPICommunicator:
@@ -354,10 +354,12 @@ class pipe:
             print("Opened input and output on rank {}.".format(self.comm.rank))
             sys.stdout.flush()
         dump_times = DumpTimes(loggingfile)
+        self.dump_assignments = open(f"assignment_{self.comm.rank}.txt", "w")
         # In Linear read mode, global attributes are only present after calling
         # this method to access the first iteration
         inseries.parse_base()
         self.__copy(inseries, outseries, dump_times)
+        self.dump_assignments.close()
         dump_times.close()
         del inseries
         del outseries
@@ -475,6 +477,9 @@ class pipe:
                 my_chunks = strategy.assign(chunk_table, self.inranks,
                                             self.outranks,
                                             self.comm.rank, self.comm.size)
+                for_print = {source_chunk.source_id
+                             for source_chunk in my_chunks[self.comm.rank]}
+                print(for_print)
                 accum = 0
                 for chunk in my_chunks[
                         self.comm.rank] if self.comm.rank in my_chunks else []:
@@ -482,9 +487,8 @@ class pipe:
                         end = chunk.offset.copy()
                         for i in range(len(end)):
                             end[i] += chunk.extent[i]
-                        print("{}\t{}/{}:\t{} -- {}".format(
-                            current_path, self.comm.rank, self.comm.size,
-                            chunk.offset, end))
+                        self.dump_assignments.write(
+                            f"{chunk.source_id}:\t{current_path}\t{self.comm.rank}/{self.comm.size}:\t{chunk.offset} -- {end}\n")
                     accum += math.prod(chunk.extent)
                     span = dest.store_chunk(chunk.offset, chunk.extent)
                     self.loads.append(
