@@ -214,6 +214,7 @@ class Attributable
     friend class StatefulSnapshotsContainer;
     friend class internal::AttributableData;
     friend class Snapshots;
+    friend class RandomAccessIteratorContainer;
 
 protected:
     // tag for internal constructor

@@ -293,6 +293,7 @@ class Series : public Attributable
     friend class internal::SeriesData;
     friend class internal::AttributableData;
     friend class StatefulSnapshotsContainer;
+    friend class RandomAccessIteratorContainer;
 
 public:
     explicit Series();

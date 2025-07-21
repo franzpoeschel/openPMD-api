@@ -103,15 +103,20 @@ private:
     friend class Series;
     using Container_t = Container<Iteration, key_type>;
     Container_t m_cont;
+    bool m_parseLazily;
     RandomAccessIteratorContainer(Container<Iteration, key_type> cont);
 
-    using concrete_iterator_type = RandomAccessIterator<Container_t::iterator>;
-    using concrete_reverse_iterator_type =
-        RandomAccessIterator<Container_t::reverse_iterator>;
-    using concrete_const_iterator_type =
-        RandomAccessIterator<Container_t::const_iterator>;
+    using concrete_iterator_type = Container_t::iterator;
+    using concrete_reverse_iterator_type = Container_t::reverse_iterator;
+    using concrete_const_iterator_type = Container_t::const_iterator;
     using concrete_const_reverse_iterator_type =
-        RandomAccessIterator<Container_t::const_reverse_iterator>;
+        Container_t::const_reverse_iterator;
+
+    template <typename ConcreteIteratorClass, typename ValueType>
+    auto make_opaque_iterator(
+        ConcreteIteratorClass &&it,
+        ConcreteIteratorClass &&begin,
+        ConcreteIteratorClass &&end) const -> OpaqueSeriesIterator<ValueType>;
 
 public:
     ~RandomAccessIteratorContainer() override;

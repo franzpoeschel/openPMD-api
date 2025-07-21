@@ -20,7 +20,6 @@
  */
 #pragma once
 
-#include "openPMD/Iteration.hpp"
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/IteratorTraits.hpp"
 
@@ -63,9 +62,17 @@ private:
         detail::iterator_to_value_type<iterator_t>>;
 
     RandomAccessIterator(iterator_t it);
+    RandomAccessIterator(iterator_t it, iterator_t begin, iterator_t end);
 
     /* Internal iterator */
     iterator_t m_it;
+    struct InfoForAutomaticallyOpeningIterations
+    {
+        iterator_t m_begin;
+        iterator_t m_end;
+    };
+    std::optional<InfoForAutomaticallyOpeningIterations>
+        m_automaticallyOpenIterations;
 
 public:
     using typename parent_t::value_type;

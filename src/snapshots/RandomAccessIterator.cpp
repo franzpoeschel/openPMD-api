@@ -1,9 +1,18 @@
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
+#include "openPMD/Error.hpp"
 namespace openPMD
 {
 template <typename iterator_t>
 inline RandomAccessIterator<iterator_t>::RandomAccessIterator(iterator_t it)
     : m_it(it)
+{}
+
+template <typename iterator_t>
+inline RandomAccessIterator<iterator_t>::RandomAccessIterator(
+    iterator_t it, iterator_t begin, iterator_t end)
+    : m_it(it)
+    , m_automaticallyOpenIterations(
+          InfoForAutomaticallyOpeningIterations{begin, end})
 {}
 
 template <typename iterator_t>
@@ -24,7 +33,39 @@ auto RandomAccessIterator<iterator_t>::operator*() const -> value_type const &
 template <typename iterator_t>
 auto RandomAccessIterator<iterator_t>::operator++() -> RandomAccessIterator &
 {
-    ++m_it;
+    if (!m_automaticallyOpenIterations.has_value())
+    {
+        ++m_it;
+        return *this;
+    }
+
+    auto &end = m_automaticallyOpenIterations->m_end;
+
+    if constexpr (std::is_const_v<std::remove_reference_t<decltype(*m_it)>>)
+    {
+        ++m_it;
+        return *this;
+    }
+    else
+    {
+        while (true)
+        {
+            ++m_it;
+            if (m_it == end)
+            {
+                break;
+            }
+            try
+            {
+                m_it->second.open();
+            }
+            catch (error::ReadError const &)
+            {
+                continue;
+            }
+            break;
+        }
+    }
     return *this;
 }
 

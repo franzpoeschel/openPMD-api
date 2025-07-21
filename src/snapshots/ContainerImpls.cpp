@@ -301,7 +301,30 @@ auto StatefulSnapshotsContainer::snapshotWorkflow() const -> SnapshotWorkflow
 RandomAccessIteratorContainer::RandomAccessIteratorContainer(
     Container<Iteration, key_type> cont)
     : m_cont(std::move(cont))
-{}
+{
+    m_parseLazily = m_cont.retrieveSeries().get().m_parseLazily;
+}
+
+template <typename ConcreteIteratorClass, typename ValueType>
+auto RandomAccessIteratorContainer::make_opaque_iterator(
+    ConcreteIteratorClass &&it,
+    ConcreteIteratorClass &&begin,
+    ConcreteIteratorClass &&end) const -> OpaqueSeriesIterator<ValueType>
+{
+    using WrappedConcreteIterator = RandomAccessIterator<ConcreteIteratorClass>;
+    if (m_parseLazily)
+    {
+        return from_concrete_iterator<WrappedConcreteIterator, ValueType>(
+            std::forward<ConcreteIteratorClass>(it),
+            std::forward<ConcreteIteratorClass>(begin),
+            std::forward<ConcreteIteratorClass>(end));
+    }
+    else
+    {
+        return from_concrete_iterator<WrappedConcreteIterator, ValueType>(
+            std::forward<ConcreteIteratorClass>(it));
+    }
+}
 
 RandomAccessIteratorContainer::~RandomAccessIteratorContainer() = default;
 
@@ -329,49 +352,54 @@ auto RandomAccessIteratorContainer::currentIteration() const
 
 auto RandomAccessIteratorContainer::begin() -> iterator
 {
-    return from_concrete_iterator<concrete_iterator_type, iterator::value_type>(
-        m_cont.begin());
+    return make_opaque_iterator<concrete_iterator_type, iterator::value_type>(
+        m_cont.begin(), m_cont.begin(), m_cont.end());
 }
 auto RandomAccessIteratorContainer::end() -> iterator
 {
-    return from_concrete_iterator<concrete_iterator_type, iterator::value_type>(
-        m_cont.end());
+    return make_opaque_iterator<concrete_iterator_type, iterator::value_type>(
+        m_cont.end(), m_cont.begin(), m_cont.end());
 }
 auto RandomAccessIteratorContainer::begin() const -> const_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_const_iterator_type,
-        const_iterator::value_type>(m_cont.begin());
+        const_iterator::value_type>(
+        m_cont.begin(), m_cont.begin(), m_cont.end());
 }
 auto RandomAccessIteratorContainer::end() const -> const_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_const_iterator_type,
-        const_iterator::value_type>(m_cont.end());
+        const_iterator::value_type>(m_cont.end(), m_cont.begin(), m_cont.end());
 }
 auto RandomAccessIteratorContainer::rbegin() -> reverse_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_reverse_iterator_type,
-        reverse_iterator::value_type>(m_cont.rbegin());
+        reverse_iterator::value_type>(
+        m_cont.rbegin(), m_cont.rbegin(), m_cont.rend());
 }
 auto RandomAccessIteratorContainer::rend() -> reverse_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_reverse_iterator_type,
-        reverse_iterator::value_type>(m_cont.rend());
+        reverse_iterator::value_type>(
+        m_cont.rend(), m_cont.rbegin(), m_cont.rend());
 }
 auto RandomAccessIteratorContainer::rbegin() const -> const_reverse_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_const_reverse_iterator_type,
-        const_reverse_iterator::value_type>(m_cont.rbegin());
+        const_reverse_iterator::value_type>(
+        m_cont.rbegin(), m_cont.rbegin(), m_cont.rend());
 }
 auto RandomAccessIteratorContainer::rend() const -> const_reverse_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_const_reverse_iterator_type,
-        const_reverse_iterator::value_type>(m_cont.rend());
+        const_reverse_iterator::value_type>(
+        m_cont.rend(), m_cont.rbegin(), m_cont.rend());
 }
 
 auto RandomAccessIteratorContainer::empty() const -> bool
@@ -402,15 +430,16 @@ auto RandomAccessIteratorContainer::clear() -> void
 
 auto RandomAccessIteratorContainer::find(key_type const &key) -> iterator
 {
-    return from_concrete_iterator<concrete_iterator_type, iterator::value_type>(
-        m_cont.find(key));
+    return make_opaque_iterator<concrete_iterator_type, iterator::value_type>(
+        m_cont.find(key), m_cont.begin(), m_cont.end());
 }
 auto RandomAccessIteratorContainer::find(key_type const &key) const
     -> const_iterator
 {
-    return from_concrete_iterator<
+    return make_opaque_iterator<
         concrete_const_iterator_type,
-        const_iterator::value_type>(m_cont.find(key));
+        const_iterator::value_type>(
+        m_cont.find(key), m_cont.begin(), m_cont.end());
 }
 
 auto RandomAccessIteratorContainer::contains(key_type const &key) const -> bool
@@ -424,14 +453,16 @@ auto RandomAccessIteratorContainer::erase(key_type const &key) -> size_type
 }
 auto RandomAccessIteratorContainer::erase(iterator it) -> iterator
 {
-    auto bare_iterator = it.to_concrete_iterator<concrete_iterator_type>();
+    auto bare_iterator =
+        it.to_concrete_iterator<RandomAccessIterator<concrete_iterator_type>>();
     if (!bare_iterator.has_value())
     {
         throw std::runtime_error(
             "[RandomAccessIteratorContainer] Illegal dynamic iterator type.");
     }
-    return from_concrete_iterator<concrete_iterator_type, iterator::value_type>(
-        m_cont.erase(bare_iterator->m_it));
+    auto erased = m_cont.erase(bare_iterator->m_it);
+    return make_opaque_iterator<concrete_iterator_type, iterator::value_type>(
+        std::move(erased), m_cont.begin(), m_cont.end());
 }
 
 auto RandomAccessIteratorContainer::emplace(value_type &&value)
@@ -439,8 +470,8 @@ auto RandomAccessIteratorContainer::emplace(value_type &&value)
 {
     auto [tmp_iterator, newly_emplaced] = m_cont.emplace(std::move(value));
     return std::make_pair(
-        from_concrete_iterator<concrete_iterator_type, iterator::value_type>(
-            tmp_iterator),
+        make_opaque_iterator<concrete_iterator_type, iterator::value_type>(
+            std::move(tmp_iterator), m_cont.begin(), m_cont.end()),
         newly_emplaced);
 }
 
