@@ -40,12 +40,15 @@ namespace detail
         std::remove_reference_t<decltype(*std::declval<iterator_t>())>;
 }
 
-template <typename iterator_t>
+template <typename iterator_t_in>
 class RandomAccessIterator
     : public AbstractSeriesIterator<
-          RandomAccessIterator<iterator_t>,
-          detail::iterator_to_value_type<iterator_t>>
+          RandomAccessIterator<iterator_t_in>,
+          detail::iterator_to_value_type<iterator_t_in>>
 {
+public:
+    using iterator_t = iterator_t_in;
+
 private:
     friend class RandomAccessIteratorContainer;
     template <typename>
@@ -73,6 +76,17 @@ private:
     };
     std::optional<InfoForAutomaticallyOpeningIterations>
         m_automaticallyOpenIterations;
+
+    static constexpr auto is_const() -> bool
+    {
+        return std::is_const_v<std::remove_reference_t<decltype(*m_it)>>;
+    }
+
+    template <bool boundary_is_inclusive>
+    auto increment_operator_impl(
+        iterator_t &(iterator_t::*incr)(),
+        iterator_t InfoForAutomaticallyOpeningIterations::*boundary)
+        -> RandomAccessIterator &;
 
 public:
     using typename parent_t::value_type;

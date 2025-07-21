@@ -420,7 +420,12 @@ auto RandomAccessIteratorContainer::at(key_type const &key) const
 auto RandomAccessIteratorContainer::operator[](key_type const &key)
     -> mapped_type &
 {
-    return m_cont[key];
+    auto &res = m_cont[key];
+    if (m_parseLazily)
+    {
+        res.open();
+    }
+    return res;
 }
 
 auto RandomAccessIteratorContainer::clear() -> void
