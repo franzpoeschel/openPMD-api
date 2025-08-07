@@ -495,6 +495,7 @@ struct OPENPMDAPI_EXPORT
 
     Extent extent = {};
     Offset offset = {};
+    std::optional<MemorySelection> memorySelection = std::nullopt;
     Datatype dtype = Datatype::UNDEFINED;
     auxiliary::WriteBuffer data;
 };
