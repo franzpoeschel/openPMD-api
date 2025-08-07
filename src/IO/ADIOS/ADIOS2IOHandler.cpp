@@ -715,8 +715,7 @@ void ADIOS2IOHandlerImpl::createFile(
         auto &file =
             makeFile(writable, name, /* consider_open_files = */ false);
         auto &file_state = **file;
-        if (m_handler->m_backendAccess != Access::CREATE &&
-            m_handler->m_backendAccess != Access::APPEND &&
+        if (access::read(m_handler->m_backendAccess) &&
             (auxiliary::file_exists(fullPath(file_state)) ||
              auxiliary::directory_exists(fullPath(file_state))))
         {

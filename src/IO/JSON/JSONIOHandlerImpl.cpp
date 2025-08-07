@@ -516,8 +516,7 @@ void JSONIOHandlerImpl::createFile(
         auto &file_state = **file;
         auto file_exists = auxiliary::file_exists(fullPath(file_state));
 
-        if (m_handler->m_backendAccess != Access::APPEND &&
-            m_handler->m_backendAccess != Access::CREATE && file_exists)
+        if (access::read(m_handler->m_backendAccess) && file_exists)
         {
             throw std::runtime_error(
                 "[JSON] Can only overwrite existing file in CREATE mode.");
