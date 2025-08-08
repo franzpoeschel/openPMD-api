@@ -943,7 +943,7 @@ void RecordComponent::loadChunk_impl(
 
         std::optional<T> val =
             switchNonVectorType<detail::do_convert</* To = */ T>>(
-                /* from = */ getDatatype(), rc.m_constantValue);
+                /* dt = */ getDatatype(), rc.m_constantValue);
 
         if (val.has_value())
         {
