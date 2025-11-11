@@ -55,6 +55,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeinfo>
 #include <variant>
 
 namespace openPMD
@@ -100,56 +101,66 @@ namespace
     }
 
     template <typename T>
-    inline std::string formatValue(T const &value);
-
-    // Specialization for strings
-    template <>
-    inline std::string formatValue(std::string const &value)
+    auto formatType() -> char const *
     {
-        return "\"" + value + "\"";
+        return typeid(T).name();
     }
 
-    // Specialization for basic types
-    template <>
-    inline std::string formatValue(int const &value)
-    {
-        return std::to_string(value);
-    }
-
-    template <>
-    inline std::string formatValue(size_t const &value)
-    {
-        return std::to_string(value) + "UL";
-    }
-
-    // template <>
-    // inline std::string formatValue(uint64_t const &value)
-    // {
-    //     return std::to_string(value) + "ULL";
-    // }
-
-    template <>
-    inline std::string formatValue(bool const &value)
-    {
-        return value ? "true" : "false";
-    }
-
-    // Generic fallback (will use operator<<)
     template <typename T>
-    inline std::string formatValue(T const &)
+    inline std::string formatValue(T const &value)
     {
-        return "/*value*/";
+        if constexpr (std::is_same_v<T, bool>)
+        {
+            return value ? "true" : "false";
+        }
+        else if constexpr (
+            std::is_same_v<T, char const *> || std::is_same_v<T, char *> ||
+            std::is_same_v<T, std::string>)
+        {
+            std::stringstream res;
+            res << "\"" << value << "\"";
+            return res.str();
+        }
+        else if constexpr (std::is_arithmetic_v<T>)
+        {
+            std::stringstream res;
+            res << "(" << formatType<T>() << ")" << value;
+            return res.str();
+        }
+        else
+        {
+            return "/*value*/";
+        }
+    }
+
+    template <typename T>
+    inline std::string formatValue(T const *it, size_t size)
+    {
+        std::stringstream out;
+        out << "std::vector<" << formatType<T>() << ">{";
+        if (size == 0)
+        {
+            out << "}";
+            return out.str();
+        }
+        out << *it;
+        for (size_t i = 1; i < size; ++i)
+        {
+            out << ", " << it[i];
+        }
+        out << "}";
+        return out.str();
     }
 } // namespace
 
-#define ADIOS2_LOG_API_CALL(...)                                               \
-    do                                                                         \
-    {                                                                          \
-        if (::openPMD::shouldLogADIOS2ApiCalls())                              \
-        {                                                                      \
-            std::cerr << "[ADIOS2 API] " << __VA_ARGS__ << std::endl;          \
-        }                                                                      \
-    } while (false)
+template <typename... Args>
+void ADIOS2_LOG_API_CALL(Args &&...args)
+{
+    if (::openPMD::shouldLogADIOS2ApiCalls())
+    {
+        ((std::cerr << "[ADIOS2 API] ") << ... << args) << std::endl;
+    }
+}
 
 std::optional<size_t> joinedDimension(adios2::Dims const &dims)
 {
@@ -802,8 +813,11 @@ void ADIOS2IOHandlerImpl::createFile(
                 adios_defaults::str_groupBasedWarning,
                 std::string(warningADIOS2NoGroupbasedEncoding));
             ADIOS2_LOG_API_CALL(
-                "IO.DefineAttribute(\"" << adios_defaults::str_groupBasedWarning
-                                        << "\", ...);");
+                "IO.DefineAttribute(",
+                formatValue(adios_defaults::str_groupBasedWarning),
+                ",",
+                formatValue(warningADIOS2NoGroupbasedEncoding),
+                ");");
         }
     }
 }
@@ -2442,7 +2456,14 @@ namespace detail
                     /* separator = */ "/",
                     /* allowModification = */ modifiable);
                 ADIOS2_LOG_API_CALL(
-                    "IO.DefineAttribute(\"" << fullName << "\", ...);");
+                    "IO.DefineAttribute(",
+                    formatValue(fullName),
+                    ", ",
+                    formatValue(args...),
+                    ", ",
+                    R"("", "/", )",
+                    formatValue(modifiable),
+                    ");");
 
                 if (!attr)
                 {
@@ -2558,8 +2579,11 @@ namespace detail
         {
             var = IO.DefineVariable<T>(name, shape, start, count, constantDims);
             ADIOS2_LOG_API_CALL(
-                "IO.DefineVariable<T>(\""
-                << name << "\", shape, start, count, constantDims);");
+                "IO.DefineVariable<",
+                formatType<T>(),
+                ">(\"",
+                name,
+                "\", shape, start, count, constantDims);");
         }
         else
         {
