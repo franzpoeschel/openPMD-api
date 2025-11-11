@@ -25,6 +25,7 @@
 #include "openPMD/DatatypeHelpers.hpp"
 #include "openPMD/Datatype_internal.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
+#include "openPMD/auxiliary/Environment.hpp"
 
 #include <iostream>
 
@@ -281,4 +282,16 @@ Datatype attributeInfo(
     }
 }
 } // namespace openPMD::detail
+namespace openPMD
+{
+bool shouldLogADIOS2ApiCalls()
+{
+    static int cached_result = -1;
+    if (cached_result == -1)
+    {
+        cached_result = auxiliary::getEnvNum("OPENPMD_ADIOS2_LOG_API_CALLS", 0);
+    }
+    return cached_result != 0;
+}
+} // namespace openPMD
 #endif

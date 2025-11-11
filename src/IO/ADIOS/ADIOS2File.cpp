@@ -54,34 +54,6 @@
 
 #if openPMD_HAVE_ADIOS2
 
-/*
- * Logging helper for ADIOS2 API calls to enable quick construction of
- * reproducers for bug reports. Output is formatted as C++ code.
- * Controlled by environment variable OPENPMD_ADIOS2_LOG_API_CALLS
- */
-namespace
-{
-inline bool shouldLogADIOS2ApiCalls()
-{
-    static int cached_result = -1;
-    if (cached_result == -1)
-    {
-        cached_result =
-            openPMD::auxiliary::getEnvNum("OPENPMD_ADIOS2_LOG_API_CALLS", 0);
-    }
-    return cached_result != 0;
-}
-} // namespace
-
-#define ADIOS2_LOG_API_CALL(...)                                               \
-    do                                                                         \
-    {                                                                          \
-        if (::shouldLogADIOS2ApiCalls())                                       \
-        {                                                                      \
-            std::cerr << "[ADIOS2 API] " << __VA_ARGS__ << std::endl;          \
-        }                                                                      \
-    } while (false)
-
 namespace openPMD::detail
 {
 template <typename T>
@@ -141,6 +113,12 @@ void WriteDataset::call(ADIOS2File &ba, detail::BufferedPut &bp)
                     ba.variables());
 
                 engine.Put(var, ptr);
+                ADIOS2_LOG_API_CALL(
+                    "// offs./ext.: ",
+                    auxiliary::vec_as_string(bp.param.offset),
+                    " / ",
+                    auxiliary::vec_as_string(bp.param.extent));
+                ADIOS2_LOG_API_CALL("// var = ", bp.name);
                 ADIOS2_LOG_API_CALL("engine.Put(var, ptr);");
             }
             else if constexpr (std::is_same_v<
@@ -213,6 +191,12 @@ struct RunUniquePtrPut
             std::nullopt,
             ba.variables());
         engine.Put(var, ptr);
+        ADIOS2_LOG_API_CALL(
+            "// offs./ext.: ",
+            auxiliary::vec_as_string(bufferedPut.offset),
+            " / ",
+            auxiliary::vec_as_string(bufferedPut.extent));
+        ADIOS2_LOG_API_CALL("\n// var = ", bufferedPut.name);
         ADIOS2_LOG_API_CALL("engine.Put(var, ptr);");
     }
 
@@ -536,12 +520,20 @@ void ADIOS2File::configure_IO()
                 ? ADIOS2IOHandlerImpl::ModifiableAttributes::Yes
                 : ADIOS2IOHandlerImpl::ModifiableAttributes::No;
         }
+        bool_representation val = m_impl->m_modifiableAttributes ==
+                ADIOS2IOHandlerImpl::ModifiableAttributes::No
+            ? 0
+            : 1;
         m_IO.DefineAttribute<bool_representation>(
-            adios_defaults::str_useModifiableAttributes,
-            m_impl->m_modifiableAttributes ==
-                    ADIOS2IOHandlerImpl::ModifiableAttributes::No
-                ? 0
-                : 1);
+            adios_defaults::str_useModifiableAttributes, val);
+        ADIOS2_LOG_API_CALL(
+            "IO.DefineAttribute<",
+            formatType<bool_representation>,
+            ">(",
+            formatValue(adios_defaults::str_useModifiableAttributes),
+            ", ",
+            std::to_string(unsigned(val)),
+            ");");
     }
 
     // set engine type
@@ -865,14 +857,13 @@ adios2::Engine &ADIOS2File::getEngine()
                      * Otherwise we don't see the group table attributes.
                      * This branch is also taken by Streaming engines.
                      */
+                    ADIOS2_LOG_API_CALL("engine.BeginStep();");
                     if (m_engine->BeginStep() != adios2::StepStatus::OK)
                     {
-                        ADIOS2_LOG_API_CALL("engine.BeginStep();");
                         throw std::runtime_error(
                             "[ADIOS2] Unexpected step status when "
                             "opening file/stream.");
                     }
-                    ADIOS2_LOG_API_CALL("engine.BeginStep();");
                     openedANewStep = true;
                 }
 
@@ -962,18 +953,17 @@ adios2::Engine &ADIOS2File::getEngine()
                                 "very buggy, so please use "
                                 "READ_ONLY/READ_RANDOM_ACCESS instead.");
                         }
+                        ADIOS2_LOG_API_CALL("engine.BeginStep();");
                         if (!openedANewStep &&
                             m_engine.value().BeginStep() !=
                                 adios2::StepStatus::OK)
                         {
-                            ADIOS2_LOG_API_CALL("engine.BeginStep();");
                             throw std::runtime_error(
                                 "[ADIOS2] Unexpected step status when "
                                 "opening file/stream.");
                         }
                         if (!openedANewStep)
                         {
-                            ADIOS2_LOG_API_CALL("engine.BeginStep();");
                         }
                         streamStatus = StreamStatus::DuringStep;
                     }
@@ -1066,6 +1056,12 @@ void ADIOS2File::flush_impl(
         if (m_impl->m_writeAttributesFromThisRank)
         {
             m_IO.DefineAttribute<uint64_t>(adios_defaults::str_adios2Schema, 0);
+            ADIOS2_LOG_API_CALL(
+                "IO.DefineAttribute(",
+                formatValue(adios_defaults::str_adios2Schema),
+                ", ",
+                formatValue(static_cast<uint64_t>(0)),
+                ");");
         }
         initializedDefaults = true;
     }
@@ -1265,6 +1261,7 @@ AdvanceStatus ADIOS2File::advance(AdvanceMode mode)
          */
         if (streamStatus == StreamStatus::OutsideOfStep)
         {
+            ADIOS2_LOG_API_CALL("engine.BeginStep();");
             if (getEngine().BeginStep() != adios2::StepStatus::OK)
             {
                 throw std::runtime_error(
@@ -1279,11 +1276,20 @@ AdvanceStatus ADIOS2File::advance(AdvanceMode mode)
         {
             m_IO.DefineAttribute<bool_representation>(
                 adios_defaults::str_usesstepsAttribute, 1);
+            ADIOS2_LOG_API_CALL(
+                "IO.DefineAttribute(",
+                formatValue(adios_defaults::str_usesstepsAttribute),
+                ", ",
+                formatValue(static_cast<bool_representation>(1)),
+                ");");
         }
 
         flush(
             ADIOS2FlushParams{FlushLevel::UserFlush},
-            [](ADIOS2File &, adios2::Engine &eng) { eng.EndStep(); },
+            [](ADIOS2File &, adios2::Engine &eng) {
+                eng.EndStep();
+                ADIOS2_LOG_API_CALL("engine.EndStep();");
+            },
             /* writeLatePuts = */ true,
             /* flushUnconditionally = */ true);
         uncommittedAttributes.clear();
@@ -1359,6 +1365,7 @@ Be aware of the performance implications described above.)");
 
         if (streamStatus != StreamStatus::DuringStep)
         {
+            ADIOS2_LOG_API_CALL("engine.BeginStep();");
             adiosStatus = engine.BeginStep();
         }
         else
@@ -1459,6 +1466,15 @@ void ADIOS2File::markActive(Writable *writable)
                     /* variableName = */ "",
                     /* separator = */ "/",
                     /* allowModification = */ true);
+                ADIOS2_LOG_API_CALL(
+                    "IO.DefineAttribute(",
+                    formatValue(fullPath),
+                    ", ",
+                    formatValue(currentStepBuffered),
+                    ", ",
+                    R"("", "/", )",
+                    formatValue(true),
+                    ");");
                 m_pathsMarkedAsActive.emplace(writable);
                 writable = writable->parent;
             } while (writable &&

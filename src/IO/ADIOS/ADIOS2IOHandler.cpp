@@ -55,7 +55,6 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <typeinfo>
 #include <variant>
 
 namespace openPMD
@@ -81,86 +80,6 @@ namespace openPMD
     }
 
 #if openPMD_HAVE_ADIOS2
-
-/*
- * Logging helper for ADIOS2 API calls to enable quick construction of
- * reproducers for bug reports. Output is formatted as C++ code.
- * Controlled by environment variable OPENPMD_ADIOS2_LOG_API_CALLS
- */
-namespace
-{
-    inline bool shouldLogADIOS2ApiCalls()
-    {
-        static int cached_result = -1;
-        if (cached_result == -1)
-        {
-            cached_result =
-                auxiliary::getEnvNum("OPENPMD_ADIOS2_LOG_API_CALLS", 0);
-        }
-        return cached_result != 0;
-    }
-
-    template <typename T>
-    auto formatType() -> char const *
-    {
-        return typeid(T).name();
-    }
-
-    template <typename T>
-    inline std::string formatValue(T const &value)
-    {
-        if constexpr (std::is_same_v<T, bool>)
-        {
-            return value ? "true" : "false";
-        }
-        else if constexpr (
-            std::is_same_v<T, char const *> || std::is_same_v<T, char *> ||
-            std::is_same_v<T, std::string>)
-        {
-            std::stringstream res;
-            res << "\"" << value << "\"";
-            return res.str();
-        }
-        else if constexpr (std::is_arithmetic_v<T>)
-        {
-            std::stringstream res;
-            res << "(" << formatType<T>() << ")" << value;
-            return res.str();
-        }
-        else
-        {
-            return "/*value*/";
-        }
-    }
-
-    template <typename T>
-    inline std::string formatValue(T const *it, size_t size)
-    {
-        std::stringstream out;
-        out << "std::vector<" << formatType<T>() << ">{";
-        if (size == 0)
-        {
-            out << "}";
-            return out.str();
-        }
-        out << *it;
-        for (size_t i = 1; i < size; ++i)
-        {
-            out << ", " << it[i];
-        }
-        out << "}";
-        return out.str();
-    }
-} // namespace
-
-template <typename... Args>
-void ADIOS2_LOG_API_CALL(Args &&...args)
-{
-    if (::openPMD::shouldLogADIOS2ApiCalls())
-    {
-        ((std::cerr << "[ADIOS2 API] ") << ... << args) << std::endl;
-    }
-}
 
 std::optional<size_t> joinedDimension(adios2::Dims const &dims)
 {
