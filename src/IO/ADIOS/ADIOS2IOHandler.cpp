@@ -81,6 +81,76 @@ namespace openPMD
 
 #if openPMD_HAVE_ADIOS2
 
+/*
+ * Logging helper for ADIOS2 API calls to enable quick construction of
+ * reproducers for bug reports. Output is formatted as C++ code.
+ * Controlled by environment variable OPENPMD_ADIOS2_LOG_API_CALLS
+ */
+namespace
+{
+    inline bool shouldLogADIOS2ApiCalls()
+    {
+        static int cached_result = -1;
+        if (cached_result == -1)
+        {
+            cached_result =
+                auxiliary::getEnvNum("OPENPMD_ADIOS2_LOG_API_CALLS", 0);
+        }
+        return cached_result != 0;
+    }
+
+    template <typename T>
+    inline std::string formatValue(T const &value);
+
+    // Specialization for strings
+    template <>
+    inline std::string formatValue(std::string const &value)
+    {
+        return "\"" + value + "\"";
+    }
+
+    // Specialization for basic types
+    template <>
+    inline std::string formatValue(int const &value)
+    {
+        return std::to_string(value);
+    }
+
+    template <>
+    inline std::string formatValue(size_t const &value)
+    {
+        return std::to_string(value) + "UL";
+    }
+
+    // template <>
+    // inline std::string formatValue(uint64_t const &value)
+    // {
+    //     return std::to_string(value) + "ULL";
+    // }
+
+    template <>
+    inline std::string formatValue(bool const &value)
+    {
+        return value ? "true" : "false";
+    }
+
+    // Generic fallback (will use operator<<)
+    template <typename T>
+    inline std::string formatValue(T const &)
+    {
+        return "/*value*/";
+    }
+} // namespace
+
+#define ADIOS2_LOG_API_CALL(...)                                               \
+    do                                                                         \
+    {                                                                          \
+        if (::openPMD::shouldLogADIOS2ApiCalls())                              \
+        {                                                                      \
+            std::cerr << "[ADIOS2 API] " << __VA_ARGS__ << std::endl;          \
+        }                                                                      \
+    } while (false)
+
 std::optional<size_t> joinedDimension(adios2::Dims const &dims)
 {
     for (size_t i = 0; i < dims.size(); ++i)
@@ -731,6 +801,9 @@ void ADIOS2IOHandlerImpl::createFile(
             fileData.m_IO.DefineAttribute(
                 adios_defaults::str_groupBasedWarning,
                 std::string(warningADIOS2NoGroupbasedEncoding));
+            ADIOS2_LOG_API_CALL(
+                "IO.DefineAttribute(\"" << adios_defaults::str_groupBasedWarning
+                                        << "\", ...);");
         }
     }
 }
@@ -1226,7 +1299,9 @@ namespace detail
             adios2::Dims offset(params.offset.begin(), params.offset.end());
             adios2::Dims extent(params.extent.begin(), params.extent.end());
             variable.SetSelection({std::move(offset), std::move(extent)});
+            ADIOS2_LOG_API_CALL("var.SetSelection({offset, extent});");
             typename adios2::Variable<T>::Span span = engine.Put(variable);
+            ADIOS2_LOG_API_CALL("var_span = engine.Put(var);");
             params.out->backendManagedBuffer = true;
             /*
              * SIC!
@@ -2366,6 +2441,8 @@ namespace detail
                     /* variableName = */ "",
                     /* separator = */ "/",
                     /* allowModification = */ modifiable);
+                ADIOS2_LOG_API_CALL(
+                    "IO.DefineAttribute(\"" << fullName << "\", ...);");
 
                 if (!attr)
                 {
@@ -2480,13 +2557,18 @@ namespace detail
         if (!var)
         {
             var = IO.DefineVariable<T>(name, shape, start, count, constantDims);
+            ADIOS2_LOG_API_CALL(
+                "IO.DefineVariable<T>(\""
+                << name << "\", shape, start, count, constantDims);");
         }
         else
         {
             var.SetShape(shape);
+            ADIOS2_LOG_API_CALL("var.SetShape(shape);");
             if (count.size() > 0)
             {
                 var.SetSelection({start, count});
+                ADIOS2_LOG_API_CALL("var.SetSelection({start, count});");
             }
             // don't add compression operators multiple times
             return;
