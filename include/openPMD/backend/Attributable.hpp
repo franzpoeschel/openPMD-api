@@ -213,6 +213,11 @@ namespace debug
     void printDirty(Series const &);
 }
 
+namespace core
+{
+    class ConfigureLoadStore;
+}
+
 /** @brief Layer to manage storage of attributes associated with file objects.
  *
  * Mandatory and user-defined Attributes and their data for every object in the
@@ -244,6 +249,7 @@ class Attributable
     friend class internal::AttributableData;
     friend class Snapshots;
     friend struct internal::HomogenizeExtents;
+    friend class core::ConfigureLoadStore;
 
 protected:
     // tag for internal constructor
