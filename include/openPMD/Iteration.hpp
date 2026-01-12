@@ -156,6 +156,7 @@ class Iteration
     friend class Writable;
     friend class StatefulIterator;
     friend class StatefulSnapshotsContainer;
+    friend class internal::ScientificDefaults<Iteration>;
 
 public:
     Iteration(Iteration const &) = default;
