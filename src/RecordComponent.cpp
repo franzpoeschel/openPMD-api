@@ -53,7 +53,8 @@ namespace openPMD
 namespace internal
 {
     RecordComponentData::RecordComponentData() = default;
-    auto RecordComponentData::push_chunk(IOTask &&task) -> bool
+    void RecordComponentData::push_chunk(
+        IOTask &&task, std::optional<bool> immediate_flush)
     {
         Attributable a;
         a.setData(std::shared_ptr<AttributableData>{this, [](auto const &) {}});
@@ -75,9 +76,29 @@ namespace internal
                 "Cannot write/read chunks to/from closed Iterations.");
         }
 #endif
+        bool immediate_flush_resolved = [&]() {
+            if (immediate_flush.has_value())
+            {
+                return *immediate_flush;
+            }
+            else
+            {
+                return a.IOHandler()->m_flush_immediately;
+            }
+        }();
         a.setDirtyRecursive(true);
-        m_chunks.push(std::move(task));
-        return a.IOHandler()->m_flush_immediately;
+        if (immediate_flush_resolved)
+        {
+            a.seriesFlush_impl<false>(
+                internal::FlushParams{FlushLevel::ImmediateFlush});
+            auto IOHandler = a.IOHandler();
+            IOHandler->enqueue(task);
+            IOHandler->flush(FlushLevel::UserFlush);
+        }
+        else
+        {
+            m_chunks.push(std::move(task));
+        }
     }
 
     static constexpr char const *note_on_deactivating_this_check = R"(
@@ -493,7 +514,8 @@ void RecordComponent::flush(
     {
         return;
     }
-    if (access::readOnly(IOHandler()->m_frontendAccess))
+    if (access::readOnly(IOHandler()->m_frontendAccess) &&
+        flush_level::global_flushpoint(flushParams.flushLevel))
     {
         while (!rc.m_chunks.empty())
         {
@@ -717,10 +739,7 @@ void RecordComponent::storeChunk_impl(
     /* std::static_pointer_cast correctly reference-counts the pointer */
     dWrite.data = std::move(buffer);
     auto &rc = get();
-    if (rc.push_chunk(IOTask(this, std::move(dWrite))))
-    {
-        seriesFlush();
-    }
+    rc.push_chunk(IOTask(this, std::move(dWrite)));
 }
 
 void RecordComponent::verifyChunk(
@@ -981,10 +1000,7 @@ void RecordComponent::loadChunk_impl(
         dRead.extent = extent;
         dRead.dtype = getDatatype();
         dRead.data = std::static_pointer_cast<void>(data);
-        if (rc.push_chunk(IOTask(this, dRead)))
-        {
-            seriesFlush();
-        }
+        rc.push_chunk(IOTask(this, dRead));
     }
 }
 
