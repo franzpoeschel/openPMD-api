@@ -7,6 +7,15 @@ the setuptools (setup.py) "entry_points" -> "console_scripts" generator.
 Copyright 2021 openPMD contributors
 Authors: Franz Poeschel
 License: LGPLv3+
+
+I/O strategies
+--------------
+This script supports two I/O strategies selectable via the `--io-strategy`
+command line option:
+- `per-iteration`: defer dataset reads/writes and perform them once per
+    iteration (fewer I/O calls, potentially higher memory usage).
+- `per-dataset`: read/write each dataset immediately to reduce memory
+    footprint (default).
 """
 import argparse
 import os  # os.path.basename
@@ -67,6 +76,15 @@ Examples:
                         type=str,
                         default='{}',
                         help='JSON config for the out file')
+    parser.add_argument(
+        '--io-strategy',
+        choices=['per-iteration', 'per-dataset'],
+        default='per-dataset',
+        help=('I/O strategy: "per-iteration" defers actual dataset reads/writes '
+              'and performs them once per iteration (fewer I/O operations, '
+              'higher memory usage). "per-dataset" reads/writes each dataset '
+              'immediately to reduce memory footprint (default).')
+    )
     # MPI, default: Import mpi4py if available and openPMD is parallel,
     # but don't use if MPI size is 1 (this makes it easier to interact with
     # JSON, since that backend is unavailable in parallel)
@@ -303,6 +321,8 @@ class pipe:
         self.outconfig = outconfig
         self.loads = []
         self.comm = comm
+        # default io strategy: 'per-dataset' (read/write each dataset immediately)
+        self.io_strategy = 'per-dataset'
         if HAVE_MPI:
             hostinfo = io.HostInfo.MPI_PROCESSOR_NAME
             self.outranks = hostinfo.get_collective(self.comm)
@@ -446,8 +466,17 @@ class pipe:
                             current_path, self.comm.rank, self.comm.size,
                             chunk.offset, end))
                     span = dest.store_chunk(chunk.offset, chunk.extent)
-                    self.loads.append(
-                        deferred_load(src, span, chunk.offset, chunk.extent))
+                    # Two strategies supported:
+                    # - per-dataset: read/write each dataset immediately (low memory)
+                    # - per-iteration: defer actual reads and perform them once per
+                    #   iteration to reduce number of I/O operations (higher memory)
+                    if getattr(self, 'io_strategy', 'per-dataset') == 'per-dataset':
+                        src.load_chunk(span.current_buffer(), chunk.offset,
+                                       chunk.extent)
+                    else:
+                        # defer load until after the whole iteration is copied
+                        self.loads.append(
+                            deferred_load(src, span, chunk.offset, chunk.extent))
         elif isinstance(src, io.Iteration):
             self.__copy(src.meshes, dest.meshes, current_path + "meshes/")
             self.__copy(src.particles, dest.particles,
@@ -471,6 +500,8 @@ def main():
         communicator = FallbackMPICommunicator()
     run_pipe = pipe(args.infile, args.outfile, args.inconfig, args.outconfig,
                     communicator)
+    # set chosen IO strategy from CLI
+    run_pipe.io_strategy = args.io_strategy
 
     run_pipe.run()
 
