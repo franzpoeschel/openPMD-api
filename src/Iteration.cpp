@@ -113,7 +113,7 @@ Iteration &Iteration::close(bool _flush)
 
     if (access::write(IOHandler()->m_frontendAccess))
     {
-        addDefaultsRecursively(IOHandler()->m_standard);
+        writeDefaultsRecursively(IOHandler()->m_standard);
     }
 
     if (_flush)
