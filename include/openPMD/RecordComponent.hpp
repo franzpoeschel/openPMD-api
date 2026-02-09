@@ -108,9 +108,7 @@ namespace internal
 namespace core
 {
     class ConfigureLoadStore;
-    template <typename>
     class ConfigureLoadStoreFromBuffer;
-    template <typename>
     class ConfigureStoreChunkFromBuffer;
     struct VisitorEnqueueLoadVariant;
     struct VisitorLoadVariant;
@@ -138,9 +136,7 @@ class RecordComponent : public BaseRecordComponent
     template <typename T>
     friend T &internal::makeOwning(T &self, Series);
     friend class core::ConfigureLoadStore;
-    template <typename>
     friend class core::ConfigureLoadStoreFromBuffer;
-    template <typename>
     friend class core::ConfigureStoreChunkFromBuffer;
     friend struct core::VisitorEnqueueLoadVariant;
     friend struct core::VisitorLoadVariant;
@@ -495,6 +491,10 @@ private:
     template <typename T>
     void
         loadChunk_impl(std::shared_ptr<T>, internal::LoadStoreConfigWithBuffer);
+    void loadChunk_impl(
+        std::shared_ptr<void> const &,
+        Datatype,
+        internal::LoadStoreConfigWithBuffer);
     template <typename T>
     std::shared_ptr<T> loadChunkAllocate_impl(internal::LoadStoreConfig);
 
