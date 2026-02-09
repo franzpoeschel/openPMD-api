@@ -4,6 +4,7 @@
 #include "openPMD/Datatype.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Span.hpp"
+#include "openPMD/auxiliary/Future.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/Memory_internal.hpp"
 #include "openPMD/auxiliary/ShareRawInternal.hpp"
@@ -72,19 +73,75 @@ namespace core
         return internal::LoadStoreConfig{getOffset(), getExtent()};
     }
 
-    auto ConfigureLoadStore::deferFlush(Attributable &attr)
+    struct DeferFlush
     {
-        auto index = attr.IOHandler()->m_flushCounter;
-        return [attr,
-                old_index = *index,
-                current_index = std::weak_ptr(index)]() mutable {
+        Attributable attr;
+        unsigned long long old_index;
+        std::weak_ptr<unsigned long long> current_index;
+
+        DeferFlush(Attributable const &attr_in) : attr(attr_in)
+        {
+            auto index = attr.IOHandler()->m_flushCounter;
+            old_index = *index;
+            current_index = std::weak_ptr(index);
+        }
+
+        void operator()()
+        {
             auto lock_current_index = current_index.lock();
             if (!lock_current_index || *lock_current_index >= old_index)
             {
                 return;
             }
             attr.seriesFlush();
-        };
+        }
+    };
+
+    struct DeferFlushVoid
+        : DeferFlush
+        , auxiliary::DeferredComputationI<void>
+    {
+        using DeferFlush::DeferFlush;
+
+        void operator()() override
+        {
+            DeferFlush::operator()();
+        }
+    };
+
+    template <typename... Args>
+    inline auto deferFlushVoid(Args &&...args)
+        -> std::shared_ptr<auxiliary::DeferredComputationI<void>>
+    {
+        return std::make_shared<DeferFlushVoid>(std::forward<Args>(args)...);
+    }
+
+    template <typename T>
+    struct DeferFlushWithReturnVal
+        : DeferFlush
+        , auxiliary::DeferredComputationI<T>
+    {
+        T val;
+
+        template <typename... Args>
+        DeferFlushWithReturnVal(T val_in, Args &&...args)
+            : DeferFlush(std::forward<Args>(args)...), val(std::move(val_in))
+        {}
+
+        auto operator()() -> T override
+        {
+            DeferFlush::operator()();
+            return val;
+        }
+    };
+
+    template <typename T, typename... Args>
+    inline auto deferFlushWithReturnVal(T &&val, Args &&...args)
+        -> std::shared_ptr<auxiliary::DeferredComputationI<
+            std::remove_reference_t<std::remove_cv_t<T>>>>
+    {
+        return std::make_shared<DeferFlushWithReturnVal<T>>(
+            std::forward<T>(val), std::forward<Args>(args)...);
     }
 
     auto ConfigureLoadStore::getOffset() -> Offset const &
@@ -280,10 +337,7 @@ namespace core
     {
         auto res = m_rc.loadChunkAllocate_impl<T>(storeChunkConfig());
         return auxiliary::DeferredComputation<std::shared_ptr<T>>(
-            [res_lambda = std::move(res), dflush = deferFlush(m_rc)]() mutable {
-                dflush();
-                return res_lambda;
-            });
+            deferFlushWithReturnVal(std::move(res), m_rc));
     }
 
     template <typename T>
@@ -303,21 +357,16 @@ namespace core
 
     struct VisitorEnqueueLoadVariant
     {
-        template <typename T, typename F>
-        static auto
-        call(RecordComponent &rc, internal::LoadStoreConfig cfg, F &&dflush)
+        template <typename T>
+        static auto call(RecordComponent &rc, internal::LoadStoreConfig cfg)
             -> auxiliary::DeferredComputation<
                 auxiliary::detail::shared_ptr_dataset_types>
         {
-            auto res = rc.loadChunkAllocate_impl<T>(std::move(cfg));
-            return auxiliary::DeferredComputation<
-                auxiliary::detail::shared_ptr_dataset_types>(
-                [res_lambda = std::move(res),
-                 dflush_lambda = std::forward<F>(dflush)]() mutable
-                    -> auxiliary::detail::shared_ptr_dataset_types {
-                    dflush_lambda();
-                    return res_lambda;
-                });
+            using res_t = auxiliary::detail::shared_ptr_dataset_types;
+            res_t res = rc.loadChunkAllocate_impl<T>(std::move(cfg));
+            std::shared_ptr<auxiliary::DeferredComputationI<res_t>> functor =
+                deferFlushWithReturnVal(std::move(res), rc);
+            return auxiliary::DeferredComputation<res_t>(functor);
         }
     };
 
@@ -325,8 +374,7 @@ namespace core
         -> auxiliary::DeferredComputation<
             auxiliary::detail::shared_ptr_dataset_types>
     {
-        return m_rc.visit<VisitorEnqueueLoadVariant>(
-            this->storeChunkConfig(), deferFlush(m_rc));
+        return m_rc.visit<VisitorEnqueueLoadVariant>(this->storeChunkConfig());
     }
 
     struct VisitorLoadVariant
@@ -373,8 +421,7 @@ namespace core
     {
         this->m_rc.storeChunk_impl(
             std::move(m_buffer), m_datatype, storeChunkConfig());
-        return auxiliary::DeferredComputation<void>(
-            [dflush = deferFlush(m_rc)]() mutable -> void { dflush(); });
+        return auxiliary::DeferredComputation<void>(deferFlushVoid(m_rc));
     }
 
     auto ConfigureStoreChunkFromBuffer::store(EnqueuePolicy ep) -> void
@@ -404,10 +451,7 @@ namespace core
         }
         this->m_rc.loadChunk_impl(
             *shared_ptr, m_datatype, this->storeChunkConfig());
-        return auxiliary::DeferredComputation<void>(
-            [dflush = this->deferFlush(this->m_rc)]() mutable -> void {
-                dflush();
-            });
+        return auxiliary::DeferredComputation<void>(deferFlushVoid(this->m_rc));
     }
 
     auto ConfigureLoadStoreFromBuffer::load(EnqueuePolicy ep) -> void

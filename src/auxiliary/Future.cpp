@@ -14,18 +14,21 @@ namespace openPMD::auxiliary
 
 template <typename T>
 DeferredComputation<T>::DeferredComputation(task_type task)
-    : m_task([wrapped_task = std::move(task), this]() {
-        if (!this->m_valid)
-        {
-            throw std::runtime_error(
-                "[DeferredComputation] No valid state. Probably already "
-                "computed.");
-        }
-        this->m_valid = false;
-        return std::move(wrapped_task)();
-    })
-    , m_valid(true)
+    : m_task(std::move(task)), m_valid(true)
 {}
+
+template <typename T>
+auto DeferredComputation<T>::get() -> T
+{
+    if (!this->m_valid)
+    {
+        throw std::runtime_error(
+            "[DeferredComputation] No valid state. Probably already "
+            "computed.");
+    }
+    this->m_valid = false;
+    return std::move(*m_task)();
+}
 
 template <typename T>
 DeferredComputation<T>::~DeferredComputation()
@@ -47,12 +50,6 @@ DeferredComputation<T>::~DeferredComputation()
                       << std::endl;
         }
     }
-}
-
-template <typename T>
-auto DeferredComputation<T>::get() -> T
-{
-    return m_task();
 }
 
 template <typename T>

@@ -216,7 +216,8 @@ namespace debug
 namespace core
 {
     class ConfigureLoadStore;
-}
+    struct DeferFlush;
+} // namespace core
 
 /** @brief Layer to manage storage of attributes associated with file objects.
  *
@@ -250,6 +251,7 @@ class Attributable
     friend class Snapshots;
     friend struct internal::HomogenizeExtents;
     friend class core::ConfigureLoadStore;
+    friend struct core::DeferFlush;
 
 protected:
     // tag for internal constructor

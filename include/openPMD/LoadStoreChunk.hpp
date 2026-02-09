@@ -88,8 +88,6 @@ namespace core
         [[nodiscard]] auto dim() const -> uint8_t;
         auto storeChunkConfig() -> internal::LoadStoreConfig;
 
-        auto deferFlush(Attributable &);
-
     private:
         auto withSharedPtr_impl_mut(std::shared_ptr<void> data, Datatype)
             -> openPMD::ConfigureLoadStoreFromBuffer;
