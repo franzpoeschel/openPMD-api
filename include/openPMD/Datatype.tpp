@@ -222,36 +222,63 @@ namespace detail
     template <typename T>
     constexpr bool is_char_v = is_char<T>::value;
 
-    template <typename T_Char1, typename T_Char2>
-    inline bool isSameChar()
+    struct IsChar
     {
-        return
-            // both must be char types
-            is_char_v<T_Char1> && is_char_v<T_Char2> &&
-            // both must have equivalent sign
-            std::is_signed_v<T_Char1> == std::is_signed_v<T_Char2> &&
-            // both must have equivalent size
-            sizeof(T_Char1) == sizeof(T_Char2);
-    }
-
-    template <typename T1>
-    struct IsSameChar
-    {
-        template <typename T2>
-        static bool call()
+        template <typename T>
+        static constexpr bool call()
         {
-            return isSameChar<T1, T2>();
+            return is_char_v<T>;
         }
-
-        static constexpr char const *errorMsg = "IsSameChar";
+        static constexpr char const *errorMsg = "IsChar";
     };
 
+    constexpr inline bool isChar(Datatype dtype)
+    {
+        return switchType<IsChar>(dtype);
+    }
+
+    struct DtypeSize
+    {
+        template <typename T>
+        static constexpr size_t call()
+        {
+            return sizeof(T);
+        }
+        static constexpr char const *errorMsg = "DtypeSize";
+    };
+
+    constexpr inline size_t dtypeSize(Datatype dtype)
+    {
+        return switchType<DtypeSize>(dtype);
+    }
+
+    struct IsSigned
+    {
+        template <typename T>
+        static constexpr bool call()
+        {
+            return std::is_signed_v<T>;
+        }
+        static constexpr char const *errorMsg = "IsSigned";
+    };
+
+    constexpr inline bool isSigned(Datatype dtype)
+    {
+        return switchType<IsSigned>(dtype);
+    }
 } // namespace detail
 
 template <typename T_Char>
 constexpr inline bool isSameChar(Datatype d)
 {
-    return switchType<detail::IsSameChar<T_Char>>(d);
+    return isSameChar(d, determineDatatype<T_Char>());
+}
+
+constexpr bool isSameChar(Datatype d1, Datatype d2)
+{
+    return detail::isChar(d1) && detail::isChar(d2) &&
+        detail::isSigned(d1) == detail::isSigned(d2) &&
+        detail::dtypeSize(d1) == detail::dtypeSize(d2);
 }
 } // namespace openPMD
 
