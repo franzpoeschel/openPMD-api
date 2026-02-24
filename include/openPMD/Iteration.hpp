@@ -145,7 +145,7 @@ namespace internal
  */
 class Iteration
     : public Attributable
-    , internal::ScientificDefaults<Iteration>
+    , internal::ScientificDefaults
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
@@ -156,7 +156,7 @@ class Iteration
     friend class Writable;
     friend class StatefulIterator;
     friend class StatefulSnapshotsContainer;
-    friend class internal::ScientificDefaults<Iteration>;
+    friend class internal::ScientificDefaults;
 
 public:
     Iteration(Iteration const &) = default;
