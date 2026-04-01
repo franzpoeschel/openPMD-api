@@ -651,12 +651,15 @@ void RecordComponent::storeChunk(
 void RecordComponent::verifyChunk(
     Datatype dtype, Offset const &o, Extent const &e) const
 {
-    if (constant())
-        throw std::runtime_error(
-            "Chunks cannot be written for a constant RecordComponent.");
-    if (empty())
-        throw std::runtime_error(
-            "Chunks cannot be written for an empty RecordComponent.");
+    if (!std::any_of(e.begin(), e.end(), [](auto val) { return val == 0; }))
+    {
+        if (constant())
+            throw std::runtime_error(
+                "Chunks cannot be written for a constant RecordComponent.");
+        if (empty())
+            throw std::runtime_error(
+                "Chunks cannot be written for an empty RecordComponent.");
+    }
     if (!isSame(dtype, getDatatype()))
     {
         std::ostringstream oss;
