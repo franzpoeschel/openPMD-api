@@ -480,7 +480,23 @@ this method.
             &Series::iterationFormat,
             &Series::setIterationFormat)
         .def_property("name", &Series::name, &Series::setName)
-        .def("flush", &Series::flush, py::arg("backend_config") = "{}")
+        .def(
+            "flush",
+            [](Series &s,
+               std::string const &backend_config,
+               bool do_release_gil) {
+                if (do_release_gil)
+                {
+                    py::gil_scoped_release release_gil;
+                    s.flush(backend_config);
+                }
+                else
+                {
+                    s.flush(backend_config);
+                }
+            },
+            py::arg("backend_config") = "{}",
+            py::arg("release_gil") = false)
 
         .def_property_readonly(
             "backend", static_cast<std::string (Series::*)()>(&Series::backend))

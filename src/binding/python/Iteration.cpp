@@ -86,8 +86,19 @@ void init_Iteration(py::module &m)
              * Cannot release the GIL here since Python buffers might be
              * accessed in deferred tasks
              */
-            &Iteration::close,
-            py::arg("flush") = true)
+            [](Iteration &iteration, bool do_flush, bool do_release_gil) {
+                if (do_release_gil)
+                {
+                    py::gil_scoped_release release_gil;
+                    iteration.close(do_flush);
+                }
+                else
+                {
+                    iteration.close(do_flush);
+                }
+            },
+            py::arg("flush") = true,
+            py::arg("release_gil") = false)
 
         // TODO remove in future versions (deprecated)
         .def("set_time", &Iteration::setTime<double>)
