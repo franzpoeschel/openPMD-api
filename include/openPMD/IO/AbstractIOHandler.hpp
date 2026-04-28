@@ -26,6 +26,7 @@
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/config.hpp"
 #include "openPMD/version.hpp"
+#include <deque>
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
@@ -106,6 +107,8 @@ namespace internal
     {
         FlushLevel flushLevel = FlushLevel::InternalFlush;
         std::string backendConfig = "{}";
+        std::unique_ptr<std::deque<std::shared_ptr<void const>>>
+            deferred_deallocations;
 
         explicit FlushParams()
         {}

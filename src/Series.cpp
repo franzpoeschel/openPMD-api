@@ -786,6 +786,18 @@ void Series::flush(std::string backendConfig)
         {FlushLevel::UserFlush, std::move(backendConfig)});
 }
 
+auto Series::flushWithoutDeallocations(std::string backendConfig)
+    -> std::deque<std::shared_ptr<void const>>
+{
+    auto &series = get();
+    internal::FlushParams flushParams{
+        FlushLevel::UserFlush, std::move(backendConfig)};
+    flushParams.deferred_deallocations =
+        std::make_unique<std::deque<std::shared_ptr<void const>>>();
+    flush_impl(series.iterations.begin(), series.iterations.end(), flushParams);
+    return std::move(*flushParams.deferred_deallocations);
+}
+
 std::unique_ptr<Series::ParsedInput> Series::parseInput(std::string filepath)
 {
     std::unique_ptr<Series::ParsedInput> input{new Series::ParsedInput};

@@ -678,6 +678,9 @@ public:
      */
     void flush(std::string backendConfig = "{}");
 
+    auto flushWithoutDeallocations(std::string backendConfig = "{}")
+        -> std::deque<std::shared_ptr<void const>>;
+
     /**
      * @brief Entry point to the reading end of the streaming API.
      *

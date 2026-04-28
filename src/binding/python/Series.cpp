@@ -487,8 +487,12 @@ this method.
                bool do_release_gil) {
                 if (do_release_gil)
                 {
-                    py::gil_scoped_release release_gil;
-                    s.flush(backend_config);
+                    std::deque<std::shared_ptr<void const>> deallocations;
+                    {
+                        py::gil_scoped_release release_gil;
+                        deallocations =
+                            s.flushWithoutDeallocations(backend_config);
+                    }
                 }
                 else
                 {
