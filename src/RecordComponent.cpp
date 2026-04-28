@@ -24,8 +24,10 @@
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
+#include "openPMD/auxiliary/Memory_internal.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
@@ -371,6 +373,95 @@ bool RecordComponent::empty() const
     return get().m_isEmpty;
 }
 
+namespace
+{
+    void extractMemoryManagement(
+        IOTask &task,
+        std::deque<std::shared_ptr<void const>> &deferred_deallocations)
+    {
+        auto deal_with_shared_pointer =
+            [&deferred_deallocations](auto &shared_ptr) {
+                // shared_ptr has type shared_ptr<void> or shared_ptr<void
+                // const>
+                auto bare_ptr = shared_ptr.get();
+                deferred_deallocations.emplace_back(std::move(shared_ptr));
+                shared_ptr = {bare_ptr, [](auto const *) { /* no-op */ }};
+            };
+        switch (task.operation)
+        {
+        case Operation::ADVANCE:
+            break;
+        case Operation::AVAILABLE_CHUNKS:
+            break;
+        case Operation::CHECK_FILE:
+            break;
+        case Operation::CLOSE_FILE:
+            break;
+        case Operation::CLOSE_PATH:
+            break;
+        case Operation::CREATE_DATASET:
+            break;
+        case Operation::CREATE_FILE:
+            break;
+        case Operation::CREATE_PATH:
+            break;
+        case Operation::DELETE_ATT:
+            break;
+        case Operation::DELETE_DATASET:
+            break;
+        case Operation::DELETE_FILE:
+            break;
+        case Operation::DELETE_PATH:
+            break;
+        case Operation::DEREGISTER:
+            break;
+        case Operation::EXTEND_DATASET:
+            break;
+        case Operation::GET_BUFFER_VIEW:
+            break;
+        case Operation::LIST_ATTS:
+            break;
+        case Operation::LIST_DATASETS:
+            break;
+        case Operation::LIST_PATHS:
+            break;
+        case Operation::OPEN_DATASET:
+            break;
+        case Operation::OPEN_FILE:
+            break;
+        case Operation::OPEN_PATH:
+            break;
+        case Operation::READ_ATT:
+            break;
+        case Operation::READ_ATT_ALLSTEPS:
+            break;
+        case Operation::READ_DATASET: {
+            auto &parameter = auxiliary::deref_dynamic_cast<
+                Parameter<Operation::READ_DATASET>>(task.parameter.get());
+            deal_with_shared_pointer(parameter.data);
+        }
+        break;
+        case Operation::SET_WRITTEN:
+            break;
+        case Operation::TOUCH:
+            break;
+        case Operation::WRITE_ATT:
+            break;
+        case Operation::WRITE_DATASET:
+            auto &parameter = auxiliary::deref_dynamic_cast<
+                Parameter<Operation::WRITE_DATASET>>(task.parameter.get());
+            std::visit(
+                auxiliary::overloaded{
+                    [&](auxiliary::WriteBuffer::SharedPtr &shared_ptr) {
+                        deal_with_shared_pointer(shared_ptr);
+                    },
+                    [&](auxiliary::WriteBuffer::CopyableUniquePtr &) {}},
+                parameter.data.as_variant<auxiliary::WriteBufferTypes>());
+            break;
+        }
+    }
+} // namespace
+
 void RecordComponent::flush(
     std::string const &name, internal::FlushParams const &flushParams)
 {
@@ -387,6 +478,11 @@ void RecordComponent::flush(
     {
         while (!rc.m_chunks.empty())
         {
+            if (flushParams.deferred_deallocations)
+            {
+                extractMemoryManagement(
+                    rc.m_chunks.front(), *flushParams.deferred_deallocations);
+            }
             IOHandler()->enqueue(rc.m_chunks.front());
             rc.m_chunks.pop();
         }
@@ -504,6 +600,11 @@ void RecordComponent::flush(
 
         while (!rc.m_chunks.empty())
         {
+            if (flushParams.deferred_deallocations)
+            {
+                extractMemoryManagement(
+                    rc.m_chunks.front(), *flushParams.deferred_deallocations);
+            }
             IOHandler()->enqueue(rc.m_chunks.front());
             rc.m_chunks.pop();
         }
