@@ -1943,7 +1943,10 @@ void Series::readFileBased(
 
     for (auto index : unparseableIterations)
     {
-        series.iterations.container().erase(index);
+        series.iterations.container().for_both_to_string(
+            [index](auto &map, auto &&to_string) {
+                map.erase(to_string(index));
+            });
     }
 
     if (padding > 0)
@@ -2279,7 +2282,10 @@ creating new iterations.
                     std::cerr << "Cannot read iteration '" << index
                               << "' and will skip it due to read error:\n"
                               << err.what() << std::endl;
-                    series.iterations.container().erase(index);
+                    series.iterations.container().for_both_to_string(
+                        [index](auto &map, auto &&to_string) {
+                            map.erase(to_string(index));
+                        });
                     return {err};
                 }
                 i.get().m_closed = internal::CloseStatus::Open;
@@ -3368,7 +3374,7 @@ namespace internal
         }
         // Not strictly necessary, but clear the map of iterations
         // This releases the openPMD hierarchy
-        iterations.container().clear();
+        iterations.container().for_both([](auto &map) { map.clear(); });
         // Release the IO Handler
         if (IOHandler)
         {
