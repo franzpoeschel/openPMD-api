@@ -21,7 +21,8 @@ struct defer_type
         std::move(functor)();
     }
 
-    explicit defer_type() = default;
+    explicit defer_type() : do_run_this(false)
+    {}
 
     struct forwarding_tag
     {};
