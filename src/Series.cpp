@@ -1492,6 +1492,12 @@ void Series::flushFileBased(
             case IO::HasBeenOpened:
                 // continue below
                 it->second.flush(flushParams);
+
+                if (it == begin)
+                {
+                    customHierarchyFlush(
+                        flushParams, /* unset_dirty = */ false);
+                }
                 break;
             }
 
@@ -1550,6 +1556,12 @@ void Series::flushFileBased(
                 }
 
                 it->second.flushFileBased(filename, it->first, flushParams);
+
+                if (it == begin)
+                {
+                    customHierarchyFlush(
+                        flushParams, /* unset_dirty = */ false);
+                }
 
                 series.iterations.flush(
                     auxiliary::replace_first(basePath(), "%T/", ""),
@@ -1635,7 +1647,14 @@ void Series::flushGorVBased(
                         series.m_snapshotToStep.at(it->first)};
                     IOHandler()->enqueue(IOTask(this, std::move(param)));
                 }
+
                 it->second.flush(flushParams);
+
+                if (it == begin)
+                {
+                    customHierarchyFlush(
+                        flushParams, /* unset_dirty = */ false);
+                }
                 break;
             }
 
@@ -1717,6 +1736,13 @@ void Series::flushGorVBased(
                     throw std::runtime_error(
                         "[Series] Internal control flow error");
                 }
+
+                if (it == begin)
+                {
+                    customHierarchyFlush(
+                        flushParams, /* unset_dirty = */ false);
+                }
+
                 break;
             case IO::RemainsClosed:
                 break;
