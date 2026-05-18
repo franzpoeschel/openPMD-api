@@ -1667,6 +1667,11 @@ void Series::flushGorVBased(
             }
         }
 
+        if (begin == end)
+        {
+            customHierarchyFlush(flushParams, /* unset_dirty = */ false);
+        }
+
         // Phase 3
         Parameter<Operation::TOUCH> touch;
         IOHandler()->enqueue(IOTask(&writable(), touch));
@@ -1755,6 +1760,11 @@ void Series::flushGorVBased(
                 // the iteration has no dedicated file in group-based mode
                 it->second.get().m_closed = internal::CloseStatus::Closed;
             }
+        }
+
+        if (begin == end)
+        {
+            customHierarchyFlush(flushParams, /* unset_dirty = */ false);
         }
 
         flushAttributes(flushParams);

@@ -405,6 +405,9 @@ void RecordComponent::flush(
     }
     if (access::readOnly(IOHandler()->m_frontendAccess))
     {
+        // TODO maybe guard against custom hierarchies on datasets?
+        // they can be created upon constant components however..
+        customHierarchyFlush(flushParams, /* unset_dirty = */ false);
         while (!rc.m_chunks.empty())
         {
             IOHandler()->enqueue(rc.m_chunks.front());
@@ -523,6 +526,10 @@ void RecordComponent::flush(
             IOHandler()->enqueue(rc.m_chunks.front());
             rc.m_chunks.pop();
         }
+
+        // TODO maybe guard against custom hierarchies on datasets?
+        // they can be created upon constant components however..
+        customHierarchyFlush(flushParams, /* unset_dirty = */ false);
 
         flushAttributes(flushParams);
     }
