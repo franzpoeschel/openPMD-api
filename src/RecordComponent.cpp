@@ -221,7 +221,7 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
     auto &rc = get();
     if (written())
     {
-        if (!rc.m_dataset.has_value())
+        if (!rc.dataset().has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
@@ -229,9 +229,9 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         }
         if (d.dtype == Datatype::UNDEFINED)
         {
-            d.dtype = rc.m_dataset.value().dtype;
+            d.dtype = rc.dataset().value().dtype;
         }
-        else if (d.dtype != rc.m_dataset.value().dtype)
+        else if (d.dtype != rc.dataset().value().dtype)
         {
             throw std::runtime_error(
                 "Cannot change the datatype of a dataset.");
@@ -257,7 +257,7 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         }
         else
         {
-            rc.m_dataset = std::move(d);
+            rc.dataset() = std::move(d);
             setDirty(true);
             return *this;
         }
@@ -266,17 +266,17 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
     rc.m_isEmpty = false;
     if (written())
     {
-        if (!rc.m_dataset.has_value())
+        if (!rc.dataset().has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
                 "have defined datatype and extent.");
         }
-        rc.m_dataset.value().extend(std::move(d.extent));
+        rc.dataset().value().extend(std::move(d.extent));
     }
     else
     {
-        rc.m_dataset = std::move(d);
+        rc.dataset() = std::move(d);
     }
 
     setDirty(true);
@@ -286,9 +286,9 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
 uint8_t RecordComponent::getDimensionality() const
 {
     auto &rc = get();
-    if (rc.m_dataset.has_value())
+    if (rc.dataset().has_value())
     {
-        return rc.m_dataset.value().rank;
+        return rc.dataset().value().rank;
     }
     else
     {
@@ -299,9 +299,9 @@ uint8_t RecordComponent::getDimensionality() const
 Extent RecordComponent::getExtent() const
 {
     auto &rc = get();
-    if (rc.m_dataset.has_value())
+    if (rc.dataset().has_value())
     {
-        return rc.m_dataset.value().extent;
+        return rc.dataset().value().extent;
     }
     else
     {
@@ -338,7 +338,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     auto &rc = get();
     if (written())
     {
-        if (!rc.m_dataset.has_value())
+        if (!rc.dataset().has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
@@ -353,22 +353,22 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
         }
         if (d.dtype == Datatype::UNDEFINED)
         {
-            d.dtype = rc.m_dataset.value().dtype;
+            d.dtype = rc.dataset().value().dtype;
         }
-        else if (d.dtype != rc.m_dataset.value().dtype)
+        else if (d.dtype != rc.dataset().value().dtype)
         {
             throw std::runtime_error(
                 "Cannot change the datatype of a dataset.");
         }
-        rc.m_dataset.value().extend(std::move(d.extent));
+        rc.dataset().value().extend(std::move(d.extent));
         rc.m_hasBeenExtended = true;
     }
     else
     {
-        rc.m_dataset = std::move(d);
+        rc.dataset() = std::move(d);
     }
 
-    if (rc.m_dataset.value().extent.size() == 0)
+    if (rc.dataset().value().extent.size() == 0)
         throw std::runtime_error("Dataset extent must be at least 1D.");
 
     rc.m_isEmpty = true;
@@ -376,7 +376,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     if (!written())
     {
         switchType<detail::DefaultValue<RecordComponent>>(
-            rc.m_dataset.value().dtype, *this);
+            rc.dataset().value().dtype, *this);
     }
     return *this;
 }
@@ -419,11 +419,11 @@ void RecordComponent::flush(
         /*
          * This catches when a user forgets to use resetDataset.
          */
-        if (!rc.m_dataset.has_value())
+        if (!rc.dataset().has_value())
         {
             // The check for !written() is technically not needed, just
             // defensive programming against internal bugs that go on us.
-            if (!written() && rc.m_chunks.empty() && !rc.m_isConstant)
+            if (!written() && rc.m_chunks.empty() && !rc.isConstant())
             {
                 // No data written yet, just accessed the object so far without
                 // doing anything
@@ -481,7 +481,7 @@ void RecordComponent::flush(
             else
             {
                 Parameter<Operation::CREATE_DATASET> dCreate(
-                    rc.m_dataset.value());
+                    rc.dataset().value());
                 dCreate.name = name;
                 IOHandler()->enqueue(IOTask(this, dCreate));
             }
@@ -515,7 +515,7 @@ void RecordComponent::flush(
             else
             {
                 Parameter<Operation::EXTEND_DATASET> pExtend(
-                    rc.m_dataset.value().extent);
+                    rc.dataset().value().extent);
                 IOHandler()->enqueue(IOTask(this, std::move(pExtend)));
                 rc.m_hasBeenExtended = false;
             }
@@ -745,7 +745,7 @@ RecordComponent &RecordComponent::makeConstant(T value)
     auto &rc = get();
 
     rc.m_constantValue = Attribute(value);
-    rc.m_isConstant = true;
+    rc.isConstant() = true;
     return *this;
 }
 
