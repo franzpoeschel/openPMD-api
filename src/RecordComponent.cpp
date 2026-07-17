@@ -236,7 +236,7 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
             throw std::runtime_error(
                 "Cannot change the datatype of a dataset.");
         }
-        rc.m_hasBeenExtended = true;
+        rc.hasBeenExtended() = true;
     }
 
     if (d.extent.empty())
@@ -263,7 +263,7 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         }
     }
 
-    rc.m_isEmpty = false;
+    rc.isEmpty() = false;
     if (written())
     {
         if (!rc.dataset().has_value())
@@ -361,7 +361,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
                 "Cannot change the datatype of a dataset.");
         }
         rc.dataset().value().extend(std::move(d.extent));
-        rc.m_hasBeenExtended = true;
+        rc.hasBeenExtended() = true;
     }
     else
     {
@@ -371,7 +371,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     if (rc.dataset().value().extent.size() == 0)
         throw std::runtime_error("Dataset extent must be at least 1D.");
 
-    rc.m_isEmpty = true;
+    rc.isEmpty() = true;
     setDirty(true);
     if (!written())
     {
@@ -383,7 +383,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
 
 bool RecordComponent::empty() const
 {
-    return get().m_isEmpty;
+    return get().isEmpty();
 }
 
 void RecordComponent::visitHierarchy(HierarchyVisitor &v, bool)
@@ -456,8 +456,8 @@ void RecordComponent::flush(
                 IOHandler()->enqueue(IOTask(this, pCreate));
                 Parameter<Operation::WRITE_ATT> aWrite;
                 aWrite.name = "value";
-                aWrite.dtype = rc.m_constantValue.dtype;
-                aWrite.m_resource = rc.m_constantValue.getAny();
+                aWrite.dtype = rc.constantValue().dtype;
+                aWrite.m_resource = rc.constantValue().getAny();
                 if (isVBased)
                 {
                     aWrite.changesOverSteps = Parameter<
@@ -487,7 +487,7 @@ void RecordComponent::flush(
             }
         }
 
-        if (rc.m_hasBeenExtended)
+        if (rc.hasBeenExtended())
         {
             if (constant())
             {
@@ -517,7 +517,7 @@ void RecordComponent::flush(
                 Parameter<Operation::EXTEND_DATASET> pExtend(
                     rc.dataset().value().extent);
                 IOHandler()->enqueue(IOTask(this, std::move(pExtend)));
-                rc.m_hasBeenExtended = false;
+                rc.hasBeenExtended() = false;
             }
         }
 
@@ -744,7 +744,7 @@ RecordComponent &RecordComponent::makeConstant(T value)
 
     auto &rc = get();
 
-    rc.m_constantValue = Attribute(value);
+    rc.constantValue() = Attribute(value);
     rc.isConstant() = true;
     return *this;
 }
@@ -891,7 +891,7 @@ void RecordComponent::loadChunk(std::shared_ptr<T> data, Offset o, Extent e)
 
         std::optional<T> val =
             switchNonVectorType<detail::do_convert</* To = */ T>>(
-                /* dt = */ getDatatype(), rc.m_constantValue);
+                /* dt = */ getDatatype(), rc.constantValue());
 
         if (val.has_value())
         {
