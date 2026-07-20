@@ -1669,7 +1669,8 @@ void Series::flushGorVBased(
 
         if (begin == end)
         {
-            customHierarchyFlush(flushParams, /* unset_dirty = */ false);
+            customHierarchyFlush(
+                flushParams, /* managed_as_custom_object = */ false);
         }
 
         // Phase 3
@@ -1764,7 +1765,8 @@ void Series::flushGorVBased(
 
         if (begin == end)
         {
-            customHierarchyFlush(flushParams, /* unset_dirty = */ false);
+            customHierarchyFlush(
+                flushParams, /* managed_as_custom_object = */ false);
         }
 
         flushAttributes(flushParams);

@@ -407,7 +407,8 @@ void RecordComponent::flush(
     {
         // TODO maybe guard against custom hierarchies on datasets?
         // they can be created upon constant components however..
-        customHierarchyFlush(flushParams, /* unset_dirty = */ false);
+        customHierarchyFlush(
+            flushParams, /* managed_as_custom_object = */ false);
         while (!rc.chunks().empty())
         {
             IOHandler()->enqueue(rc.chunks().front());
@@ -529,7 +530,8 @@ void RecordComponent::flush(
 
         // TODO maybe guard against custom hierarchies on datasets?
         // they can be created upon constant components however..
-        customHierarchyFlush(flushParams, /* unset_dirty = */ false);
+        customHierarchyFlush(
+            flushParams, /* managed_as_custom_object = */ false);
 
         flushAttributes(flushParams);
     }
