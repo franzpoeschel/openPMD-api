@@ -216,7 +216,7 @@ std::future<void> AbstractIOHandlerImpl::flush(FlushLevel l)
                     ", extent=",
                     [&parameter]() { return vec_as_string(parameter.extent); });
                 createDataset(i.writable, parameter);
-                i.writable->objectType = ObjectType::Dataset;
+                i.writable->objectType.initDataset();
                 break;
             }
             case O::EXTEND_DATASET: {
@@ -230,7 +230,7 @@ std::future<void> AbstractIOHandlerImpl::flush(FlushLevel l)
                     i.writable,
                     "] EXTEND_DATASET");
                 extendDataset(i.writable, parameter);
-                i.writable->objectType = ObjectType::Dataset;
+                i.writable->objectType.initDataset();
                 break;
             }
             case O::OPEN_FILE: {
@@ -287,7 +287,7 @@ std::future<void> AbstractIOHandlerImpl::flush(FlushLevel l)
                     "] OPEN_DATASET: ",
                     parameter.name);
                 openDataset(i.writable, parameter);
-                i.writable->objectType = ObjectType::Dataset;
+                i.writable->objectType.initDataset();
                 break;
             }
             case O::DELETE_FILE: {
@@ -347,7 +347,7 @@ std::future<void> AbstractIOHandlerImpl::flush(FlushLevel l)
                     ", extent=",
                     [&parameter]() { return vec_as_string(parameter.extent); });
                 writeDataset(i.writable, parameter);
-                i.writable->objectType = ObjectType::Dataset;
+                i.writable->objectType.initDataset();
                 break;
             }
             case O::WRITE_ATT: {
@@ -379,7 +379,7 @@ std::future<void> AbstractIOHandlerImpl::flush(FlushLevel l)
                     ", extent=",
                     [&parameter]() { return vec_as_string(parameter.extent); });
                 readDataset(i.writable, parameter);
-                i.writable->objectType = ObjectType::Dataset;
+                i.writable->objectType.initDataset();
                 break;
             }
             case O::GET_BUFFER_VIEW: {
