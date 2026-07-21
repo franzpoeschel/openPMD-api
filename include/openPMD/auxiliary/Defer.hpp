@@ -33,7 +33,8 @@ struct defer_type
     {}
 
     template <typename F_>
-    defer_type(defer_type<F_> &&other) : functor{std::move(other.functor)}
+    defer_type(defer_type<F_> &&other)
+        : functor{std::move(other.functor)}, do_run_this(other.do_run_this)
     {
         other.do_run_this = false;
     }
@@ -42,6 +43,7 @@ struct defer_type
     auto operator=(defer_type<F_> &&other)
     {
         functor = std::move(other.functor);
+        do_run_this = other.do_run_this;
         other.do_run_this = false;
     }
 
