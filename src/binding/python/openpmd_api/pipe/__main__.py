@@ -448,36 +448,43 @@ class pipe:
             elif src.constant:
                 dest.make_constant(src.get_attribute("value"))
             else:
-                chunk_table = src.available_chunks()
-                # todo buffer the strategy
-                strategy = distribution_strategy(shape)
-                my_chunks = strategy.assign(
-                    chunk_table,
-                    self.inranks,
-                    self.outranks,
-                    self.comm.rank,
-                    self.comm.size,
-                )
-                for chunk in (
-                    my_chunks[self.comm.rank] if self.comm.rank in my_chunks else []
-                ):
-                    if debug:
-                        end = chunk.offset.copy()
-                        for i in range(len(end)):
-                            end[i] += chunk.extent[i]
-                        print(
-                            "{}\t{}/{}:\t{} -- {}".format(
-                                current_path,
-                                self.comm.rank,
-                                self.comm.size,
-                                chunk.offset,
-                                end,
-                            )
-                        )
-                    span = dest.store_chunk(chunk.offset, chunk.extent)
-                    self.loads.append(
-                        deferred_load(src, span, chunk.offset, chunk.extent)
-                    )
+                extent = src.shape
+                offset = [0 for _ in extent]
+                # (dest_offset, dest_extent, src_offset, src_extent)
+                operations = [([], [], [], [])]
+                for i in range(len(extent)):
+                    o = offset[i]
+                    e = extent[i]
+                    o_low = o
+                    e_low = e // 2
+                    o_up = o_low + e_low
+                    e_up = e - e_low
+                    operations = [
+                        assignment
+                        for (
+                            dest_offset,
+                            dest_extent,
+                            src_offset,
+                            src_extent,
+                        ) in operations
+                        for assignment in [
+                            (
+                                dest_offset + [o_low + e_up],
+                                dest_extent + [e_low],
+                                src_offset + [o_low],
+                                src_extent + [e_low],
+                            ),
+                            (
+                                dest_offset + [o_low],
+                                dest_extent + [e_up],
+                                src_offset + [o_up],
+                                src_extent + [e_up],
+                            ),
+                        ]
+                    ]
+                for dest_offset, dest_extent, src_offset, src_extent in operations:
+                    span = dest.store_chunk(dest_offset, dest_extent)
+                    self.loads.append(deferred_load(src, span, src_offset, src_extent))
         elif isinstance(src, io.Iteration):
             self.__copy(src.meshes, dest.meshes, current_path + "meshes/")
             self.__copy(src.particles, dest.particles, current_path + "particles/")
