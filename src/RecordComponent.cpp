@@ -386,7 +386,7 @@ bool RecordComponent::empty() const
     return get().isEmpty();
 }
 
-void RecordComponent::visitHierarchy(HierarchyVisitor &v, bool)
+void RecordComponent::visitHierarchyImpl(HierarchyVisitor &v, bool)
 {
     v(*this);
 }

@@ -3674,7 +3674,7 @@ bool Series::closed() const
     return !w.IOHandler->has_value();
 }
 
-void Series::visitHierarchy(HierarchyVisitor &v, bool recursive)
+void Series::visitHierarchyImpl(HierarchyVisitor &v, bool recursive)
 {
     if (recursive)
     {
