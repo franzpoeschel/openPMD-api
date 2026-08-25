@@ -177,7 +177,7 @@ protected:
 
     void flush_internal(
         internal::FlushParams const &, std::vector<std::string> currentPath);
-    void flush(std::string const &path, internal::FlushParams const &) override;
+    void flush(std::string const &path, internal::FlushParams const &);
 
     /**
      * @brief Link with parent.
