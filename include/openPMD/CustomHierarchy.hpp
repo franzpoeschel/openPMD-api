@@ -25,6 +25,7 @@
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/RecordComponent.hpp"
+#include "openPMD/auxiliary/Export.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/backend/Writable.hpp"
@@ -210,6 +211,7 @@ private:
     void printRecursively(std::string indent);
 
 protected:
-    void visitHierarchyImpl(HierarchyVisitor &v, bool recursive) override;
+    OPENPMDAPI_EXPORT void
+    visitHierarchyImpl(HierarchyVisitor &v, bool recursive) override;
 };
 } // namespace openPMD
