@@ -219,9 +219,10 @@ RecordComponent &RecordComponent::setUnitSI(double usi)
 RecordComponent &RecordComponent::resetDataset(Dataset d)
 {
     auto &rc = get();
+    auto &dataset = rc.dataset();
     if (written())
     {
-        if (!rc.dataset().has_value())
+        if (!dataset.has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
@@ -229,9 +230,9 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         }
         if (d.dtype == Datatype::UNDEFINED)
         {
-            d.dtype = rc.dataset().value().dtype;
+            d.dtype = dataset.value().dtype;
         }
-        else if (d.dtype != rc.dataset().value().dtype)
+        else if (d.dtype != dataset.value().dtype)
         {
             throw std::runtime_error(
                 "Cannot change the datatype of a dataset.");
@@ -257,7 +258,7 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
         }
         else
         {
-            rc.dataset() = std::move(d);
+            dataset = std::move(d);
             setDirty(true);
             return *this;
         }
@@ -266,17 +267,17 @@ RecordComponent &RecordComponent::resetDataset(Dataset d)
     rc.isEmpty() = false;
     if (written())
     {
-        if (!rc.dataset().has_value())
+        if (!dataset.has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
                 "have defined datatype and extent.");
         }
-        rc.dataset().value().extend(std::move(d.extent));
+        dataset.value().extend(std::move(d.extent));
     }
     else
     {
-        rc.dataset() = std::move(d);
+        dataset = std::move(d);
     }
 
     setDirty(true);
@@ -336,9 +337,10 @@ RecordComponent &RecordComponent::makeEmpty(Datatype dt, uint8_t dimensions)
 RecordComponent &RecordComponent::makeEmpty(Dataset d)
 {
     auto &rc = get();
+    auto &dataset = rc.dataset();
     if (written())
     {
-        if (!rc.dataset().has_value())
+        if (!dataset.has_value())
         {
             throw error::Internal(
                 "Internal control flow error: Written record component must "
@@ -353,22 +355,22 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
         }
         if (d.dtype == Datatype::UNDEFINED)
         {
-            d.dtype = rc.dataset().value().dtype;
+            d.dtype = dataset.value().dtype;
         }
-        else if (d.dtype != rc.dataset().value().dtype)
+        else if (d.dtype != dataset.value().dtype)
         {
             throw std::runtime_error(
                 "Cannot change the datatype of a dataset.");
         }
-        rc.dataset().value().extend(std::move(d.extent));
+        dataset.value().extend(std::move(d.extent));
         rc.hasBeenExtended() = true;
     }
     else
     {
-        rc.dataset() = std::move(d);
+        dataset = std::move(d);
     }
 
-    if (rc.dataset().value().extent.size() == 0)
+    if (dataset.value().extent.size() == 0)
         throw std::runtime_error("Dataset extent must be at least 1D.");
 
     rc.isEmpty() = true;
@@ -376,7 +378,7 @@ RecordComponent &RecordComponent::makeEmpty(Dataset d)
     if (!written())
     {
         switchType<detail::DefaultValue<RecordComponent>>(
-            rc.dataset().value().dtype, *this);
+            dataset.value().dtype, *this);
     }
     return *this;
 }

@@ -1497,7 +1497,7 @@ void Series::flushFileBased(
                 if (it == begin)
                 {
                     customHierarchyFlush(
-                        flushParams, /* unset_dirty = */ false);
+                        flushParams, /* managed_as_custom_object = */ false);
                 }
                 break;
             }
@@ -1561,7 +1561,7 @@ void Series::flushFileBased(
                 if (it == begin)
                 {
                     customHierarchyFlush(
-                        flushParams, /* unset_dirty = */ false);
+                        flushParams, /* managed_as_custom_object = */ false);
                 }
 
                 series.iterations.flush(
@@ -1654,7 +1654,7 @@ void Series::flushGorVBased(
                 if (it == begin)
                 {
                     customHierarchyFlush(
-                        flushParams, /* unset_dirty = */ false);
+                        flushParams, /* managed_as_custom_object = */ false);
                 }
                 break;
             }
@@ -1747,7 +1747,7 @@ void Series::flushGorVBased(
                 if (it == begin)
                 {
                     customHierarchyFlush(
-                        flushParams, /* unset_dirty = */ false);
+                        flushParams, /* managed_as_custom_object = */ false);
                 }
 
                 break;
