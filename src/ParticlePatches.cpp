@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/ParticlePatches.hpp"
-
 #include <iostream>
 #include <map>
 #include <memory>

@@ -21,7 +21,6 @@
 #include "openPMD/backend/MeshRecordComponent.hpp"
 #include "openPMD/backend/PatchRecord.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
-
 #include <pybind11/gil.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>

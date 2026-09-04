@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "ParallelIOTests.hpp"
-
 #include <mpi.h>
 #include <openPMD/openPMD.hpp>
 

@@ -23,7 +23,6 @@
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
-
 #include <hdf5.h>
 
 #include <map>

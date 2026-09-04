@@ -19,7 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Datatype.hpp"
-
+#include "openPMD/binding/python/Common.hpp"
+#include "openPMD/binding/python/Numpy.hpp"
 #include <pybind11/attr.h>
 #include <pybind11/cast.h>
 #include <pybind11/detail/common.h>
@@ -28,9 +29,6 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
-
-#include "openPMD/binding/python/Common.hpp"
-#include "openPMD/binding/python/Numpy.hpp"
 
 void init_Datatype(py::module &m)
 {

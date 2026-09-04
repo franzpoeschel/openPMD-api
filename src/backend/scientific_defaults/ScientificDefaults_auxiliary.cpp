@@ -1,6 +1,5 @@
 
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
-
 #include <complex>
 #include <iostream>
 #include <type_traits>

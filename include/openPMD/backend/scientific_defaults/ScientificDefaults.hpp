@@ -1,10 +1,9 @@
 #pragma once
 
-#include <cstdint>
-
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
+#include <cstdint>
 
 namespace openPMD
 {

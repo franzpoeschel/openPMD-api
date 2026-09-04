@@ -22,7 +22,6 @@
 #pragma once
 
 #include "MemoryProfiler.hpp"
-
 #include <chrono>
 #include <fstream>
 #include <iostream>

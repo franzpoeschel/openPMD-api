@@ -19,12 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/auxiliary/Filesystem.hpp"
-
-#include <errno.h>
-#include <stdio.h>
-
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
+#include <errno.h>
+#include <stdio.h>
 
 #ifdef _WIN32
 #include <windows.h>

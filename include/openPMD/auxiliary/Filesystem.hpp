@@ -20,11 +20,10 @@
  */
 #pragma once
 
+#include "openPMD/config.hpp"
 #include <optional>
 #include <string>
 #include <vector>
-
-#include "openPMD/config.hpp"
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>

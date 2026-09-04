@@ -19,14 +19,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ReadIterations.hpp"
-
-#include <memory>
-#include <utility>
-
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/snapshots/IteratorHelpers.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
+#include <memory>
+#include <utility>
 
 namespace openPMD
 {

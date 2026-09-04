@@ -34,7 +34,6 @@ void read_nonexistent_attribute()
 #define OPENPMD_protected public:
 
 #include "CoreTests.hpp"
-
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"

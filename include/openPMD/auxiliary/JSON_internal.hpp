@@ -21,9 +21,8 @@
 
 #pragma once
 
-#include "openPMD/config.hpp"
-
 #include "openPMD/auxiliary/toml11_wrapper.hpp"
+#include "openPMD/config.hpp"
 
 #include <nlohmann/json.hpp>
 

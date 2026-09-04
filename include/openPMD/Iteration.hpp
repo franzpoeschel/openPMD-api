@@ -20,18 +20,6 @@
  */
 #pragma once
 
-#include <cstdint>
-#include <deque>
-#include <memory>
-#include <optional>
-#include <set>
-#include <stddef.h>
-#include <string>
-#include <tuple>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Mesh.hpp"
@@ -43,6 +31,17 @@
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/PerIterationData.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <optional>
+#include <set>
+#include <stddef.h>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace openPMD
 {

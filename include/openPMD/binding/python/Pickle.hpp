@@ -26,7 +26,6 @@
 #include "openPMD/backend/Attributable.hpp"
 
 #include "Common.hpp"
-
 #include <cstdint>
 #include <exception>
 #include <memory>

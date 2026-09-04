@@ -19,6 +19,9 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/config.hpp"
 #include <adios2/cxx/IO.h>
 #include <adios2/cxx/Types.h>
 #include <array>
@@ -30,15 +33,10 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "openPMD/Dataset.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
-#include <iostream>
-
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
+#include <iostream>
 
 namespace openPMD::adios_defs
 {

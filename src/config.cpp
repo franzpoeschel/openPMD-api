@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/config.hpp"
-
 #include <adios2/common/ADIOSConfig.h>
 
 #include "openPMD/version.hpp"

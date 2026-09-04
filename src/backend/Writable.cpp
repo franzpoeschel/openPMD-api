@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/Writable.hpp"
-
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/backend/Attributable.hpp"

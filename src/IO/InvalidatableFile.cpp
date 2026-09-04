@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/IO/InvalidatableFile.hpp"
-
 #include <utility>
 
 openPMD::InvalidatableFile::InvalidatableFile(std::string s)

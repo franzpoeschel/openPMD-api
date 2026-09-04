@@ -30,7 +30,6 @@
 #endif
 
 #include "SerialIOTests.hpp"
-
 #include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"

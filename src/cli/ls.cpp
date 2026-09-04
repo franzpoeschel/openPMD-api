@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/cli/ls.hpp"
-
 #include <string>
 #include <vector>
 

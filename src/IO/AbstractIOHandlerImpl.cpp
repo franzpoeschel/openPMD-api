@@ -20,18 +20,6 @@
  */
 
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
-
-#include <exception>
-#include <iostream>
-#include <optional>
-#include <queue>
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
@@ -43,6 +31,16 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
+#include <exception>
+#include <iostream>
+#include <optional>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace openPMD
 {

@@ -1,14 +1,12 @@
 
 #include "openPMD/backend/scientific_defaults/AttributeReader.hpp"
-
+#include "openPMD/Error.hpp"
+#include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
 #include <algorithm>
 #include <optional>
 #include <string>
 #include <utility>
-
-#include "openPMD/Error.hpp"
-#include "openPMD/backend/Attribute.hpp"
-#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
 
 namespace openPMD
 {

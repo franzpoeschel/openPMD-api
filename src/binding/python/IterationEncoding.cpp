@@ -19,15 +19,13 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IterationEncoding.hpp"
-
+#include "openPMD/binding/python/Common.hpp"
 #include <pybind11/cast.h>
 #include <pybind11/detail/common.h>
 #include <pybind11/detail/descr.h>
 #include <pybind11/detail/internals.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
-
-#include "openPMD/binding/python/Common.hpp"
 
 void init_IterationEncoding(py::module &m)
 {

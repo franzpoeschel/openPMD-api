@@ -20,16 +20,6 @@
  */
 #pragma once
 
-#include <initializer_list>
-#include <memory>
-#include <optional>
-#include <sstream>
-#include <stdexcept>
-#include <stdint.h>
-#include <string>
-#include <unordered_map>
-#include <utility>
-
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Datatype.tpp"
@@ -41,6 +31,15 @@
 #include "openPMD/backend/BaseRecordComponent.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
+#include <initializer_list>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <stdint.h>
+#include <string>
+#include <unordered_map>
+#include <utility>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_private

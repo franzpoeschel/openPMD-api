@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
-
 #include <memory>
 
 namespace openPMD::auxiliary

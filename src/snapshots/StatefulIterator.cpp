@@ -20,18 +20,6 @@
  */
 
 #include "openPMD/snapshots/StatefulIterator.hpp"
-
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <map>
-#include <optional>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <variant>
-#include <vector>
-
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/Access.hpp"
@@ -43,6 +31,16 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <variant>
+#include <vector>
 
 namespace openPMD
 {

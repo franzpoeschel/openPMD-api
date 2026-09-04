@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/PatchRecord.hpp"
-
 #include <array>
 #include <iostream>
 #include <map>

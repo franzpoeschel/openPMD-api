@@ -1,7 +1,6 @@
 #pragma once
 
 #include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
-
 #include <variant>
 
 namespace openPMD::internal

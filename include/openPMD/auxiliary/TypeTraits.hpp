@@ -22,7 +22,6 @@
 #pragma once
 
 #include "openPMD/auxiliary/UniquePtr.hpp"
-
 #include <array>
 #include <complex>
 #include <cstddef> // size_t

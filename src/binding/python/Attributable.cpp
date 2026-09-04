@@ -23,10 +23,8 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Numpy.hpp"
-
 #include <pybind11/detail/common.h>
 
 #include <algorithm>

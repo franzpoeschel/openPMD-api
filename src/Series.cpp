@@ -20,7 +20,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Series.hpp"
-
 #include <algorithm>
 #include <any>
 #include <cctype>

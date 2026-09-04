@@ -36,7 +36,6 @@
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
-
 #include <catch2/catch_test_macros.hpp>
 
 #include <array>

@@ -19,14 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/RecordComponent.hpp"
-
-#include <algorithm>
-#include <any>
-#include <sstream>
-#include <stddef.h>
-#include <stdexcept>
-#include <vector>
-
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
@@ -38,6 +30,12 @@
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
+#include <algorithm>
+#include <any>
+#include <sstream>
+#include <stddef.h>
+#include <stdexcept>
+#include <vector>
 // comment so clang-format does not move this
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Datatype.tpp"

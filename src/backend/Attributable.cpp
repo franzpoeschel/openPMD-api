@@ -29,7 +29,6 @@
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/HierarchyVisitorImpl.hpp"
-
 #include <algorithm>
 #include <complex>
 #include <iostream>

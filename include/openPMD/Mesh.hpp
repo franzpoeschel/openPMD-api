@@ -20,12 +20,6 @@
  */
 #pragma once
 
-#include <ostream>
-#include <stdint.h>
-#include <string>
-#include <type_traits>
-#include <vector>
-
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
@@ -33,6 +27,11 @@
 #include "openPMD/backend/MeshRecordComponent.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
+#include <ostream>
+#include <stdint.h>
+#include <string>
+#include <type_traits>
+#include <vector>
 
 namespace openPMD
 {

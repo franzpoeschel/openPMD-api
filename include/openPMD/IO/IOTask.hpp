@@ -20,16 +20,6 @@
  */
 #pragma once
 
-#include <any>
-#include <cstddef>
-#include <memory>
-#include <optional>
-#include <ostream>
-#include <string>
-#include <utility>
-#include <variant>
-#include <vector>
-
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
@@ -41,6 +31,15 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
+#include <any>
+#include <cstddef>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 namespace openPMD
 {

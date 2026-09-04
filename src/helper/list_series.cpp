@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/helper/list_series.hpp"
-
 #include <algorithm>
 #include <iterator>
 #include <set>

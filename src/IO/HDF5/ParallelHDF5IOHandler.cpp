@@ -20,7 +20,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/HDF5/ParallelHDF5IOHandler.hpp"
-
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/FlushParametersInternal.hpp"
+#include "openPMD/IO/HDF5/HDF5IOHandlerImpl.hpp"
+#include "openPMD/IO/HDF5/ParallelHDF5IOHandlerImpl.hpp"
+#include "openPMD/auxiliary/Environment.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include <H5ACpublic.h>
 #include <H5Cpublic.h>
 #include <H5FDmpi.h>
@@ -37,13 +42,6 @@
 #include <unordered_set>
 #include <utility>
 #include <vector>
-
-#include "openPMD/Error.hpp"
-#include "openPMD/IO/FlushParametersInternal.hpp"
-#include "openPMD/IO/HDF5/HDF5IOHandlerImpl.hpp"
-#include "openPMD/IO/HDF5/ParallelHDF5IOHandlerImpl.hpp"
-#include "openPMD/auxiliary/Environment.hpp"
-#include "openPMD/auxiliary/JSON_internal.hpp"
 
 #ifdef H5_HAVE_SUBFILING_VFD
 #include <H5FDsubfiling.h>

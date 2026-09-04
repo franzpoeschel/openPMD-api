@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/IteratorTraits.hpp"
-
 #include <memory>
 
 #include "openPMD/snapshots/ContainerTraits.hpp"

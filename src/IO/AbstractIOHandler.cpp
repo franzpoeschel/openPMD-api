@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
-
 #include <utility>
 
 #include "openPMD/Error.hpp"

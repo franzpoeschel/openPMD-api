@@ -20,6 +20,8 @@
  */
 #pragma once
 
+#include "openPMD/auxiliary/TypeTraits.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
 #include <array>
 #include <climits>
 #include <complex>
@@ -35,9 +37,6 @@
 #include <utility> // std::declval
 #include <variant>
 #include <vector>
-
-#include "openPMD/auxiliary/TypeTraits.hpp"
-#include "openPMD/auxiliary/UniquePtr.hpp"
 // comment to prevent clang-format from moving this #include up
 // datatype macros may be included and un-included in other headers
 #include "openPMD/DatatypeMacros.hpp"

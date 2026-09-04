@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/UnitDimension.hpp"
-
 #include <algorithm>
 #include <iterator>
 #include <stddef.h>

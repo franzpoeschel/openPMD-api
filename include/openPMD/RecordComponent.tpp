@@ -30,7 +30,6 @@
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/auxiliary/UniquePtr.hpp"
 #include "openPMD/backend/Attributable.hpp"
-
 #include <memory>
 #include <type_traits>
 

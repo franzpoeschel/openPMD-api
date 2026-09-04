@@ -19,7 +19,14 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticleSpecies.hpp"
-
+#include "openPMD/Iteration.hpp"
+#include "openPMD/Record.hpp"
+#include "openPMD/Series.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/binding/python/Common.hpp"
+#include "openPMD/binding/python/Container.H"
+#include "openPMD/binding/python/Pickle.hpp"
 #include <bytearrayobject.h>
 #include <listobject.h>
 #include <map>
@@ -36,15 +43,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "openPMD/Iteration.hpp"
-#include "openPMD/Record.hpp"
-#include "openPMD/Series.hpp"
-#include "openPMD/backend/Attributable.hpp"
-#include "openPMD/backend/Container.hpp"
-#include "openPMD/binding/python/Common.hpp"
-#include "openPMD/binding/python/Container.H"
-#include "openPMD/binding/python/Pickle.hpp"
 
 void init_ParticleSpecies(py::module &m)
 {

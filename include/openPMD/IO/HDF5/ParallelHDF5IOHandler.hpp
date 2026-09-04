@@ -20,15 +20,14 @@
  */
 #pragma once
 
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/config.hpp"
 #include <future>
 #include <memory>
 #include <mpi.h>
 #include <optional>
 #include <string>
-
-#include "openPMD/IO/AbstractIOHandler.hpp"
-#include "openPMD/auxiliary/JSON_internal.hpp"
-#include "openPMD/config.hpp"
 
 namespace openPMD
 {

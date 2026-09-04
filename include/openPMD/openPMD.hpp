@@ -29,6 +29,8 @@ namespace openPMD
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/Format.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Mesh.hpp"
@@ -38,8 +40,13 @@ namespace openPMD
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/UnitDimension.hpp"
-#include "openPMD/snapshots/Snapshots.hpp"
-
+#include "openPMD/auxiliary/Date.hpp"
+#include "openPMD/auxiliary/DerefDynamicCast.hpp"
+#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/OutOfRangeMsg.hpp"
+#include "openPMD/auxiliary/ShareRaw.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
@@ -50,21 +57,10 @@ namespace openPMD
 #include "openPMD/backend/PatchRecord.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 #include "openPMD/backend/Writable.hpp"
-
-#include "openPMD/IO/Access.hpp"
-#include "openPMD/IO/Format.hpp"
-
-#include "openPMD/auxiliary/Date.hpp"
-#include "openPMD/auxiliary/DerefDynamicCast.hpp"
-#include "openPMD/auxiliary/JSON.hpp"
-#include "openPMD/auxiliary/OutOfRangeMsg.hpp"
-#include "openPMD/auxiliary/ShareRaw.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-
-#include "openPMD/helper/list_series.hpp"
+#include "openPMD/snapshots/Snapshots.hpp"
 
 #include "openPMD/config.hpp"
+#include "openPMD/helper/list_series.hpp"
 #include "openPMD/version.hpp"
 
 #ifdef OPENPMD_GUARD_HEADER_AGAINST_PUBLIC_INCLUSION

@@ -1,10 +1,9 @@
 #pragma once
 
-#include "openPMD/backend/HierarchyVisitor.hpp"
-
 #include "openPMD/Iteration.hpp"
 #include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
 #include <type_traits>
 
 namespace openPMD

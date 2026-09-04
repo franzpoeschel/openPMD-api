@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
-
 #include <algorithm>
 #include <deque>
 #include <iostream>

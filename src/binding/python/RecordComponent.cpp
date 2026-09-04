@@ -18,6 +18,13 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/DatatypeHelpers.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/Series.hpp"
+#include "openPMD/backend/BaseRecordComponent.hpp"
 #include <limits>
 #include <pybind11/detail/common.h>
 #include <pybind11/gil.h>
@@ -26,20 +33,11 @@
 #include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 
-#include "openPMD/Dataset.hpp"
-#include "openPMD/Datatype.hpp"
-#include "openPMD/DatatypeHelpers.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/RecordComponent.hpp"
-#include "openPMD/Series.hpp"
-#include "openPMD/backend/BaseRecordComponent.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/Numpy.hpp"
 #include "openPMD/binding/python/Pickle.hpp"
 #include "openPMD/binding/python/RecordComponent.hpp"
-
 #include <algorithm>
 #include <complex>
 #include <cstdint>

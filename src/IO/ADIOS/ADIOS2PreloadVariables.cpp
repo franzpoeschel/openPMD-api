@@ -29,9 +29,8 @@
 #include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
 
-#include <algorithm>
-
 #include "openPMD/IO/ADIOS/ADIOS2PreloadVariables.hpp"
+#include <algorithm>
 
 namespace openPMD::detail
 {

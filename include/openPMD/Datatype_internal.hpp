@@ -21,7 +21,6 @@
 #pragma once
 
 #include "openPMD/auxiliary/TypeTraits.hpp"
-
 #include <array>
 #include <cstddef>
 #include <vector>

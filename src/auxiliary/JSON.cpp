@@ -20,7 +20,10 @@
  */
 
 #include "openPMD/auxiliary/JSON.hpp"
-
+#include "openPMD/Error.hpp"
+#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
 #include <algorithm>
 #include <array>
 #include <cctype> // std::isspace
@@ -43,11 +46,6 @@
 #include <unordered_map>
 #include <utility> // std::forward
 #include <vector>
-
-#include "openPMD/Error.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
-#include "openPMD/auxiliary/JSON_internal.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
 
 namespace openPMD::json
 {

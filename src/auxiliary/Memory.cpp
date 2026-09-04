@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/auxiliary/Memory.hpp"
-
 #include <any>
 #include <complex>
 #include <functional>

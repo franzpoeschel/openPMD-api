@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/UnitDimension.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 
 void init_UnitDimension(py::module &m)

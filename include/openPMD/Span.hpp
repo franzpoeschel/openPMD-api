@@ -22,7 +22,6 @@
 #pragma once
 
 #include "openPMD/RecordComponent.hpp"
-
 #include <iterator>
 
 namespace openPMD

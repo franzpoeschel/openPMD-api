@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/JSON/JSONFilePosition.hpp"
-
 #include <utility>
 
 namespace openPMD

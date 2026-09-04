@@ -19,16 +19,14 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/auxiliary/Variant.hpp"
-
+#include "openPMD/Datatype.hpp"
+#include "openPMD/DatatypeMacros.hpp"
 #include <complex>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include "openPMD/Datatype.hpp"
-#include "openPMD/DatatypeMacros.hpp"
 
 namespace openPMD::auxiliary
 {

@@ -19,10 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/MeshRecordComponent.hpp"
-
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series.hpp"
-
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"

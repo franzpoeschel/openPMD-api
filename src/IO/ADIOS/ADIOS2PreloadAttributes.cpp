@@ -19,6 +19,9 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "openPMD/Datatype.tpp"
+#include "openPMD/auxiliary/Variant.hpp"
+#include "openPMD/config.hpp"
 #include <adios2/common/ADIOSMacros.h>
 #include <adios2/cxx/Attribute.h>
 #include <adios2/cxx/IO.h>
@@ -33,10 +36,6 @@
 #include <variant>
 #include <vector>
 
-#include "openPMD/Datatype.tpp"
-#include "openPMD/auxiliary/Variant.hpp"
-#include "openPMD/config.hpp"
-
 namespace openPMD
 {
 namespace detail
@@ -47,13 +46,12 @@ namespace detail
 } // namespace openPMD
 #if openPMD_HAVE_ADIOS2
 
-#include <algorithm>
-#include <cstddef>
-#include <optional>
-
 #include "openPMD/Datatype.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
+#include <algorithm>
+#include <cstddef>
+#include <optional>
 
 namespace openPMD::detail
 {

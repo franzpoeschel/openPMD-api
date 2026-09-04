@@ -21,22 +21,6 @@
  */
 
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
-
-#include <adios2/common/ADIOSConfig.h>
-#include <algorithm>
-#include <iostream>
-#include <iterator>
-#include <memory>
-#include <nlohmann/json_fwd.hpp>
-#include <numeric>
-#include <set>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <variant>
-
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Datatype.tpp"
 #include "openPMD/Error.hpp"
@@ -61,6 +45,20 @@
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
+#include <adios2/common/ADIOSConfig.h>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <nlohmann/json_fwd.hpp>
+#include <numeric>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <variant>
 
 namespace openPMD
 {

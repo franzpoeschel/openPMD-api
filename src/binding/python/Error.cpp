@@ -7,7 +7,6 @@
  * License: LGPL-3.0-or-later
  */
 #include "openPMD/Error.hpp"
-
 #include <bytearrayobject.h>
 #include <pybind11/detail/common.h>
 #include <pybind11/detail/descr.h>

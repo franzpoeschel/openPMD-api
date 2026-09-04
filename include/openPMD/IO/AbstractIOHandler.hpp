@@ -20,16 +20,15 @@
  */
 #pragma once
 
-#include <optional>
-#include <ostream>
-#include <utility>
-
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/config.hpp"
 #include "openPMD/version.hpp"
+#include <optional>
+#include <ostream>
+#include <utility>
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>

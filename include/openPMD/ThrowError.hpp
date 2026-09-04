@@ -22,7 +22,6 @@
 #pragma once
 
 #include "openPMD/auxiliary/Export.hpp"
-
 #include <optional>
 #include <string>
 #include <vector>

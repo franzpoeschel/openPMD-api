@@ -1,6 +1,5 @@
 
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
-
 #include <any>
 #include <functional>
 #include <iostream>

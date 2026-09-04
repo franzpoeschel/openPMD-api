@@ -23,7 +23,6 @@
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
-
 #include <catch2/catch_test_macros.hpp>
 
 namespace close_and_reopen_test

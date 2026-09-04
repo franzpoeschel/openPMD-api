@@ -23,7 +23,6 @@
  * To guarantee a correct call to Init, launch the tests manually.
  */
 #include "Files_ParallelIO/ParallelIOTests.hpp"
-
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/IO/Access.hpp"

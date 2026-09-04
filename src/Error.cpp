@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Error.hpp"
-
 #include <sstream>
 #include <stddef.h>
 #include <utility>

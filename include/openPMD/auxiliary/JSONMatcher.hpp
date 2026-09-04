@@ -21,13 +21,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <regex>
 #include <string>
 #include <vector>
-
-#include "openPMD/auxiliary/JSON_internal.hpp"
 
 namespace openPMD::json
 {

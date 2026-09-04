@@ -19,12 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/Attribute.hpp"
-
 #include "openPMD/Datatype.hpp"
 #include "openPMD/DatatypeMacros.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
-
 #include <sstream>
 #include <stdexcept>
 

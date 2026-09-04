@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Dataset.hpp"
-
 #include <bytearrayobject.h>
 #include <listobject.h>
 #include <pybind11/cast.h>

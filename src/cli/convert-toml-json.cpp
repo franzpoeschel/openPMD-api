@@ -20,9 +20,8 @@
  */
 #include <cstdlib>
 #include <cstring>
-#include <openPMD/auxiliary/JSON_internal.hpp>
-
 #include <iostream>
+#include <openPMD/auxiliary/JSON_internal.hpp>
 #include <sstream>
 #include <string>
 

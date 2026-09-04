@@ -20,15 +20,14 @@
  */
 #pragma once
 
-#include <future>
-#include <memory>
-#include <string>
-
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
+#include <future>
+#include <memory>
+#include <string>
 
 namespace openPMD
 {

@@ -19,14 +19,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Datatype.hpp"
-
+#include "openPMD/Datatype.tpp"
+#include "openPMD/Datatype_internal.hpp"
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <unordered_map>
-
-#include "openPMD/Datatype.tpp"
-#include "openPMD/Datatype_internal.hpp"
 
 namespace openPMD
 {

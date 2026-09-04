@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/BaseRecordComponent.hpp"
-
 #include <pybind11/attr.h>
 #include <pybind11/detail/common.h>
 #include <pybind11/detail/descr.h>

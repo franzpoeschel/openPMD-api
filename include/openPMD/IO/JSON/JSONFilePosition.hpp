@@ -21,12 +21,11 @@
 
 #pragma once
 
+#include "openPMD/IO/AbstractFilePosition.hpp"
+#include "openPMD/config.hpp"
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <string>
-
-#include "openPMD/IO/AbstractFilePosition.hpp"
-#include "openPMD/config.hpp"
 
 namespace openPMD
 {

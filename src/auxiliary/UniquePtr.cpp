@@ -20,11 +20,9 @@
  */
 
 #include "openPMD/auxiliary/UniquePtr.hpp"
-
+#include "openPMD/DatatypeMacros.hpp"
 #include <complex>
 #include <iostream>
-
-#include "openPMD/DatatypeMacros.hpp"
 
 namespace openPMD
 {

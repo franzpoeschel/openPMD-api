@@ -19,7 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/auxiliary/JSONMatcher.hpp"
-
+#include "openPMD/Error.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include <iostream>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -28,9 +29,6 @@
 #include <stddef.h>
 #include <stdexcept>
 #include <utility>
-
-#include "openPMD/Error.hpp"
-#include "openPMD/auxiliary/JSON_internal.hpp"
 
 namespace openPMD::json
 {

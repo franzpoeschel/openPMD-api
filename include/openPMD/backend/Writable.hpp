@@ -21,7 +21,6 @@
 #pragma once
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
-
 #include <memory>
 #include <string>
 #include <vector>

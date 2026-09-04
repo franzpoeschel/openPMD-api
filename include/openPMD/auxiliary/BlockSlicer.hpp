@@ -22,7 +22,6 @@
 #pragma once
 
 #include "openPMD/Dataset.hpp"
-
 #include <memory>
 
 namespace openPMD::auxiliary

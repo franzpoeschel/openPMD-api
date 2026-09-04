@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/Format.hpp"
-
 #include <string>
 
 #include "openPMD/auxiliary/StringManip.hpp"

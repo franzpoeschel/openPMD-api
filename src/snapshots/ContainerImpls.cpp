@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/ContainerImpls.hpp"
-
 #include <cassert>
 #include <iterator>
 #include <memory>

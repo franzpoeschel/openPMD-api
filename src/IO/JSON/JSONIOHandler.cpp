@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/IO/JSON/JSONIOHandler.hpp"
-
 #include <future>
 #include <utility>
 

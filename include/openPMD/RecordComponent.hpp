@@ -20,6 +20,15 @@
  */
 #pragma once
 
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/auxiliary/ShareRaw.hpp"
+#include "openPMD/auxiliary/TypeTraits.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/BaseRecordComponent.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
+#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 #include <array>
 #include <cmath>
 #include <deque>
@@ -35,16 +44,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include "openPMD/Dataset.hpp"
-#include "openPMD/Datatype.hpp"
-#include "openPMD/auxiliary/ShareRaw.hpp"
-#include "openPMD/auxiliary/TypeTraits.hpp"
-#include "openPMD/auxiliary/UniquePtr.hpp"
-#include "openPMD/backend/Attributable.hpp"
-#include "openPMD/backend/BaseRecordComponent.hpp"
-#include "openPMD/backend/HierarchyVisitor.hpp"
-#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 // comment to prevent this include from being moved by clang-format
 #include "openPMD/DatatypeMacros.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"

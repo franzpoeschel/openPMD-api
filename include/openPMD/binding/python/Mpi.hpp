@@ -26,7 +26,6 @@
 #if openPMD_HAVE_MPI
 
 #include "openPMD/binding/python/Common.hpp"
-
 #include <mpi.h>
 
 /** mpi4py communicator wrapper

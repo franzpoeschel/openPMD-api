@@ -25,18 +25,16 @@
 #if openPMD_HAVE_MPI
 
 #include "RandomDatasetFiller.hpp"
-
 #include "openPMD/DatatypeHelpers.hpp"
 #include "openPMD/benchmark/mpi/BlockSlicer.hpp"
 #include "openPMD/benchmark/mpi/DatasetFiller.hpp"
 #include "openPMD/benchmark/mpi/MPIBenchmarkReport.hpp"
 #include "openPMD/openPMD.hpp"
 
-#include <mpi.h>
-
 #include <chrono>
 #include <exception>
 #include <iostream>
+#include <mpi.h>
 #include <set>
 #include <sstream>
 #include <tuple>

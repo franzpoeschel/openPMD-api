@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/PatchRecordComponent.hpp"
-
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/BaseRecord.hpp"

@@ -20,22 +20,6 @@
  */
 
 #include "openPMD/IO/JSON/JSONIOHandlerImpl.hpp"
-
-#include <algorithm>
-#include <any>
-#include <cstdio>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <nlohmann/detail/json_ref.hpp>
-#include <nlohmann/detail/value_t.hpp>
-#include <numeric>
-#include <optional>
-#include <sstream>
-#include <stdexcept>
-#include <toml.hpp>
-
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Datatype.tpp"
@@ -54,6 +38,20 @@
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Writable.hpp"
+#include <algorithm>
+#include <any>
+#include <cstdio>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <nlohmann/detail/json_ref.hpp>
+#include <nlohmann/detail/value_t.hpp>
+#include <numeric>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <toml.hpp>
 
 namespace openPMD
 {

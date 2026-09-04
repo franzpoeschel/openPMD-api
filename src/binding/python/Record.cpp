@@ -23,12 +23,10 @@
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/Pickle.hpp"
 #include "openPMD/binding/python/UnitDimension.hpp"
-
 #include <string>
 #include <vector>
 

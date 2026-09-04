@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/version.hpp"
-
 #include <sstream>
 #include <string>
 

@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticlePatches.hpp"
-
 #include <bytearrayobject.h>
 #include <listobject.h>
 #include <map>

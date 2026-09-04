@@ -20,16 +20,15 @@
  */
 #pragma once
 
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
 #include <any>
 #include <functional>
 #include <memory>
 #include <stdint.h>
 #include <utility>
-
-#include "openPMD/Dataset.hpp"
-#include "openPMD/Datatype.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/auxiliary/UniquePtr.hpp"
 
 namespace openPMD
 {

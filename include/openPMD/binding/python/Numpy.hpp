@@ -20,9 +20,8 @@
  */
 #pragma once
 
-#include "openPMD/Datatype.hpp"
-
 #include "Common.hpp"
+#include "openPMD/Datatype.hpp"
 
 #include <exception>
 #include <string>

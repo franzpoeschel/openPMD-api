@@ -19,20 +19,18 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/IOTask.hpp"
-
-#include <array>
-#include <initializer_list>
-#include <iostream> // std::cerr
-#include <map>
-#include <nlohmann/json.hpp>
-#include <utility>
-
 #include "openPMD/DatatypeMacros.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
+#include <array>
+#include <initializer_list>
+#include <iostream> // std::cerr
+#include <map>
+#include <nlohmann/json.hpp>
+#include <utility>
 
 namespace openPMD
 {

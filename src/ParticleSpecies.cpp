@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticleSpecies.hpp"
-
 #include <algorithm>
 #include <iostream>
 #include <map>

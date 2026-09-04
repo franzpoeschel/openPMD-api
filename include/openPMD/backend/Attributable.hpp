@@ -27,7 +27,6 @@
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/Writable.hpp"
-
 #include <cstddef>
 #include <map>
 #include <memory>

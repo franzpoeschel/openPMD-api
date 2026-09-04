@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
-
 #include <listobject.h>
 #include <map>
 #include <pybind11/attr.h>

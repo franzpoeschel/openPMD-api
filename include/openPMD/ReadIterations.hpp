@@ -24,11 +24,10 @@
  * Legacy header.
  */
 
-#include <optional>
-
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
+#include <optional>
 
 namespace openPMD
 {

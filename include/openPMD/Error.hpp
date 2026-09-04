@@ -20,13 +20,12 @@
  */
 #pragma once
 
+#include "openPMD/ThrowError.hpp"
 #include <exception>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include "openPMD/ThrowError.hpp"
 
 namespace openPMD
 {

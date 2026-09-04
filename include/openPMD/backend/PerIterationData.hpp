@@ -3,7 +3,6 @@
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/backend/Attributable.hpp"
-
 #include <variant>
 
 namespace openPMD::internal

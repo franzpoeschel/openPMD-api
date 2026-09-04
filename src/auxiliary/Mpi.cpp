@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/auxiliary/Mpi.hpp"
-
 #include <algorithm>
 #include <numeric>
 

@@ -29,7 +29,6 @@
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/DatatypeHelpers.hpp"
-
 #include <adios2.h>
 
 #include <complex>

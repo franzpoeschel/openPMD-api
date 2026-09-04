@@ -31,7 +31,6 @@
 #include "openPMD/backend/PatchRecordComponent.hpp"
 
 #include "openPMD/binding/python/Common.hpp"
-
 #include <cstddef>
 #include <memory>
 #include <optional>

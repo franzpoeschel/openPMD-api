@@ -19,10 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "SerialIOTests.hpp"
-
 #include "openPMD/Dataset.hpp"
 #include "openPMD/openPMD.hpp"
-
 #include <memory>
 #include <numeric>
 

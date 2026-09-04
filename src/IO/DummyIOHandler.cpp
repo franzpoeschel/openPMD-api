@@ -19,15 +19,13 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/DummyIOHandler.hpp"
-
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include <future>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <utility>
-
-#include "openPMD/auxiliary/JSON_internal.hpp"
 
 namespace openPMD
 {

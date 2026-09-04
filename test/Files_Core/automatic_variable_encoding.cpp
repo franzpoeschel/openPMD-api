@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "CoreTests.hpp"
-
 #include <catch2/catch_test_macros.hpp>
 
 namespace automatic_variable_encoding

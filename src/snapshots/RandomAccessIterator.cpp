@@ -19,12 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
-
-#include <iterator>
-#include <map>
-
 #include "openPMD/Iteration.hpp"
 #include "openPMD/backend/Container.hpp"
+#include <iterator>
+#include <map>
 
 namespace openPMD
 {

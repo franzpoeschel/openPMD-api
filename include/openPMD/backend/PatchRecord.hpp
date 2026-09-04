@@ -20,14 +20,13 @@
  */
 #pragma once
 
-#include <string>
-
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
+#include <string>
 
 namespace openPMD
 {

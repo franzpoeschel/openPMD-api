@@ -1,5 +1,4 @@
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"

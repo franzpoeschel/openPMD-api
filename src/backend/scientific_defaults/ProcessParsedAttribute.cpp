@@ -1,17 +1,15 @@
 
 #include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
-
-#include <optional>
-#include <stdexcept>
-#include <utility>
-#include <variant>
-
 #include "openPMD/Error.hpp"
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Attribute.hpp"
+#include <optional>
+#include <stdexcept>
+#include <utility>
+#include <variant>
 
 namespace openPMD::internal
 {

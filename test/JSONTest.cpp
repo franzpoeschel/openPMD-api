@@ -23,11 +23,9 @@
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/helper/list_series.hpp"
 #include "openPMD/openPMD.hpp"
-
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
-
-#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <string>

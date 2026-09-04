@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Mesh.hpp"
-
 #include <algorithm>
 #include <array>
 #include <deque>

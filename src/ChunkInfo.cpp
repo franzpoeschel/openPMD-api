@@ -19,7 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ChunkInfo.hpp"
-
+#include "openPMD/ChunkInfo_internal.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/auxiliary/Mpi.hpp"
+#include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
 #include <algorithm> // std::sort
 #include <deque>
 #include <iostream>
@@ -32,11 +35,6 @@
 #include <string>
 #include <tuple>
 #include <utility>
-
-#include "openPMD/ChunkInfo_internal.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/auxiliary/Mpi.hpp"
-#include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
 
 #ifdef _WIN32
 #define openPMD_POSIX_AVAILABLE false

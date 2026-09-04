@@ -20,7 +20,6 @@
  */
 
 #include "openPMD/binding/python/auxiliary.hpp"
-
 #include <bytearrayobject.h>
 #include <pybind11/cast.h>
 #include <pybind11/pybind11.h>

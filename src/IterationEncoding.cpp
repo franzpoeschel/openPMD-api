@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IterationEncoding.hpp"
-
 #include <ostream>
 
 std::ostream &

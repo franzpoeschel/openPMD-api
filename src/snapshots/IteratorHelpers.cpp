@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/IteratorHelpers.hpp"
-
 #include "openPMD/snapshots/StatefulIterator.hpp"
 
 namespace openPMD

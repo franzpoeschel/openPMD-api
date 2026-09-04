@@ -28,17 +28,14 @@
 #include "openPMD/openPMD.hpp"
 
 #include "Files_Core/CoreTests.hpp"
-
 #include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/Memory_internal.hpp"
 #include "openPMD/auxiliary/UniquePtr.hpp"
-
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/matchers/catch_matchers_string.hpp>
-
 #include <algorithm>
 #include <array>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 #include <complex>
 #include <cstddef>
 #include <cstdint>

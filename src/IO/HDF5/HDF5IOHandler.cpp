@@ -20,7 +20,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/HDF5/HDF5IOHandler.hpp"
-
 #include <H5Apublic.h>
 #include <H5Dpublic.h>
 #include <H5Fpublic.h>

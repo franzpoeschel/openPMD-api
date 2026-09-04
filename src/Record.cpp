@@ -19,7 +19,6 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Record.hpp"
-
 #include <array>
 #include <deque>
 #include <iostream>

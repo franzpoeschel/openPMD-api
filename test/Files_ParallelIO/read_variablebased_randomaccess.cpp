@@ -19,10 +19,8 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "ParallelIOTests.hpp"
-
 #include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/openPMD.hpp"
-
 #include <numeric>
 
 #include <catch2/catch_test_macros.hpp>
