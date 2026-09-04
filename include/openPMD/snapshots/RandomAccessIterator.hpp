@@ -20,11 +20,12 @@
  */
 #pragma once
 
+#include <type_traits>
+#include <utility>
+
 #include "openPMD/Iteration.hpp"
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/IteratorTraits.hpp"
-
-#include <utility>
 
 /*
  * Private header not included in user code.
@@ -33,6 +34,9 @@
 
 namespace openPMD
 {
+template <typename value_type_in>
+class OpaqueSeriesIterator;
+
 namespace detail
 {
     template <typename iterator_t>

@@ -21,17 +21,30 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+#include <future>
+#include <istream>
+#include <map>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <optional>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
+#include "openPMD/Dataset.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 #include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/JSON/JSONFilePosition.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
+#include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
-
-#include <istream>
-#include <nlohmann/json.hpp>
 #if openPMD_HAVE_MPI
 #include <mpi.h>
 #endif
@@ -47,6 +60,14 @@
 
 namespace openPMD
 {
+class AbstractIOHandler;
+enum class Access;
+
+namespace internal
+{
+    struct ParsedFlushParams;
+} // namespace internal
+
 // Wrapper around a shared pointer to:
 // * a filename
 // * and a boolean indicating whether the file still exists

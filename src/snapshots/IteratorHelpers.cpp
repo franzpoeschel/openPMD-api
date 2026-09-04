@@ -20,6 +20,8 @@
  */
 #include "openPMD/snapshots/IteratorHelpers.hpp"
 
+#include "openPMD/snapshots/StatefulIterator.hpp"
+
 namespace openPMD
 {
 using value_type =

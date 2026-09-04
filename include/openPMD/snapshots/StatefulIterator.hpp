@@ -20,21 +20,25 @@
  */
 #pragma once
 
+#include <deque>
+#include <iostream>
+#include <memory>
+#include <optional>
+#include <set>
+#include <stddef.h>
+#include <unordered_map>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "openPMD/Error.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
+#include "openPMD/backend/Container.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
 #include "openPMD/snapshots/IteratorTraits.hpp"
-
-#include <deque>
-#include <iostream>
-#include <optional>
-#include <set>
-#include <unordered_map>
-#include <variant>
-#include <vector>
 
 /*
  * Private header not included in user code.
@@ -46,7 +50,8 @@ namespace openPMD
 namespace internal
 {
     class SeriesData;
-}
+    enum class ParsePreference : char;
+} // namespace internal
 
 namespace detail
 {

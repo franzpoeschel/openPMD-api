@@ -21,9 +21,14 @@
 
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <string>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/JSON/JSONIOHandlerImpl.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/config.hpp"
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
@@ -31,6 +36,8 @@
 
 namespace openPMD
 {
+enum class Access;
+
 class JSONIOHandler : public AbstractIOHandler
 {
 public:

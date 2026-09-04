@@ -20,16 +20,22 @@
  */
 #pragma once
 
-#include "openPMD/ThrowError.hpp"
-
 #include <exception>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "openPMD/ThrowError.hpp"
+
 namespace openPMD
 {
+namespace error
+{
+    enum class AffectedObject;
+    enum class Reason;
+} // namespace error
+
 /**
  * @brief Base class for all openPMD-specific error types.
  *

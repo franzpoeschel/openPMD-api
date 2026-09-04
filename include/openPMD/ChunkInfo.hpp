@@ -20,10 +20,9 @@
  */
 #pragma once
 
-#include "openPMD/config.hpp"
-
 #include "openPMD/Dataset.hpp" // Offset, Extent
 #include "openPMD/auxiliary/BlockSlicer.hpp"
+#include "openPMD/config.hpp"
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
@@ -31,6 +30,7 @@
 
 #include <map>
 #include <memory>
+#include <stddef.h>
 #include <string>
 #include <vector>
 

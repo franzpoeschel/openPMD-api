@@ -19,35 +19,41 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Iteration.hpp"
+
+#include <algorithm>
+#include <deque>
+#include <iostream>
+#include <iterator>
+#include <map>
+#include <optional>
+#include <set>
+#include <stdexcept>
+#include <type_traits>
+#include <unordered_map>
+#include <variant>
+
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/Streaming.hpp"
-#include "openPMD/auxiliary/DerefDynamicCast.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
-#include "openPMD/backend/BaseRecordComponent.hpp"
-#include "openPMD/backend/Variant_internal.hpp"
+#include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
+#include "openPMD/backend/MeshRecordComponent.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.tpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-
-#include <algorithm>
-#include <exception>
-#include <iostream>
-#include <iterator>
-#include <optional>
-#include <stdexcept>
-#include <tuple>
-#include <type_traits>
-#include <variant>
 
 namespace openPMD
 {

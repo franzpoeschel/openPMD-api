@@ -20,11 +20,18 @@
  */
 #pragma once
 
+#include <functional>
+#include <memory>
+#include <optional>
+#include <stddef.h>
+#include <utility>
+#include <variant>
+
+#include "openPMD/Iteration.hpp"
+#include "openPMD/backend/Container.hpp"
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
-
-#include <optional>
 
 /*
  * Private header, not included in user code.

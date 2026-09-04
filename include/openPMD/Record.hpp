@@ -20,16 +20,22 @@
  */
 #pragma once
 
-#include "openPMD/RecordComponent.hpp"
-#include "openPMD/UnitDimension.hpp"
-#include "openPMD/backend/BaseRecord.hpp"
-#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-
 #include <string>
 #include <type_traits>
 
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/UnitDimension.hpp"
+#include "openPMD/backend/BaseRecord.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
+
 namespace openPMD
 {
+namespace internal
+{
+    class ScientificDefaults;
+} // namespace internal
+
 class Record : public BaseRecord<RecordComponent>
 {
     friend class Container<Record>;

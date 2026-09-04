@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include <iosfwd>
 #include <stdexcept>
 
 namespace openPMD

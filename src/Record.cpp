@@ -19,15 +19,32 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Record.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/RecordComponent.hpp"
-#include "openPMD/ThrowError.hpp"
-#include "openPMD/UnitDimension.hpp"
-#include "openPMD/backend/BaseRecord.hpp"
-#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
-#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
+#include <array>
+#include <deque>
 #include <iostream>
+#include <map>
+#include <memory>
+#include <optional>
+#include <stdint.h>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/UnitDimension.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/BaseRecord.hpp"
+#include "openPMD/backend/Writable.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
 namespace openPMD
 {

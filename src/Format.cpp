@@ -19,11 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/Format.hpp"
-#include "openPMD/auxiliary/Environment.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/config.hpp"
 
 #include <string>
+
+#include "openPMD/auxiliary/StringManip.hpp"
 
 namespace openPMD
 {

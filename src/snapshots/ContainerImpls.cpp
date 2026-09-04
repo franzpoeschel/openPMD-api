@@ -19,17 +19,28 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/ContainerImpls.hpp"
+
+#include <cassert>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <set>
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/Access.hpp"
+#include "openPMD/Series.hpp"
+#include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/IteratorHelpers.hpp"
+#include "openPMD/snapshots/IteratorTraits.hpp"
 #include "openPMD/snapshots/RandomAccessIterator.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
-#include <cassert>
-#include <memory>
-#include <optional>
-#include <stdexcept>
 
 namespace openPMD
 {

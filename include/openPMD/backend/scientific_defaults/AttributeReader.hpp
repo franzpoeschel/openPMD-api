@@ -1,13 +1,25 @@
 #pragma once
 
+#include <deque>
+#include <memory>
+#include <optional>
+#include <variant>
+
 #include "openPMD/Error.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
 
-#include <deque>
-#include <optional>
-#include <variant>
+namespace openPMD
+{
+class Attributable;
+enum class Datatype : int;
+
+namespace internal
+{
+    struct ProcessParsedAttribute;
+} // namespace internal
+} // namespace openPMD
 
 namespace openPMD::internal
 {

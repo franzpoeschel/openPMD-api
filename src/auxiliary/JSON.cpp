@@ -20,26 +20,34 @@
  */
 
 #include "openPMD/auxiliary/JSON.hpp"
-#include "openPMD/auxiliary/JSON_internal.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cctype> // std::isspace
+#include <deque>
+#include <errno.h>
+#include <fstream>
+#include <iostream> // std::cerr
+#include <limits>
+#include <map>
+#include <memory>
+#include <nlohmann/detail/value_t.hpp>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <optional>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
+#include <string.h>
+#include <toml.hpp>
+#include <unordered_map>
+#include <utility> // std::forward
+#include <vector>
 
 #include "openPMD/Error.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-#include "openPMD/auxiliary/toml11_wrapper.hpp"
-
-#include <limits>
-#include <queue>
-
-#include <algorithm>
-#include <cctype> // std::isspace
-#include <fstream>
-#include <iostream> // std::cerr
-#include <map>
-#include <optional>
-#include <sstream>
-#include <utility> // std::forward
-#include <vector>
 
 namespace openPMD::json
 {

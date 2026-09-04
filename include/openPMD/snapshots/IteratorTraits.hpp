@@ -20,10 +20,11 @@
  */
 #pragma once
 
-#include "openPMD/Iteration.hpp"
-#include "openPMD/backend/Writable.hpp"
-
 #include <memory>
+
+#include "openPMD/Iteration.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/Writable.hpp"
 
 /*
  * Public header due to use in OpaqueSeriesIterator type which is the public

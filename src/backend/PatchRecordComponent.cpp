@@ -19,13 +19,14 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/PatchRecordComponent.hpp"
-#include "openPMD/RecordComponent.hpp"
-#include "openPMD/auxiliary/Memory.hpp"
-#include "openPMD/backend/BaseRecord.hpp"
-#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
-#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
-#include <algorithm>
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/backend/BaseRecord.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
 namespace openPMD
 {

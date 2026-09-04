@@ -1,12 +1,20 @@
 
 #include "openPMD/backend/scientific_defaults/AttributeReader.hpp"
 
-#include "openPMD/Datatype.hpp"
+#include <algorithm>
+#include <optional>
+#include <string>
+#include <utility>
+
 #include "openPMD/Error.hpp"
 #include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.hpp"
 
-#include <optional>
-#include <utility>
+namespace openPMD
+{
+class Attributable;
+enum class Datatype : int;
+} // namespace openPMD
 
 namespace openPMD::internal
 {

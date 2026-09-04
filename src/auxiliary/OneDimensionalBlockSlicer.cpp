@@ -21,6 +21,8 @@
 
 #include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
 
+#include <memory>
+
 namespace openPMD::auxiliary
 {
 OneDimensionalBlockSlicer::OneDimensionalBlockSlicer(Extent::value_type dim)

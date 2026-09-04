@@ -1,15 +1,17 @@
 
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
 
+#include <complex>
+#include <iostream>
+#include <type_traits>
+#include <utility>
+#include <variant>
+
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
-
-#include <iostream>
-#include <type_traits>
-#include <utility>
 
 namespace openPMD::auxiliary
 {

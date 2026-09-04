@@ -21,21 +21,28 @@
 
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 
+#include <exception>
+#include <iostream>
+#include <optional>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/Streaming.hpp"
+#include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
-
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
-#include <type_traits>
-#include <variant>
 
 namespace openPMD
 {

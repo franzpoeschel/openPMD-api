@@ -20,13 +20,16 @@
  */
 #pragma once
 
+#include <optional>
+#include <ostream>
+#include <utility>
+
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/Format.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/config.hpp"
 #include "openPMD/version.hpp"
-#include <ostream>
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
@@ -41,6 +44,8 @@
 
 namespace openPMD
 {
+enum class Access;
+
 namespace json
 {
     class JsonMatcher;

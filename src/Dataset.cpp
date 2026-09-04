@@ -20,10 +20,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Dataset.hpp"
-#include "openPMD/Error.hpp"
 
-#include <cstddef>
-#include <iostream>
+#include <stdexcept>
+#include <utility>
+
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
 
 namespace openPMD
 {

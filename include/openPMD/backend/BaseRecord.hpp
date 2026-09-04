@@ -20,7 +20,19 @@
  */
 #pragma once
 
+#include <array>
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <type_traits> // std::remove_reference_t
+#include <utility> // std::declval
+#include <variant>
+
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
@@ -29,18 +41,16 @@
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
-#include <array>
-#include <stdexcept>
-#include <string>
-#include <type_traits> // std::remove_reference_t
-#include <utility> // std::declval
-
 namespace openPMD
 {
 template <typename>
 class BaseRecord;
+
 namespace internal
 {
+    class ScientificDefaults;
+    enum class WriteOrRead : std::uint8_t;
+
     template <
         typename T_elem, // = T_RecordComponent
         /*

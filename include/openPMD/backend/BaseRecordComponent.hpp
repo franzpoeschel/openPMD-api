@@ -20,12 +20,17 @@
  */
 #pragma once
 
+#include <memory>
+#include <optional>
+#include <stddef.h>
+#include <stdexcept>
+#include <utility>
+
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/backend/Attributable.hpp"
-
-#include <optional>
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected

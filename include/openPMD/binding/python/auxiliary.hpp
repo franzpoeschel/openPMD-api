@@ -21,7 +21,15 @@
 
 #pragma once
 
+#include <string>
+#include <utility>
+
 #include "openPMD/binding/python/Common.hpp"
+
+namespace pybind11
+{
+class object;
+} // namespace pybind11
 
 namespace auxiliary
 {

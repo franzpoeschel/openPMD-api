@@ -19,6 +19,10 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/auxiliary/Filesystem.hpp"
+
+#include <errno.h>
+#include <stdio.h>
+
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 
@@ -31,8 +35,9 @@
 #include <sys/types.h>
 #endif
 
+#include <algorithm>
 #include <fstream>
-#include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <system_error>
 

@@ -19,21 +19,35 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Mesh.hpp"
-#include "openPMD/Error.hpp"
+
+#include <abstract.h>
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <map>
+#include <memory>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/Iteration.hpp"
+#include "openPMD/Series.hpp"
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
 #include "openPMD/backend/MeshRecordComponent.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/Pickle.hpp"
 #include "openPMD/binding/python/UnitDimension.hpp"
-
-#include <string>
-#include <variant>
-#include <vector>
 
 void init_Mesh(py::module &m)
 {

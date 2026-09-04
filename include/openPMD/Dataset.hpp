@@ -20,17 +20,21 @@
  */
 #pragma once
 
-#include "openPMD/Datatype.hpp"
-
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <optional>
+#include <stddef.h>
 #include <string>
 #include <type_traits>
 #include <vector>
 
+#include "openPMD/Datatype.hpp"
+
 namespace openPMD
 {
+enum class Datatype : int;
+
 using Extent = std::vector<std::uint64_t>;
 using Offset = std::vector<std::uint64_t>;
 

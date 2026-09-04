@@ -20,8 +20,33 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Series.hpp"
+
+#include <algorithm>
+#include <any>
+#include <cctype>
+#include <chrono>
+#include <exception>
+#include <iomanip>
+#include <iostream>
+#include <map>
+#include <memory>
+#include <nlohmann/json.hpp>
+#include <optional>
+#include <queue>
+#include <regex>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/ChunkInfo_internal.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Datatype.tpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerHelper.hpp"
@@ -31,39 +56,35 @@
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/IterationEncoding.hpp"
+#include "openPMD/Mesh.hpp"
+#include "openPMD/ParticlePatches.hpp"
+#include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/ReadIterations.hpp"
+#include "openPMD/Record.hpp"
+#include "openPMD/RecordComponent.hpp"
 #include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/Date.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
+#include "openPMD/backend/MeshRecordComponent.hpp"
+#include "openPMD/backend/ParsePreference.hpp"
+#include "openPMD/backend/PatchRecord.hpp"
+#include "openPMD/backend/PatchRecordComponent.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/snapshots/ContainerImpls.hpp"
 #include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
 #include "openPMD/version.hpp"
-
-#include <algorithm>
-#include <cctype>
-#include <chrono>
-#include <exception>
-#include <iomanip>
-#include <iostream>
-#include <memory>
-#include <optional>
-#include <regex>
-#include <set>
-#include <stdexcept>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-#include <vector>
 
 namespace openPMD
 {

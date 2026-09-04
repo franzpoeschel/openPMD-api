@@ -19,18 +19,31 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "openPMD/backend/ContainerImpl.tpp"
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticlePatches.hpp"
 #include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/Record.hpp"
+#include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/Container.hpp"
-#include "openPMD/backend/HierarchyVisitorImpl.hpp"
+#include "openPMD/backend/MeshRecordComponent.hpp"
+#include "openPMD/backend/PatchRecord.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 
 namespace openPMD
 {
+template <
+    typename T,
+    typename T_key = std::string,
+    typename T_container = std::map<T_key, T>>
+class Container;
+
 #define OPENPMD_COMMA ,
 #define OPENPMD_INSTANTIATE(type) template class Container<type>;
 

@@ -20,15 +20,17 @@
  */
 #pragma once
 
+#include <future>
+#include <string>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/IOTask.hpp"
 
-#include <future>
-#include <string>
-
 namespace openPMD
 {
+enum class Access;
+
 /** Dummy handler without any IO operations.
  */
 class DummyIOHandler : public AbstractIOHandler

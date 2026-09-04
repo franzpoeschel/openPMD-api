@@ -21,6 +21,15 @@
  */
 #pragma once
 
+#include <algorithm>
+#include <complex>
+#include <map>
+#include <sstream>
+#include <stdexcept>
+#include <type_traits>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2FilePosition.hpp"
@@ -40,7 +49,6 @@
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
-#include <stdexcept>
 
 #if openPMD_HAVE_ADIOS2
 #include <adios2.h>
@@ -48,15 +56,24 @@
 #if openPMD_HAVE_MPI
 #include <mpi.h>
 #endif
-#include <nlohmann/json.hpp>
-
+#include <adios2/common/ADIOSBaseTypes.h>
+#include <adios2/common/ADIOSTypes.h>
+#include <adios2/cxx/ADIOS.h>
+#include <adios2/cxx/Attribute.h>
+#include <adios2/cxx/Engine.h>
+#include <adios2/cxx/IO.h>
+#include <adios2/cxx/Operator.h>
+#include <adios2/cxx/Types.h>
+#include <adios2/cxx/Variable.h>
 #include <array>
 #include <exception>
 #include <future>
 #include <iostream>
 #include <memory> // shared_ptr
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <set>
+#include <stddef.h>
 #include <string>
 #include <unordered_map>
 #include <utility> // pair
@@ -64,6 +81,8 @@
 
 namespace openPMD
 {
+class Writable;
+enum class Access;
 #if openPMD_HAVE_ADIOS2
 
 std::optional<size_t> joinedDimension(adios2::Dims const &dims);

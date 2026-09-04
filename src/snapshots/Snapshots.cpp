@@ -18,10 +18,15 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+#include <memory>
+#include <optional>
+#include <stddef.h>
 #include <utility>
 
 #include "openPMD/backend/Attributable.hpp"
+#include "openPMD/snapshots/ContainerTraits.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
+
 namespace openPMD
 {
 Snapshots::Snapshots(

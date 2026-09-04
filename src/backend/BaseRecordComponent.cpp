@@ -19,9 +19,15 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/BaseRecordComponent.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/Iteration.hpp"
+
 #include <optional>
+#include <string>
+
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/Iteration.hpp"
+#include "openPMD/backend/Attribute.hpp"
 
 namespace openPMD
 {

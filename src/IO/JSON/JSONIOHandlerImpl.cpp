@@ -20,10 +20,30 @@
  */
 
 #include "openPMD/IO/JSON/JSONIOHandlerImpl.hpp"
+
+#include <algorithm>
+#include <any>
+#include <cstdio>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <nlohmann/detail/json_ref.hpp>
+#include <nlohmann/detail/value_t.hpp>
+#include <numeric>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <toml.hpp>
+
+#include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Datatype.hpp"
+#include "openPMD/Datatype.tpp"
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractFilePosition.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
+#include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
 #include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
@@ -32,17 +52,8 @@
 #include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
-#include "openPMD/auxiliary/toml11_wrapper.hpp"
 #include "openPMD/backend/Attribute.hpp"
 #include "openPMD/backend/Writable.hpp"
-
-#include <iomanip>
-#include <sstream>
-
-#include <algorithm>
-#include <exception>
-#include <iostream>
-#include <optional>
 
 namespace openPMD
 {

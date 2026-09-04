@@ -20,10 +20,14 @@
  */
 #pragma once
 
-#include "openPMD/Iteration.hpp"
-#include "openPMD/snapshots/IteratorTraits.hpp"
+#include <memory>
 #include <optional>
+#include <stddef.h>
 #include <utility>
+
+#include "openPMD/Iteration.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/snapshots/IteratorTraits.hpp"
 
 /* Public header due to use of AbstractSnapshotsContainer and its iterator type
  * OpaqueSeriesIterator in Snapshots class header. No direct user interaction

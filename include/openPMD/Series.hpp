@@ -20,6 +20,7 @@
  */
 #pragma once
 
+#include "openPMD/ChunkInfo.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/Access.hpp"
@@ -34,6 +35,7 @@
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
 #include "openPMD/backend/PerIterationData.hpp"
+#include "openPMD/backend/Writable.hpp"
 #include "openPMD/config.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
 #include "openPMD/version.hpp"
@@ -45,14 +47,17 @@
 #include <cstdint> // uint64_t
 #include <deque>
 #include <functional>
+#include <future>
 #include <map>
 #include <memory>
 #include <optional>
 #include <set>
+#include <stddef.h>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -66,9 +71,13 @@ namespace openPMD
 class ReadIterations;
 class StatefulIterator;
 class Series;
+enum class Access;
+enum class Format;
 
 namespace internal
 {
+    enum class ParsePreference : char;
+
     /* Just a more self-documenting boolean used for
      * m_iterationEncodingSetExplicitly */
     enum class default_or_explicit : bool
@@ -806,6 +815,7 @@ OPENPMD_private
     static constexpr char const *const BASEPATH = "/data/%T/";
 
     struct ParsedInput;
+
     using iterations_t = decltype(internal::SeriesData::iterations);
     using iterations_iterator = iterations_t::iterator;
 

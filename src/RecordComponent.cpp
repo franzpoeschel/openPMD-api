@@ -19,13 +19,18 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/RecordComponent.hpp"
+
+#include <algorithm>
+#include <any>
+#include <sstream>
+#include <stddef.h>
+#include <stdexcept>
+#include <vector>
+
 #include "openPMD/Dataset.hpp"
-#include "openPMD/DatatypeHelpers.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
-#include "openPMD/IO/Format.hpp"
 #include "openPMD/Series.hpp"
-#include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attributable.hpp"
@@ -33,16 +38,21 @@
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-
 // comment so clang-format does not move this
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Datatype.tpp"
 #include "openPMD/DatatypeMacros.hpp"
-
-#include <algorithm>
-#include <climits>
-#include <complex>
-#include <iostream>
-#include <sstream>
-#include <stdexcept>
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/Iteration.hpp"
+#include "openPMD/IterationEncoding.hpp"
+#include "openPMD/RecordComponent.tpp"
+#include "openPMD/Span.hpp"
+#include "openPMD/ThrowError.hpp"
+#include "openPMD/auxiliary/ShareRawInternal.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
+#include "openPMD/backend/HierarchyVisitor.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.tpp"
 
 namespace openPMD
 {

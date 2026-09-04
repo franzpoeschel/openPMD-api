@@ -20,11 +20,12 @@
  */
 #pragma once
 
-#include "openPMD/backend/Container.hpp"
-#include "openPMD/backend/PatchRecord.hpp"
-
 #include <cstddef>
 #include <vector>
+
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/backend/PatchRecord.hpp"
 
 namespace openPMD
 {

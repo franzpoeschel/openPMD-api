@@ -21,6 +21,11 @@
 
 #include "openPMD/binding/python/auxiliary.hpp"
 
+#include <bytearrayobject.h>
+#include <pybind11/cast.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+
 namespace auxiliary
 {
 auto json_dumps(py::object const &obj) -> std::string

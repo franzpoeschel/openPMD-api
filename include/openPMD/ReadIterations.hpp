@@ -24,12 +24,22 @@
  * Legacy header.
  */
 
+#include <optional>
+
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
 
 namespace openPMD
 {
+class Series;
+enum class Access;
+
+namespace internal
+{
+    enum class ParsePreference : char;
+} // namespace internal
+
 /** @brief Legacy Iterator type for `Series::readIterations()`
  *
  * Wraps the Iterator type of `Series::snapshots()`, but has `IndexedIteration`

@@ -20,14 +20,38 @@
  */
 #pragma once
 
+#include <adios2/common/ADIOSBaseTypes.h>
+#include <adios2/cxx/Engine.h>
+#include <adios2/cxx/IO.h>
+#include <adios2/cxx/Variable.h>
+#include <map>
+#include <memory>
+#include <optional>
+#include <set>
+#include <stddef.h>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2PreloadVariables.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
+#include "openPMD/Streaming.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
+#include "openPMD/backend/ParsePreference.hpp"
 #include "openPMD/config.hpp"
-#include <optional>
+
+namespace adios2
+{
+class ADIOS;
+enum class Mode;
+} // namespace adios2
 
 #if openPMD_HAVE_ADIOS2
 #include <adios2.h>
@@ -42,7 +66,10 @@
 namespace openPMD
 {
 class ADIOS2IOHandlerImpl;
-}
+class Writable;
+enum class FlushLevel;
+struct InvalidatableFile;
+} // namespace openPMD
 
 #if openPMD_HAVE_ADIOS2
 namespace openPMD::detail

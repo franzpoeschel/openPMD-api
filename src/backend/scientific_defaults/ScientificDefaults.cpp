@@ -1,9 +1,13 @@
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 
-#include "openPMD/IO/AbstractIOHandler.hpp"
-#include "openPMD/backend/Writable.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
+
+namespace openPMD
+{
+enum class OpenpmdStandard;
+} // namespace openPMD
 
 namespace openPMD::internal
 {

@@ -20,6 +20,9 @@
  */
 #pragma once
 
+#include <memory>
+#include <string>
+
 #include "openPMD/ParticlePatches.hpp"
 #include "openPMD/Record.hpp"
 #include "openPMD/backend/Attributable.hpp"
@@ -27,8 +30,6 @@
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
-
-#include <string>
 
 namespace openPMD
 {

@@ -21,11 +21,13 @@
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
 
+#include <utility>
+
 #include "openPMD/Error.hpp"
+#include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
-
-#include <utility>
+#include "openPMD/auxiliary/JSON_internal.hpp"
 
 namespace openPMD
 {

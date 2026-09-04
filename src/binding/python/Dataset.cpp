@@ -20,11 +20,22 @@
  */
 #include "openPMD/Dataset.hpp"
 
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <sstream>
+#include <string>
+#include <utility>
+
+#include "openPMD/Datatype.hpp"
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Numpy.hpp"
 #include "openPMD/binding/python/auxiliary.hpp"
-
-#include <string>
 
 void init_Dataset(py::module &m)
 {

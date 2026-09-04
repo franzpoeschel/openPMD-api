@@ -20,14 +20,25 @@
  */
 #include "openPMD/Iteration.hpp"
 
+#include <listobject.h>
+#include <map>
+#include <pybind11/attr.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/gil.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <sstream>
+#include <string>
+
+#include "openPMD/Series.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/Pickle.hpp"
-
-#include <ios>
-#include <sstream>
-#include <string>
 
 void init_Iteration(py::module &m)
 {

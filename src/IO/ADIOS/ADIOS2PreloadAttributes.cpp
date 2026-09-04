@@ -19,18 +19,41 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <adios2/common/ADIOSMacros.h>
+#include <adios2/cxx/Attribute.h>
+#include <adios2/cxx/IO.h>
+#include <complex>
+#include <map>
+#include <new>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "openPMD/Datatype.tpp"
+#include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/config.hpp"
+
+namespace openPMD
+{
+namespace detail
+{
+    template <typename T>
+    struct AttributeWithShape;
+} // namespace detail
+} // namespace openPMD
 #if openPMD_HAVE_ADIOS2
-
-#include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
-
-#include "openPMD/Datatype.hpp"
-#include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 
 #include <algorithm>
 #include <cstddef>
-#include <cstdlib>
 #include <optional>
+
+#include "openPMD/Datatype.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 
 namespace openPMD::detail
 {

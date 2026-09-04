@@ -20,19 +20,37 @@
  */
 
 #include "openPMD/IO/ADIOS/ADIOS2File.hpp"
+
+#include <adios2/common/ADIOSConfig.h>
+#include <adios2/common/ADIOSTypes.h>
+#include <adios2/cxx/ADIOS.h>
+#include <adios2/cxx/Attribute.h>
+#include <algorithm>
+#include <assert.h>
+#include <cctype>
+#include <cstdint>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <variant>
+
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2FilePosition.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
+#include "openPMD/IO/ADIOS/macros.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/InvalidatableFile.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/Memory_internal.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
-
-#include <cstdint>
-#include <optional>
-#include <stdexcept>
+#include "openPMD/backend/Writable.hpp"
 
 #if openPMD_USE_VERIFY
 #define VERIFY(CONDITION, TEXT)                                                \

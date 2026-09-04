@@ -19,12 +19,29 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/BaseRecord.hpp"
+
+#include <array>
+#include <iterator>
+#include <map>
+#include <stdexcept>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/MeshRecordComponent.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
+#include "openPMD/backend/scientific_defaults/ConfigAttribute.tpp"
+#include "openPMD/backend/scientific_defaults/ProcessParsedAttribute.tpp"
 
-#include <optional>
+namespace openPMD
+{
+namespace internal
+{
+    enum class WriteOrRead : std::uint8_t;
+} // namespace internal
+} // namespace openPMD
 
 #define OPENPMD_FORALL_RECORDCOMPONENT_TYPES(MACRO)                            \
     MACRO(RecordComponent)                                                     \

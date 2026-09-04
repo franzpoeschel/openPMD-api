@@ -21,6 +21,8 @@
 
 #include "openPMD/IO/InvalidatableFile.hpp"
 
+#include <utility>
+
 openPMD::InvalidatableFile::InvalidatableFile(std::string s)
     : fileState{std::make_shared<FileState>(std::move(s))}
 {}

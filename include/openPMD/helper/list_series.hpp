@@ -20,13 +20,15 @@
  */
 #pragma once
 
-#include "openPMD/Series.hpp"
-
 #include <iostream>
 #include <ostream>
 
+#include "openPMD/Series.hpp"
+
 namespace openPMD
 {
+class Series;
+
 namespace helper
 {
     /** List information about an openPMD data series

@@ -20,17 +20,16 @@
  */
 #pragma once
 
-#include "openPMD/config.hpp"
-
 #include "openPMD/auxiliary/TypeTraits.hpp"
+#include "openPMD/config.hpp"
 
 #if openPMD_HAVE_MPI
 #include <mpi.h>
-
 #include <string>
 #include <vector>
 #endif
 
+#include <stddef.h>
 #include <type_traits>
 
 namespace openPMD::auxiliary

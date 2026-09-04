@@ -19,18 +19,32 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticleSpecies.hpp"
+
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <map>
+#include <pybind11/attr.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <sstream>
+#include <stdint.h>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Iteration.hpp"
 #include "openPMD/Record.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/Pickle.hpp"
-
-#include <sstream>
-#include <string>
-#include <vector>
 
 void init_ParticleSpecies(py::module &m)
 {

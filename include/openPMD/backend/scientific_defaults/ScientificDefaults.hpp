@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/scientific_defaults/ConfigAttribute.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults_auxiliary.hpp"
@@ -7,7 +9,13 @@
 namespace openPMD
 {
 class Attributable;
-}
+enum class OpenpmdStandard;
+
+namespace internal
+{
+    enum class WriteOrRead : std::uint8_t;
+} // namespace internal
+} // namespace openPMD
 
 namespace openPMD::internal
 {

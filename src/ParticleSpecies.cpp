@@ -19,11 +19,22 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticleSpecies.hpp"
-#include "openPMD/RecordComponent.hpp"
-#include "openPMD/backend/Writable.hpp"
 
 #include <algorithm>
 #include <iostream>
+#include <map>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/RecordComponent.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/PatchRecord.hpp"
+#include "openPMD/backend/Writable.hpp"
 
 namespace openPMD
 {

@@ -20,18 +20,21 @@
  */
 #pragma once
 
+#include <any>
+#include <functional>
+#include <memory>
+#include <stdint.h>
+#include <utility>
+
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/auxiliary/UniquePtr.hpp"
 
-#include <any>
-#include <functional>
-#include <memory>
-#include <utility>
-
 namespace openPMD
 {
+enum class Datatype : int;
+
 namespace auxiliary
 {
     std::unique_ptr<void, std::function<void(void *)>>

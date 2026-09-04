@@ -21,8 +21,13 @@
 
 #include "openPMD/IO/JSON/JSONIOHandler.hpp"
 
+#include <future>
+#include <utility>
+
 namespace openPMD
 {
+enum class Access;
+
 JSONIOHandler::~JSONIOHandler() = default;
 
 JSONIOHandler::JSONIOHandler(

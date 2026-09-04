@@ -20,17 +20,6 @@
  */
 #pragma once
 
-#include "openPMD/ChunkInfo.hpp"
-#include "openPMD/Dataset.hpp"
-#include "openPMD/Error.hpp"
-#include "openPMD/IterationEncoding.hpp"
-#include "openPMD/Streaming.hpp"
-#include "openPMD/auxiliary/Export.hpp"
-#include "openPMD/auxiliary/Memory.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-#include "openPMD/backend/Attribute.hpp"
-#include "openPMD/backend/ParsePreference.hpp"
-
 #include <any>
 #include <cstddef>
 #include <memory>
@@ -41,10 +30,23 @@
 #include <variant>
 #include <vector>
 
+#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/IterationEncoding.hpp"
+#include "openPMD/Streaming.hpp"
+#include "openPMD/auxiliary/Export.hpp"
+#include "openPMD/auxiliary/Memory.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
+#include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/ParsePreference.hpp"
+
 namespace openPMD
 {
 class Attributable;
 class Writable;
+
 namespace json
 {
     class JsonMatcher;

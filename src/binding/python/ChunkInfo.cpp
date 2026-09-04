@@ -19,14 +19,28 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ChunkInfo.hpp"
-#include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
-#include "openPMD/binding/python/Mpi.hpp"
 
-#include "openPMD/binding/python/Common.hpp"
-
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/detail/struct_smart_holder.h>
+#include <pybind11/detail/typeid.h>
+#include <pybind11/gil.h>
+#include <pybind11/pybind11.h>
 #include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <stdexcept>
 #include <string>
+#include <tupleobject.h>
 #include <utility> // std::move
+#include <variant>
+
+#include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
+#include "openPMD/binding/python/Common.hpp"
+#include "openPMD/binding/python/Mpi.hpp"
 
 /*
  * PyStrategy and PyPartialStrategy are the C++ representations for objects

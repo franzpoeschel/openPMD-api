@@ -19,11 +19,13 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/config.hpp"
+
+#include <adios2/common/ADIOSConfig.h>
+
 #include "openPMD/version.hpp"
 
 #if openPMD_HAVE_ADIOS2
 #include "openPMD/IO/ADIOS/macros.hpp"
-#include <adios2.h>
 #endif
 #include <map>
 #include <string>

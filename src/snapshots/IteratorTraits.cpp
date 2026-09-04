@@ -19,11 +19,12 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/snapshots/IteratorTraits.hpp"
-#include "openPMD/snapshots/RandomAccessIterator.hpp"
-#include "openPMD/snapshots/Snapshots.hpp"
-#include "openPMD/snapshots/StatefulIterator.hpp"
+
 #include <memory>
-#include <stdexcept>
+
+#include "openPMD/snapshots/ContainerTraits.hpp"
+#include "openPMD/snapshots/RandomAccessIterator.hpp"
+#include "openPMD/snapshots/StatefulIterator.hpp"
 
 namespace openPMD
 {

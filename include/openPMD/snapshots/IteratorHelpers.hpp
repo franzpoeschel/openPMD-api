@@ -20,11 +20,19 @@
  */
 #pragma once
 
+#include <memory>
+#include <utility>
+
 #include "openPMD/Iteration.hpp"
+#include "openPMD/backend/Container.hpp"
+#include "openPMD/snapshots/ContainerTraits.hpp"
+#include "openPMD/snapshots/IteratorTraits.hpp"
 #include "openPMD/snapshots/StatefulIterator.hpp"
 
 namespace openPMD
 {
+class StatefulIterator;
+
 auto stateful_to_opaque(StatefulIterator const &it) -> OpaqueSeriesIterator<
     Container<Iteration, Iteration::IterationIndex_t>::value_type>;
 

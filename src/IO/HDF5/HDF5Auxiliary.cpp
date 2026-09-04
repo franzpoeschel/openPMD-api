@@ -19,16 +19,21 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+#include <H5Ipublic.h>
+#include <H5Spublic.h>
+#include <H5Tpublic.h>
+#include <H5public.h>
+#include <algorithm>
+#include <memory>
+#include <stddef.h>
+#include <stdint.h>
+#include <unordered_map>
+#include <utility>
+
+#include "openPMD/Datatype.hpp"
+#include "openPMD/IO/AbstractFilePosition.hpp"
 #include "openPMD/config.hpp"
 #if openPMD_HAVE_HDF5
-#include "openPMD/IO/HDF5/HDF5Auxiliary.hpp"
-#include "openPMD/IO/HDF5/HDF5FilePosition.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/backend/Attribute.hpp"
-#include "openPMD/backend/Writable.hpp"
-
-#include <hdf5.h>
-
 #include <array>
 #include <complex>
 #include <map>
@@ -37,6 +42,12 @@
 #include <string>
 #include <typeinfo>
 #include <vector>
+
+#include "openPMD/IO/HDF5/HDF5Auxiliary.hpp"
+#include "openPMD/IO/HDF5/HDF5FilePosition.hpp"
+#include "openPMD/auxiliary/StringManip.hpp"
+#include "openPMD/backend/Attribute.hpp"
+#include "openPMD/backend/Writable.hpp"
 
 #if openPMD_USE_VERIFY
 #define VERIFY(CONDITION, TEXT)                                                \

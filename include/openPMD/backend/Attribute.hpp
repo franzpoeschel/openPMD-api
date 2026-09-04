@@ -20,20 +20,14 @@
  */
 #pragma once
 
-#include "openPMD/Datatype.hpp"
-#include "openPMD/auxiliary/TypeTraits.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-
-// comment to prevent clang-format from moving this #include up
-// datatype macros may be included and un-included in other headers
-#include "openPMD/DatatypeMacros.hpp"
-
 #include <algorithm>
+#include <any>
 #include <array>
 #include <complex>
 #include <cstdint>
 #include <iterator>
 #include <optional>
+#include <stddef.h>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -41,8 +35,16 @@
 #include <variant>
 #include <vector>
 
+#include "openPMD/Datatype.hpp"
+#include "openPMD/auxiliary/TypeTraits.hpp"
+#include "openPMD/auxiliary/Variant.hpp"
+// comment to prevent clang-format from moving this #include up
+// datatype macros may be included and un-included in other headers
+#include "openPMD/DatatypeMacros.hpp"
+
 namespace openPMD
 {
+enum class Datatype : int;
 // TODO This might have to be a Writable
 // Reasoning - Flushes are expected to be done often.
 // Attributes should not be written unless dirty.

@@ -20,15 +20,26 @@
  */
 #include "openPMD/backend/PatchRecord.hpp"
 
+#include <abstract.h>
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <map>
+#include <memory>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <variant>
+
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/BaseRecord.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
 #include "openPMD/binding/python/UnitDimension.hpp"
-
-#include <variant>
 
 void init_PatchRecord(py::module &m)
 {

@@ -19,12 +19,19 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <adios2/cxx/IO.h>
+#include <map>
+#include <optional>
+#include <stddef.h>
+#include <string>
+#include <vector>
+
 #include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
 
-#include "openPMD/IO/ADIOS/ADIOS2PreloadVariables.hpp"
-
 #include <algorithm>
+
+#include "openPMD/IO/ADIOS/ADIOS2PreloadVariables.hpp"
 
 namespace openPMD::detail
 {

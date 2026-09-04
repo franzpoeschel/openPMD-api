@@ -18,6 +18,7 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
+#include <catch2/catch_config.hpp>
 #include <catch2/catch_session.hpp>
 
 #if openPMD_HAVE_MPI

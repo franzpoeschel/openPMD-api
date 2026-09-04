@@ -20,17 +20,20 @@
  */
 #pragma once
 
+#include <future>
+#include <memory>
+#include <mpi.h>
+#include <optional>
+#include <string>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/config.hpp"
 
-#include <future>
-#include <memory>
-#include <string>
-
 namespace openPMD
 {
 class ParallelHDF5IOHandlerImpl;
+enum class Access;
 
 class ParallelHDF5IOHandler : public AbstractIOHandler
 {

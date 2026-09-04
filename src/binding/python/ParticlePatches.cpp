@@ -19,14 +19,26 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/ParticlePatches.hpp"
+
+#include <bytearrayobject.h>
+#include <listobject.h>
+#include <map>
+#include <memory>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/detail/internals.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl_bind.h>
+#include <sstream>
+#include <string>
+
 #include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/Container.hpp"
 #include "openPMD/backend/PatchRecord.hpp"
-
 #include "openPMD/binding/python/Common.hpp"
 #include "openPMD/binding/python/Container.H"
-
-#include <string>
 
 void init_ParticlePatches(py::module &m)
 {

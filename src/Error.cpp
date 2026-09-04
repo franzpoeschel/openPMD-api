@@ -21,6 +21,10 @@
 #include "openPMD/Error.hpp"
 
 #include <sstream>
+#include <stddef.h>
+#include <utility>
+
+#include "openPMD/ThrowError.hpp"
 
 namespace openPMD
 {

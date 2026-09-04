@@ -20,6 +20,22 @@
  */
 #pragma once
 
+#include <array>
+#include <cmath>
+#include <deque>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <queue>
+#include <sstream>
+#include <stdexcept>
+#include <stdint.h>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Datatype.hpp"
 #include "openPMD/auxiliary/ShareRaw.hpp"
@@ -29,22 +45,12 @@
 #include "openPMD/backend/BaseRecordComponent.hpp"
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
-
 // comment to prevent this include from being moved by clang-format
 #include "openPMD/DatatypeMacros.hpp"
-
-#include <array>
-#include <cmath>
-#include <limits>
-#include <memory>
-#include <queue>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
-#include <utility>
-#include <variant>
-#include <vector>
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/auxiliary/Memory.hpp"
+#include "openPMD/backend/Attribute.hpp"
 
 // expose private and protected members for invasive testing
 #ifndef OPENPMD_protected
@@ -56,8 +62,10 @@ namespace openPMD
 
 template <typename T>
 class DynamicMemoryView;
-
 class RecordComponent;
+enum class Datatype : int;
+template <typename T>
+class UniquePtrWithLambda;
 
 namespace internal
 {

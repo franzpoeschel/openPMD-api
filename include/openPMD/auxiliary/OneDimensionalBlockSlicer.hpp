@@ -21,6 +21,9 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <utility>
+
 #include "openPMD/Dataset.hpp"
 #include "openPMD/auxiliary/BlockSlicer.hpp"
 

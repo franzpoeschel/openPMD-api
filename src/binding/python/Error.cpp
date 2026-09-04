@@ -8,6 +8,12 @@
  */
 #include "openPMD/Error.hpp"
 
+#include <bytearrayobject.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+
 #include "openPMD/binding/python/Common.hpp"
 
 void init_Error(py::module &m)

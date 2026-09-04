@@ -18,15 +18,23 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include "openPMD/Series.hpp"
-#include "openPMD/cli/ls.hpp"
-#include "openPMD/helper/list_series.hpp"
-
-#include "openPMD/binding/python/Common.hpp"
-
+#include <bytearrayobject.h>
+#include <pybind11/cast.h>
+#include <pybind11/detail/common.h>
+#include <pybind11/detail/descr.h>
+#include <pybind11/pybind11.h>
 #include <sstream>
 #include <string>
 #include <vector>
+
+#include "openPMD/binding/python/Common.hpp"
+#include "openPMD/cli/ls.hpp"
+#include "openPMD/helper/list_series.hpp"
+
+namespace openPMD
+{
+class Series;
+} // namespace openPMD
 
 void init_Helper(py::module &m)
 {

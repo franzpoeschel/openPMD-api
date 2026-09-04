@@ -20,18 +20,49 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/HDF5/HDF5IOHandler.hpp"
+
+#include <H5Apublic.h>
+#include <H5Dpublic.h>
+#include <H5Fpublic.h>
+#include <H5Gpublic.h>
+#include <H5Ipublic.h>
+#include <H5Lpublic.h>
+#include <H5Opublic.h>
+#include <H5Ppublic.h>
+#include <H5Spublic.h>
+#include <H5Tpublic.h>
+#include <H5Zpublic.h>
+#include <H5public.h>
+#include <H5version.h>
+#include <algorithm>
+#include <any>
+#include <array>
+#include <cstdint>
+#include <map>
+#include <mpi.h>
+#include <nlohmann/json.hpp>
+#include <nlohmann/json_fwd.hpp>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <sys/types.h>
+#include <unordered_set>
+#include <variant>
+
+#include "openPMD/Dataset.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
 #include "openPMD/IO/HDF5/HDF5IOHandlerImpl.hpp"
+#include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/Defer.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
+#include "openPMD/auxiliary/Memory.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
-#include <optional>
-#include <sstream>
-#include <stdexcept>
+#include "openPMD/backend/Writable.hpp"
+#include "openPMD/config.hpp"
 
 #if openPMD_HAVE_HDF5
 #include "openPMD/Datatype.hpp"
@@ -41,13 +72,8 @@
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
-#include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/backend/Attribute.hpp"
-
-#include <H5FDmpio.h>
-#include <hdf5.h>
 #endif
 
 #include <complex>

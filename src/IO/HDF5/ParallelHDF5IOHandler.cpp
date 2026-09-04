@@ -20,15 +20,30 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/IO/HDF5/ParallelHDF5IOHandler.hpp"
+
+#include <H5ACpublic.h>
+#include <H5Cpublic.h>
+#include <H5FDmpi.h>
+#include <H5FDmpio.h>
+#include <H5Fpublic.h>
+#include <H5Ppublic.h>
+#include <H5pubconf.h>
+#include <H5public.h>
+#include <future>
+#include <map>
+#include <nlohmann/json.hpp>
+#include <stdexcept>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
+#include <vector>
+
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
 #include "openPMD/IO/HDF5/HDF5IOHandlerImpl.hpp"
 #include "openPMD/IO/HDF5/ParallelHDF5IOHandlerImpl.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
-#include "openPMD/auxiliary/StringManip.hpp"
-#include "openPMD/auxiliary/Variant.hpp"
-#include <type_traits>
 
 #ifdef H5_HAVE_SUBFILING_VFD
 #include <H5FDsubfiling.h>
@@ -43,6 +58,7 @@
 
 namespace openPMD
 {
+enum class Access;
 #if openPMD_HAVE_HDF5 && openPMD_HAVE_MPI
 #if openPMD_USE_VERIFY
 #define VERIFY(CONDITION, TEXT)                                                \

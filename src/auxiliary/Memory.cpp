@@ -20,18 +20,21 @@
  */
 
 #include "openPMD/auxiliary/Memory.hpp"
-#include "openPMD/ChunkInfo.hpp"
-#include "openPMD/auxiliary/Memory_internal.hpp"
-#include "openPMD/auxiliary/UniquePtr.hpp"
 
 #include <any>
 #include <complex>
 #include <functional>
-#include <iostream>
 #include <memory>
-#include <type_traits>
+#include <stdexcept>
+#include <string>
 #include <utility>
 #include <variant>
+#include <vector>
+
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/auxiliary/Memory_internal.hpp"
+#include "openPMD/auxiliary/UniquePtr.hpp"
 
 namespace openPMD::auxiliary
 {

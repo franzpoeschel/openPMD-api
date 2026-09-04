@@ -19,10 +19,22 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/backend/PatchRecord.hpp"
-#include "openPMD/auxiliary/Memory.hpp"
-#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
+#include <array>
 #include <iostream>
+#include <map>
+#include <memory>
+#include <stdint.h>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/Access.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
 namespace openPMD
 {

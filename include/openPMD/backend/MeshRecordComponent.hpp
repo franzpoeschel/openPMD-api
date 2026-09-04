@@ -20,19 +20,25 @@
  */
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/scientific_defaults/ScientificDefaults.hpp"
 
-#include <vector>
-
 namespace openPMD
 {
+template <typename>
+class BaseRecord;
+
 namespace internal
 {
     template <typename, typename>
     class BaseRecordData;
-}
+    class ScientificDefaults;
+} // namespace internal
 
 class MeshRecordComponent : public RecordComponent
 {

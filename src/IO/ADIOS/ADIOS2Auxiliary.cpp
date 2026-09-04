@@ -19,14 +19,26 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <adios2/cxx/IO.h>
+#include <adios2/cxx/Types.h>
+#include <array>
+#include <map>
+#include <sstream>
+#include <stddef.h>
+#include <stdexcept>
+#include <stdint.h>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Error.hpp"
 #include "openPMD/config.hpp"
 #if openPMD_HAVE_ADIOS2
-#include "openPMD/Datatype.hpp"
-#include "openPMD/DatatypeHelpers.hpp"
-#include "openPMD/Datatype_internal.hpp"
-#include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
-
 #include <iostream>
+
+#include "openPMD/Datatype.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
 
 namespace openPMD::adios_defs
 {

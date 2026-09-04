@@ -20,11 +20,18 @@
  */
 #pragma once
 
+#include <memory>
+#include <mpi.h>
+#include <optional>
+#include <string>
+
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/config.hpp"
 
 namespace openPMD
 {
+enum class Access;
+enum class Format;
 #if openPMD_HAVE_MPI
 
 /** Construct an appropriate specific IOHandler for the desired IO mode that may

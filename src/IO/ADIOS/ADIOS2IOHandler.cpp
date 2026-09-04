@@ -21,15 +21,33 @@
  */
 
 #include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
-#include "openPMD/IO/ADIOS/ADIOS2File.hpp"
+
+#include <adios2/common/ADIOSConfig.h>
+#include <algorithm>
+#include <iostream>
+#include <iterator>
+#include <memory>
+#include <nlohmann/json_fwd.hpp>
+#include <numeric>
+#include <set>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <variant>
 
 #include "openPMD/Datatype.hpp"
+#include "openPMD/Datatype.tpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2Auxiliary.hpp"
+#include "openPMD/IO/ADIOS/ADIOS2File.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2FilePosition.hpp"
-#include "openPMD/IO/ADIOS/ADIOS2IOHandler.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2PreloadAttributes.hpp"
 #include "openPMD/IO/ADIOS/ADIOS2PreloadVariables.hpp"
+#include "openPMD/IO/ADIOS/macros.hpp"
+#include "openPMD/IO/AbstractIOHandlerImpl.hpp"
+#include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
 #include "openPMD/Streaming.hpp"
@@ -38,25 +56,11 @@
 #include "openPMD/auxiliary/Filesystem.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
-#include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
-
-#include <algorithm>
-#include <cstddef>
-#include <deque>
-#include <iostream>
-#include <iterator>
-#include <memory>
-#include <numeric>
-#include <set>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <type_traits>
-#include <variant>
+#include "openPMD/backend/Writable.hpp"
 
 namespace openPMD
 {

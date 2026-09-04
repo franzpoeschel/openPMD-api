@@ -20,9 +20,23 @@
  */
 
 #include "openPMD/ParticlePatches.hpp"
-#include "openPMD/Error.hpp"
 
 #include <iostream>
+#include <map>
+#include <memory>
+#include <optional>
+#include <stdint.h>
+#include <string>
+#include <vector>
+
+#include "openPMD/Dataset.hpp"
+#include "openPMD/Datatype.hpp"
+#include "openPMD/Error.hpp"
+#include "openPMD/IO/AbstractIOHandler.hpp"
+#include "openPMD/IO/IOTask.hpp"
+#include "openPMD/ThrowError.hpp"
+#include "openPMD/backend/Attributable.hpp"
+#include "openPMD/backend/PatchRecordComponent.hpp"
 
 namespace openPMD
 {

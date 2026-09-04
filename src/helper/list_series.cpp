@@ -21,14 +21,19 @@
 
 #include "openPMD/helper/list_series.hpp"
 
-#include "openPMD/Iteration.hpp"
-#include "openPMD/Mesh.hpp"
-#include "openPMD/ParticleSpecies.hpp"
-
+#include <algorithm>
 #include <iterator>
 #include <set>
 #include <string>
 #include <utility>
+
+#include "openPMD/Error.hpp"
+#include "openPMD/Iteration.hpp"
+#include "openPMD/IterationEncoding.hpp"
+#include "openPMD/Mesh.hpp"
+#include "openPMD/ParticleSpecies.hpp"
+#include "openPMD/Series.hpp"
+#include "openPMD/snapshots/Snapshots.hpp"
 
 namespace openPMD::helper
 {

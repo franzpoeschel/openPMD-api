@@ -19,7 +19,9 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
+#include "openPMD/auxiliary/JSON_internal.hpp"
 
 namespace openPMD::internal
 {
