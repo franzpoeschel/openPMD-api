@@ -151,9 +151,17 @@ public:
     }
     /** Disable automatic flush after store operation
      *
-     * The returned objects of type DeferredComputation will still return a
-     * buffer upon get() / operator()(), but these buffers are not guaranteed to
-     * be filled until explicitly flushing.
+     * By default, the chaining API flushes automatically upon evaluation of
+     * the returned DeferredComputation object, i.e. whenever the result of the
+     * operation is requested via get() / operator()(). With this option, this
+     * automatic flush is disabled: the returned objects of type
+     * DeferredComputation will still return a buffer upon get() /
+     * operator()(), but these buffers are not guaranteed to be filled until
+     * explicitly flushing.
+     *
+     * This entails a fallback to the flushing semantics of the legacy API,
+     * i.e. the sync-flush option (Series option "flush_immediately" /
+     * OPENPMD_FLUSH_IMMEDIATELY) becomes active again for the operation.
      *
      * @return Reference to this object for chaining
      */
@@ -287,9 +295,17 @@ public:
 
     /** Disable automatic flush after store operation
      *
-     * The returned objects of type DeferredComputation will still return a
-     * buffer upon get() / operator()(), but these buffers are not guaranteed to
-     * be filled until explicitly flushing.
+     * By default, the chaining API flushes automatically upon evaluation of
+     * the returned DeferredComputation object, i.e. whenever the result of the
+     * operation is requested via get() / operator()(). With this option, this
+     * automatic flush is disabled: the returned objects of type
+     * DeferredComputation will still return a buffer upon get() /
+     * operator()(), but these buffers are not guaranteed to be filled until
+     * explicitly flushing.
+     *
+     * This entails a fallback to the flushing semantics of the legacy API,
+     * i.e. the sync-flush option (Series option "flush_immediately" /
+     * OPENPMD_FLUSH_IMMEDIATELY) becomes active again for the operation.
      *
      * @return Reference to this object for chaining
      */
@@ -380,9 +396,17 @@ public:
 
     /** Disable automatic flush after operation
      *
-     * The returned objects of type DeferredComputation will still return a
-     * buffer upon get() / operator()(), but these buffers are not guaranteed to
-     * be filled until explicitly flushing.
+     * By default, the chaining API flushes automatically upon evaluation of
+     * the returned DeferredComputation object, i.e. whenever the result of the
+     * operation is requested via get() / operator()(). With this option, this
+     * automatic flush is disabled: the returned objects of type
+     * DeferredComputation will still return a buffer upon get() /
+     * operator()(), but these buffers are not guaranteed to be filled until
+     * explicitly flushing.
+     *
+     * This entails a fallback to the flushing semantics of the legacy API,
+     * i.e. the sync-flush option (Series option "flush_immediately" /
+     * OPENPMD_FLUSH_IMMEDIATELY) becomes active again for the operation.
      *
      * @return Reference to this object for chaining
      */
