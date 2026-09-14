@@ -522,6 +522,8 @@ struct OPENPMDAPI_EXPORT
 
     Extent extent = {};
     Offset offset = {};
+    /** Optional memory selection for non-contiguous memory regions */
+    std::optional<MemorySelection> memorySelection = std::nullopt;
     Datatype dtype = Datatype::UNDEFINED;
     std::shared_ptr<void> data = nullptr;
 };

@@ -58,6 +58,12 @@
 #if openPMD_HAVE_ADIOS2
 namespace openPMD::detail
 {
+static constexpr char const *warningMemorySelection =
+    "[Warning] Using a version of ADIOS2 that cannot reset memory selections "
+    "on a variable, once specified. When using memory selections, then please "
+    "specify it explicitly on all storeChunk() calls. Further info: "
+    "https://github.com/ornladios/ADIOS2/pull/4169.";
+
 template <typename T>
 void DatasetReader::call(
     ADIOS2IOHandlerImpl *impl,
@@ -71,7 +77,7 @@ void DatasetReader::call(
     adios2::Variable<T> var = impl->verifyDataset<T>(
         bp.param.offset,
         bp.param.extent,
-        std::nullopt,
+        bp.param.memorySelection,
         IO,
         engine,
         bp.name,
@@ -85,16 +91,27 @@ void DatasetReader::call(
     }
     auto ptr = std::static_pointer_cast<T>(bp.param.data).get();
     engine.Get(var, ptr);
+    if (bp.param.memorySelection.has_value())
+    {
+        /*
+         * Conform to the write path: reset the memory selection so it does
+         * not leak into subsequent Get/Put calls.
+         * (Only possible if the ADIOS2 version supports resetting it.)
+         */
+        if constexpr (openPMD::CanTheMemorySelectionBeReset)
+        {
+            var.SetMemorySelection();
+        }
+        else if (!impl->printedWarningsAlready.memorySelection)
+        {
+            std::cerr << warningMemorySelection << std::endl;
+            impl->printedWarningsAlready.memorySelection = true;
+        }
+    }
 }
 
 template <class>
 inline constexpr bool always_false_v = false;
-
-static constexpr char const *warningMemorySelection =
-    "[Warning] Using a version of ADIOS2 that cannot reset memory selections "
-    "on a variable, once specified. When using memory selections, then please "
-    "specify it explicitly on all storeChunk() calls. Further info: "
-    "https://github.com/ornladios/ADIOS2/pull/4169.";
 
 template <typename T>
 void WriteDataset::call(ADIOS2File &ba, detail::BufferedPut &bp)

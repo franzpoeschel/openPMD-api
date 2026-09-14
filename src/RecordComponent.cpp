@@ -996,11 +996,6 @@ void RecordComponent::loadChunk_impl(
     Datatype dtype_requested,
     internal::LoadStoreConfigWithBuffer cfg)
 {
-    if (cfg.memorySelection.has_value())
-    {
-        throw error::WrongAPIUsage(
-            "Unsupported: Memory selections in chunk loading.");
-    }
     /*
      * For constant components, we implement type conversion, so there is
      * a separate check further below.
@@ -1057,6 +1052,7 @@ void RecordComponent::loadChunk_impl(
         Parameter<Operation::READ_DATASET> dRead;
         dRead.offset = offset;
         dRead.extent = extent;
+        dRead.memorySelection = std::move(memorySelection);
         dRead.dtype = getDatatype();
         dRead.data = std::static_pointer_cast<void>(data);
         rc.push_chunk(IOTask(this, dRead), api);
