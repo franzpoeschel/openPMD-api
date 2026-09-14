@@ -53,6 +53,11 @@ public:
         return "MPI_HDF5";
     }
 
+    bool supportsMemorySelection() const override
+    {
+        return true;
+    }
+
     std::future<void> flush_impl(internal::ParsedFlushParams &) override;
 
 private:

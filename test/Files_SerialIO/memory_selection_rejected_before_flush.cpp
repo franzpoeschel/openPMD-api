@@ -23,8 +23,8 @@
  * Bug: rejecting a memory selection inside the IO task (at flush time)
  * corrupts the whole output file.
  *
- * The HDF5 and JSON backends do not support non-contiguous memory selections.
- * They used to throw error::OperationUnsupportedInBackend from within
+ * The JSON backend does not support non-contiguous memory selections.
+ * It used to throw error::OperationUnsupportedInBackend from within
  * writeDataset(), i.e. while flushing an IO task. AbstractIOHandlerImpl::flush
  * reacts to an exception in an IO task by clearing the whole IO queue and
  * rethrowing ("Clearing IO queue and passing on the exception"), so every
@@ -38,8 +38,8 @@
  *  1. the unsupported store throws immediately (not at flush time), and
  *  2. a valid chunk stored in the same Series survives and can be read back.
  *
- * The ADIOS2 backend does support memory selections, so the corresponding
- * store must not throw there.
+ * The ADIOS2 and HDF5 backends do support memory selections, so the
+ * corresponding store must not throw there.
  */
 
 #include "SerialIOTests.hpp"
@@ -82,10 +82,12 @@ struct WriteResult
 WriteResult write_and_reject(std::string const &name)
 {
     Series s(name, Access::CREATE);
-    // HDF5 and JSON never support memory selections. ADIOS2 only supports them
-    // if its version can reset a memory selection (>= 2.10.1).
+    // HDF5 supports memory selections; JSON does not. ADIOS2 only supports
+    // them if its version can reset a memory selection (>= 2.10.1).
+    std::string const backend = s.backend();
     bool const backendSupports =
-        s.backend() == "ADIOS2" && adios2SupportsMemorySelection();
+        backend == "HDF5" || backend == "MPI_HDF5" ||
+        (backend == "ADIOS2" && adios2SupportsMemorySelection());
     s.setAttribute("some_global", "attribute");
 
     // Valid chunk that must not be lost.
