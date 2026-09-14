@@ -46,15 +46,6 @@ py::array load_chunk(RecordComponent &r, py::tuple const &slices);
 
 void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
 
-void store_chunk_with_memory_selection(
-    RecordComponent &r, py::array &a, py::tuple const &slices);
-
-void load_chunk_with_memory_selection(
-    RecordComponent &r,
-    py::array &a,
-    Offset const &offset,
-    Extent const &extent);
-
 namespace docstring
 {
 constexpr static char const *is_scalar = R"docstr(
@@ -95,10 +86,10 @@ Class &&addRecordComponentSetGet(Class &&class_)
         .def(
             "__setitem__",
             [](RecordComponent &r, py::tuple const &slices, py::array &a) {
-                // store_chunk_with_memory_selection() transparently falls back
-                // to the ordinary store_chunk() when no memory selection is
-                // needed (e.g. contiguous own-buffer arrays).
-                store_chunk_with_memory_selection(r, a, slices);
+                // store_chunk() transparently falls back to the ordinary
+                // contiguous path when no memory selection is needed (e.g.
+                // contiguous own-buffer arrays).
+                store_chunk(r, a, slices);
             },
             py::arg("tuple of index slices"),
             py::arg("array with values to assign"))
@@ -106,7 +97,7 @@ Class &&addRecordComponentSetGet(Class &&class_)
             "__setitem__",
             [](RecordComponent &r, py::slice const &slice_obj, py::array &a) {
                 auto const slices = py::make_tuple(slice_obj);
-                store_chunk_with_memory_selection(r, a, slices);
+                store_chunk(r, a, slices);
             },
             py::arg("slice"),
             py::arg("array with values to assign"))
@@ -114,7 +105,7 @@ Class &&addRecordComponentSetGet(Class &&class_)
             "__setitem__",
             [](RecordComponent &r, py::int_ const &slice_obj, py::array &a) {
                 auto const slices = py::make_tuple(slice_obj);
-                store_chunk_with_memory_selection(r, a, slices);
+                store_chunk(r, a, slices);
             },
             py::arg("axis index"),
             py::arg("array with values to assign"));

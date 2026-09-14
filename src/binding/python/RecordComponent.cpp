@@ -292,21 +292,26 @@ inline std::tuple<Offset, Extent, std::vector<bool>> parseJoinedTupleSlices(
  *
  * - not strided with paddings
  * - not a view in another buffer that results in striding
- *
- * @return The PEP 3118 buffer description of the array (strides in bytes).
  */
-inline py::buffer_info
-check_buffer_is_contiguous(py::array &a, bool writable = false)
+inline void check_buffer_is_contiguous(py::array &a)
 {
 
-    auto info = a.request(writable);
-    bool isContiguous = (PyBuffer_IsContiguous(info.view(), 'C') != 0);
+    auto *view = new Py_buffer();
+    int flags = PyBUF_STRIDES | PyBUF_FORMAT;
+    if (PyObject_GetBuffer(a.ptr(), view, flags) != 0)
+    {
+        delete view;
+        throw py::error_already_set();
+    }
+    bool isContiguous = (PyBuffer_IsContiguous(view, 'C') != 0);
+    PyBuffer_Release(view);
+    delete view;
+
     if (!isContiguous)
         throw py::index_error(
             "strides in chunk are inefficient, not implemented!");
     // @todo in order to implement stride handling, one needs to
     //       loop over the input data strides in store/load calls
-    return info;
 }
 
 namespace
@@ -319,7 +324,8 @@ struct StoreChunkFromPythonArray
         py::object owning_handle,
         void *data,
         Offset const &offset,
-        Extent const &extent)
+        Extent const &extent,
+        std::optional<MemorySelection> memorySelection)
     {
         // here, we store an owning handle in the lambda capture so that
         // temporary and lost-scope variables stay alive until we flush
@@ -332,41 +338,14 @@ struct StoreChunkFromPythonArray
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        r.prepareLoadStore()
-            .offset(offset)
-            .extent(extent)
-            .withSharedPtr(std::move(shared))
-            .unsafeNoAutomaticFlush()
-            .store();
-    }
-
-    static constexpr char const *errorMsg = "store_chunk()";
-};
-struct StoreChunkFromPythonArrayWithMemorySelection
-{
-    template <typename T>
-    static void call(
-        RecordComponent &r,
-        py::object owning_handle,
-        void *data,
-        Offset const &offset,
-        Extent const &extent,
-        MemorySelection memorySelection)
-    {
-        std::shared_ptr<T> shared(
-            (T *)data,
-            [owning_handle =
-                 std::make_optional(std::move(owning_handle))](T *) mutable {
-                py::gil_scoped_acquire need_the_gil_for_this;
-                owning_handle.reset();
-            });
-        r.prepareLoadStore()
-            .offset(offset)
-            .extent(extent)
-            .withSharedPtr(std::move(shared))
-            .memorySelection(memorySelection)
-            .unsafeNoAutomaticFlush()
-            .store();
+        auto config =
+            r.prepareLoadStore().offset(offset).extent(extent).withSharedPtr(
+                std::move(shared));
+        if (memorySelection.has_value())
+        {
+            config.memorySelection(std::move(*memorySelection));
+        }
+        config.unsafeNoAutomaticFlush().store();
     }
 
     static constexpr char const *errorMsg = "store_chunk()";
@@ -376,38 +355,16 @@ struct LoadChunkIntoPythonArray
     template <typename T>
     static void call(
         RecordComponent &r,
-        py::array &a,
-        Offset const &offset,
-        Extent const &extent)
-    {
-        void *data = a.mutable_data();
-        // here, we store an owning handle in the lambda capture so that
-        // temporary and lost-scope variables stay alive until we flush
-        // note: this does not yet prevent the user, as in C++, to build
-        // a race condition by manipulating the data that was passed
-        std::shared_ptr<T> shared(
-            (T *)data,
-            [owning_handle =
-                 std::make_optional(a.cast<py::object>())](T *) mutable {
-                py::gil_scoped_acquire need_the_gil_for_this;
-                owning_handle.reset();
-            });
-        r.loadChunk(std::move(shared), offset, extent);
-    }
-
-    static constexpr char const *errorMsg = "load_chunk()";
-};
-struct LoadChunkIntoPythonArrayWithMemorySelection
-{
-    template <typename T>
-    static void call(
-        RecordComponent &r,
         py::object owning_handle,
         void *data,
         Offset const &offset,
         Extent const &extent,
-        MemorySelection memorySelection)
+        std::optional<MemorySelection> memorySelection)
     {
+        // here, we store an owning handle in the lambda capture so that
+        // temporary and lost-scope variables stay alive until we flush
+        // note: this does not yet prevent the user, as in C++, to build
+        // a race condition by manipulating the data that was passed
         std::shared_ptr<T> shared(
             (T *)data,
             [owning_handle =
@@ -415,45 +372,26 @@ struct LoadChunkIntoPythonArrayWithMemorySelection
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        r.prepareLoadStore()
-            .offset(offset)
-            .extent(extent)
-            .withSharedPtr(std::move(shared))
-            .memorySelection(memorySelection)
-            .unsafeNoAutomaticFlush()
-            .load();
-    }
-
-    static constexpr char const *errorMsg = "load_chunk()";
-};
-struct LoadChunkIntoPythonBuffer
-{
-    template <typename T>
-    static void call(
-        RecordComponent &r,
-        py::buffer &buffer,
-        py::buffer_info const &buffer_info,
-        Offset const &offset,
-        Extent const &extent)
-    {
-        void *data = buffer_info.ptr;
-        // here, we store an owning handle in the lambda capture so that
-        // temporary and lost-scope variables stay alive until we flush
-        // note: this does not yet prevent the user, as in C++, to build
-        // a race condition by manipulating the data that was passed
-        std::shared_ptr<T> shared(
-            (T *)data,
-            [owning_handle =
-                 std::make_optional(buffer.cast<py::object>())](T *) mutable {
-                py::gil_scoped_acquire need_the_gil_for_this;
-                owning_handle.reset();
-            });
-        r.loadChunk(std::move(shared), offset, extent);
+        auto config =
+            r.prepareLoadStore().offset(offset).extent(extent).withSharedPtr(
+                std::move(shared));
+        if (memorySelection.has_value())
+        {
+            config.memorySelection(std::move(*memorySelection));
+        }
+        config.unsafeNoAutomaticFlush().load();
     }
 
     static constexpr char const *errorMsg = "load_chunk()";
 };
 } // namespace
+
+/*
+ * Defined further below; forward declarations so the store/load entry points
+ * above can use them.
+ */
+inline std::optional<MemorySelection> derive_memory_selection(py::array &a);
+inline py::array deepest_base_of(py::array &a);
 
 /** Store Chunk
  *
@@ -462,13 +400,18 @@ struct LoadChunkIntoPythonBuffer
  *
  * Size checks of the requested chunk (spanned data is in valid bounds)
  * will be performed at C++ API part in RecordComponent::storeChunk .
+ *
+ * If `memorySelection` is set, the data is read from the given sub-region of
+ * the (deepest) memory block behind `a`; otherwise `a` must be a contiguous
+ * buffer covering the selection.
  */
 inline void store_chunk(
     RecordComponent &r,
     py::array &a,
     Offset const &offset,
     Extent const &extent,
-    std::vector<bool> const &flatten)
+    std::vector<bool> const &flatten,
+    std::optional<MemorySelection> memorySelection = std::nullopt)
 {
     // @todo keep locked until flush() is performed
     // a.flags.writable = false;
@@ -554,7 +497,10 @@ inline void store_chunk(
         }
     }
 
-    check_buffer_is_contiguous(a);
+    if (!memorySelection.has_value())
+    {
+        check_buffer_is_contiguous(a);
+    }
 
     if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
     {
@@ -564,18 +510,41 @@ inline void store_chunk(
             << "' into Record Component of type '" << r.getDatatype() << "'.";
         throw error::WrongAPIUsage(err.str());
     }
-    switchDatasetType<StoreChunkFromPythonArray>(
-        r.getDatatype(),
-        r,
-        a.cast<py::object>(),
-        a.mutable_data(),
-        offset,
-        extent);
+
+    if (memorySelection.has_value())
+    {
+        // Data pointer = origin of the memory block (the view's deepest base).
+        py::array owner_arr = deepest_base_of(a);
+        switchDatasetType<StoreChunkFromPythonArray>(
+            r.getDatatype(),
+            r,
+            owner_arr.cast<py::object>(),
+            owner_arr.mutable_data(),
+            offset,
+            extent,
+            std::move(memorySelection));
+    }
+    else
+    {
+        switchDatasetType<StoreChunkFromPythonArray>(
+            r.getDatatype(),
+            r,
+            a.cast<py::object>(),
+            a.mutable_data(),
+            offset,
+            extent,
+            std::nullopt);
+    }
 }
 
 /** Store Chunk
  *
- * Called with a py::tuple of slices and a py::array
+ * Called with a py::tuple of slices and a py::array.
+ *
+ * If the RHS array is a (non-flattened) view of a larger contiguous buffer, a
+ * memory selection is derived and the store happens through a single
+ * prepareLoadStore().memorySelection().store() operation. Otherwise (owning or
+ * flattened selection), the ordinary contiguous path is used.
  */
 inline void
 store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
@@ -598,7 +567,18 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
             parseTupleSlices(ndim, full_extent, slices);
     }
 
-    store_chunk(r, a, offset, extent, flatten);
+    std::optional<MemorySelection> memorySelection;
+    if (std::count(flatten.begin(), flatten.end(), true) == 0)
+    {
+        // No axis was flattened by integer indexing: a memory selection may
+        // apply. derive_memory_selection() returns nullopt for whole /
+        // owning / contiguous arrays, in which case the contiguous path
+        // (which validates contiguity and throws for genuinely strided data,
+        // as before) is taken.
+        memorySelection = derive_memory_selection(a);
+    }
+
+    store_chunk(r, a, offset, extent, flatten, std::move(memorySelection));
 }
 
 /** Derive an openPMD MemorySelection from a (view of a) numpy array.
@@ -867,107 +847,6 @@ inline py::array deepest_base_of(py::array &a)
     return py::cast<py::array>(owner_obj);
 }
 
-/** Store Chunk with a memory selection.
- *
- * Called when the RHS array is a (possibly non-contiguous in its own shape)
- * view of a larger contiguous buffer and the user selects a sub-cuboid of the
- * dataset on the LHS, e.g.:
- *
- *   record_component[0:2, 0:2, 0:2] = write_buffer[2:4, 2:4, 2:4]
- *
- * @param r        The record component to store into.
- * @param a        The RHS numpy array (view of a larger buffer).
- * @param slices   The LHS `__setitem__` slices (dataset selection).
- */
-inline void store_chunk_with_memory_selection(
-    RecordComponent &r, py::array &a, py::tuple const &slices)
-{
-    uint8_t const ndim = r.getDimensionality();
-    auto const full_extent = r.getExtent();
-
-    Offset offset;
-    Extent extent;
-    std::vector<bool> flatten;
-    if (auto joined_dimension = r.joinedDimension();
-        joined_dimension.has_value())
-    {
-        std::tie(offset, extent, flatten) = parseJoinedTupleSlices(
-            ndim, full_extent, slices, *joined_dimension, a);
-    }
-    else
-    {
-        std::tie(offset, extent, flatten) =
-            parseTupleSlices(ndim, full_extent, slices);
-    }
-
-    /*
-     * If any axis was flattened by integer indexing, or the view is contiguous
-     * in its own shape, fall back to the conventional path (which validates
-     * contiguity and will throw for genuinely strided data, as before).
-     */
-    size_t const numFlattenDims =
-        std::count(flatten.begin(), flatten.end(), true);
-    if (numFlattenDims > 0)
-    {
-        store_chunk(r, a, offset, extent, flatten);
-        return;
-    }
-
-    auto memsel = derive_memory_selection(a);
-    if (!memsel.has_value())
-    {
-        store_chunk(r, a, offset, extent, flatten);
-        return;
-    }
-
-    /*
-     * A memory selection is necessary. Verify shape compatibility between the
-     * RHS view and the dataset selection (mirrors store_chunk's checks).
-     */
-    auto const r_extent = r.getExtent();
-    if (size_t(a.ndim()) != r_extent.size())
-        throw py::index_error(
-            std::string("dimension of chunk (") + std::to_string(a.ndim()) +
-            std::string(
-                "D) does not fit dimension of selection "
-                "in record component (") +
-            std::to_string(r_extent.size()) + std::string("D)"));
-
-    for (py::ssize_t d = 0; d < a.ndim(); ++d)
-    {
-        if (extent[d] != std::uint64_t(a.shape()[d]))
-            throw py::index_error(
-                std::string("size of chunk (") + std::to_string(a.shape()[d]) +
-                std::string(") for axis ") + std::to_string(d) +
-                std::string(
-                    " does not match selection size in record "
-                    "component (") +
-                std::to_string(extent[d]) + std::string(")"));
-    }
-
-    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
-    {
-        std::stringstream err;
-        err << "Attempting store from Python array of type '"
-            << dtype_from_numpy(a.dtype())
-            << "' into Record Component of type '" << r.getDatatype() << "'.";
-        throw error::WrongAPIUsage(err.str());
-    }
-
-    // Data pointer = origin of the memory block (the view's deepest base).
-    py::array owner_arr = deepest_base_of(a);
-    void *const data = owner_arr.mutable_data();
-
-    switchDatasetType<StoreChunkFromPythonArrayWithMemorySelection>(
-        r.getDatatype(),
-        r,
-        owner_arr.cast<py::object>(),
-        data,
-        offset,
-        extent,
-        std::move(*memsel));
-}
-
 struct PythonDynamicMemoryView
 {
     using ShapeContainer = pybind11::array::ShapeContainer;
@@ -1113,61 +992,19 @@ store_chunk_span(RecordComponent &r, py::tuple const &slices)
  *
  * Size checks of the requested chunk (spanned data is in valid bounds)
  * will be performed at C++ API part in RecordComponent::loadChunk .
- */
-void load_chunk(
-    RecordComponent &r,
-    py::buffer &buffer,
-    Offset const &offset,
-    Extent const &extent)
-{
-    auto const dtype = dtype_to_numpy(r.getDatatype());
-    py::buffer_info buffer_info = buffer.request(/* writable = */ true);
-
-    auto const &strides = buffer_info.strides;
-    // this function requires a contiguous slab of memory, so check the strides
-    // whether we have that
-    if (strides.size() == 0)
-    {
-        throw error::WrongAPIUsage(
-            "[Record_Component::load_chunk()] Empty buffer passed.");
-    }
-    {
-        py::ssize_t accumulator = toBytes(r.getDatatype());
-        if (buffer_info.itemsize != accumulator)
-        {
-            std::stringstream errorMsg;
-            errorMsg << "[Record_Component::load_chunk()] Loading from a "
-                        "record component of type "
-                     << r.getDatatype() << " with item size " << accumulator
-                     << ", but Python buffer has item size "
-                     << buffer_info.itemsize << ".";
-            throw error::WrongAPIUsage(errorMsg.str());
-        }
-        size_t dim = strides.size();
-        while (dim > 0)
-        {
-            --dim;
-            if (strides[dim] != accumulator)
-            {
-                throw error::WrongAPIUsage(
-                    "[Record_Component::load_chunk()] Requires contiguous slab"
-                    " of memory.");
-            }
-            accumulator *= extent[dim];
-        }
-    }
-
-    switchDatasetType<LoadChunkIntoPythonBuffer>(
-        r.getDatatype(), r, buffer, buffer_info, offset, extent);
-}
-
-/** Load Chunk
  *
- * Called with offset and extent that are already in the record component's
- * dimension.
+ * If the destination numpy array is a (possibly non-contiguous in its own
+ * shape) view of a larger contiguous buffer, a memory selection is derived and
+ * the dataset chunk is loaded directly into that sub-region through a single
+ * `prepareLoadStore().memorySelection().load()` operation, avoiding an
+ * intermediate buffer. e.g. loading into a strided view of a larger
+ * ghost-cell-style buffer:
  *
- * Size checks of the requested chunk (spanned data is in valid bounds)
- * will be performed at C++ API part in RecordComponent::loadChunk .
+ *   record_component.load_chunk(
+ *       offset, extent, read_buffer[2:4, 2:4, 2:4])
+ *
+ * If the destination array is contiguous (or owns its memory), the ordinary
+ * contiguous load path is used.
  */
 inline void load_chunk(
     RecordComponent &r,
@@ -1214,66 +1051,11 @@ inline void load_chunk(
             str_extent_shape + std::string(")"));
     }
 
-    check_buffer_is_contiguous(a);
-
-    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
-    {
-        std::stringstream err;
-        err << "Attempting load into Python array of type '"
-            << dtype_from_numpy(a.dtype())
-            << "' from Record Component of type '" << r.getDatatype() << "'.";
-        throw error::WrongAPIUsage(err.str());
-    }
-
-    switchDatasetType<LoadChunkIntoPythonArray>(
-        r.getDatatype(), r, a, offset, extent);
-}
-
-/** Load a chunk into a pre-allocated strided destination view.
- *
- * When the destination numpy array is a (possibly non-contiguous in its own
- * shape) view of a larger contiguous buffer, this mirrors
- * store_chunk_with_memory_selection(): the dataset chunk is loaded directly
- * into the destination sub-region through a single
- * `prepareLoadStore().memorySelection().load()` operation, avoiding an
- * intermediate buffer.
- *
- * e.g. loading into a strided view of a larger ghost-cell-style buffer:
- *
- *   record_component.load_chunk(
- *       offset, extent, read_buffer[2:4, 2:4, 2:4])
- *
- * If the destination array is contiguous (or owns its memory), the ordinary
- * contiguous load path is used.
- */
-inline void load_chunk_with_memory_selection(
-    RecordComponent &r,
-    py::array &a,
-    Offset const &offset,
-    Extent const &extent)
-{
     auto memsel = derive_memory_selection(a);
     if (!memsel.has_value())
     {
-        load_chunk(r, a, offset, extent);
-        return;
+        check_buffer_is_contiguous(a);
     }
-
-    if (size_t(a.ndim()) != extent.size())
-        throw py::index_error(
-            std::string("dimension of chunk (") + std::to_string(a.ndim()) +
-            std::string(
-                "D) does not fit dimension of selection "
-                "in record component (") +
-            std::to_string(extent.size()) + std::string("D)"));
-    for (py::ssize_t d = 0; d < a.ndim(); ++d)
-        if (extent[d] != std::uint64_t(a.shape()[d]))
-            throw py::index_error(
-                std::string("size of chunk (") + std::to_string(a.shape()[d]) +
-                std::string(") for axis ") + std::to_string(d) +
-                std::string(
-                    " does not match selection size in record component (") +
-                std::to_string(extent[d]) + std::string(")"));
 
     if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
     {
@@ -1284,17 +1066,29 @@ inline void load_chunk_with_memory_selection(
         throw error::WrongAPIUsage(err.str());
     }
 
-    py::array owner_arr = deepest_base_of(a);
-    void *const data = owner_arr.mutable_data();
-
-    switchDatasetType<LoadChunkIntoPythonArrayWithMemorySelection>(
-        r.getDatatype(),
-        r,
-        owner_arr.cast<py::object>(),
-        data,
-        offset,
-        extent,
-        std::move(*memsel));
+    if (memsel.has_value())
+    {
+        py::array owner_arr = deepest_base_of(a);
+        switchDatasetType<LoadChunkIntoPythonArray>(
+            r.getDatatype(),
+            r,
+            owner_arr.cast<py::object>(),
+            owner_arr.mutable_data(),
+            offset,
+            extent,
+            std::move(memsel));
+    }
+    else
+    {
+        switchDatasetType<LoadChunkIntoPythonArray>(
+            r.getDatatype(),
+            r,
+            a.cast<py::object>(),
+            a.mutable_data(),
+            offset,
+            extent,
+            std::nullopt);
+    }
 }
 
 /** Load Chunk
@@ -1587,7 +1381,7 @@ void init_RecordComponent(py::module &m)
                     extent = extent_in;
 
                 std::vector<bool> flatten(ndim, false);
-                load_chunk_with_memory_selection(r, buffer, offset, extent);
+                load_chunk(r, buffer, offset, extent);
             },
             py::arg("pre-allocated buffer"),
             py::arg_v(
