@@ -286,32 +286,31 @@ inline std::tuple<Offset, Extent, std::vector<bool>> parseJoinedTupleSlices(
     return std::make_tuple(offset, extent, flatten);
 }
 
-/** Check an array is a contiguous buffer
+/** Check a buffer is a contiguous buffer
  *
- * Required are contiguous buffers for store and load
+ * Required are contiguous buffers for store and load, unless a memory
+ * selection is used to address a sub-region of the (contiguous) memory block.
  *
  * - not strided with paddings
  * - not a view in another buffer that results in striding
  */
-inline void check_buffer_is_contiguous(py::array &a)
+inline void check_buffer_is_contiguous(py::buffer_info const &info)
 {
-
-    auto *view = new Py_buffer();
-    int flags = PyBUF_STRIDES | PyBUF_FORMAT;
-    if (PyObject_GetBuffer(a.ptr(), view, flags) != 0)
+    bool isContiguous = true;
+    py::ssize_t expected = info.itemsize;
+    for (py::ssize_t d = info.ndim - 1; d >= 0; --d)
     {
-        delete view;
-        throw py::error_already_set();
+        if (info.strides[d] != expected)
+        {
+            isContiguous = false;
+            break;
+        }
+        expected *= info.shape[d];
     }
-    bool isContiguous = (PyBuffer_IsContiguous(view, 'C') != 0);
-    PyBuffer_Release(view);
-    delete view;
 
     if (!isContiguous)
         throw py::index_error(
             "strides in chunk are inefficient, not implemented!");
-    // @todo in order to implement stride handling, one needs to
-    //       loop over the input data strides in store/load calls
 }
 
 namespace
@@ -390,7 +389,8 @@ struct LoadChunkIntoPythonArray
  * Defined further below; forward declarations so the store/load entry points
  * above can use them.
  */
-inline std::optional<MemorySelection> derive_memory_selection(py::buffer &a);
+inline std::optional<MemorySelection>
+derive_memory_selection(py::object const &obj, py::buffer_info const &info);
 inline py::object deepest_owner(py::object const &obj);
 
 /** Store Chunk
@@ -413,6 +413,8 @@ inline void store_chunk(
     std::vector<bool> const &flatten,
     std::optional<MemorySelection> memorySelection = std::nullopt)
 {
+    py::buffer_info const info = a.request(/* writable = */ true);
+
     // @todo keep locked until flush() is performed
     // a.flags.writable = false;
     // a.flags.owndata = false;
@@ -441,9 +443,9 @@ inline void store_chunk(
         [&maskIt](std::uint64_t) { return !*(maskIt++); });
 
     //   verify shape and extent
-    if (size_t(a.ndim()) != r_shape.size())
+    if (size_t(info.ndim) != r_shape.size())
         throw py::index_error(
-            std::string("dimension of chunk (") + std::to_string(a.ndim()) +
+            std::string("dimension of chunk (") + std::to_string(info.ndim) +
             std::string(
                 "D) does not fit dimension of selection "
                 "in record component (") +
@@ -451,7 +453,7 @@ inline void store_chunk(
 
     if (auto joined_dim = r.joinedDimension(); joined_dim.has_value())
     {
-        for (py::ssize_t d = 0; d < a.ndim(); ++d)
+        for (py::ssize_t d = 0; d < info.ndim; ++d)
         {
             // selection causes overflow of r
             if (d != py::ssize_t(*joined_dim) && extent.at(d) != r_shape.at(d))
@@ -463,10 +465,10 @@ inline void store_chunk(
                     std::to_string(extent.at(d)) + ", but was " +
                     std::to_string(r_shape.at(d)) + ".");
             // underflow of selection in r for given a
-            if (s_shape.at(d) != std::uint64_t(a.shape()[d]))
+            if (s_shape.at(d) != std::uint64_t(info.shape[d]))
                 throw py::index_error(
                     std::string("size of chunk (") +
-                    std::to_string(a.shape()[d]) + std::string(") for axis ") +
+                    std::to_string(info.shape[d]) + std::string(") for axis ") +
                     std::to_string(d) +
                     std::string(" does not match selection ") +
                     std::string("size in record component (") +
@@ -475,7 +477,7 @@ inline void store_chunk(
     }
     else
     {
-        for (auto d = 0; d < a.ndim(); ++d)
+        for (auto d = 0; d < info.ndim; ++d)
         {
             // selection causes overflow of r
             if (offset.at(d) + extent.at(d) > r_shape.at(d))
@@ -486,10 +488,10 @@ inline void store_chunk(
                     std::to_string(d) + std::string(" with size ") +
                     std::to_string(r_shape.at(d)));
             // underflow of selection in r for given a
-            if (s_shape.at(d) != std::uint64_t(a.shape()[d]))
+            if (s_shape.at(d) != std::uint64_t(info.shape[d]))
                 throw py::index_error(
                     std::string("size of chunk (") +
-                    std::to_string(a.shape()[d]) + std::string(") for axis ") +
+                    std::to_string(info.shape[d]) + std::string(") for axis ") +
                     std::to_string(d) +
                     std::string(" does not match selection ") +
                     std::string("size in record component (") +
@@ -499,14 +501,16 @@ inline void store_chunk(
 
     if (!memorySelection.has_value())
     {
-        check_buffer_is_contiguous(a);
+        check_buffer_is_contiguous(info);
     }
 
-    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
+    // datatype check: the buffer's PEP 3118 format string must map to the
+    // record component's datatype
+    Datatype const buffer_dtype = dtype_from_bufferformat(info.format);
+    if (buffer_dtype != r.getDatatype())
     {
         std::stringstream err;
-        err << "Attempting store from Python array of type '"
-            << dtype_from_numpy(a.dtype())
+        err << "Attempting store from Python buffer of type '" << buffer_dtype
             << "' into Record Component of type '" << r.getDatatype() << "'.";
         throw error::WrongAPIUsage(err.str());
     }
@@ -564,13 +568,15 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
         // owning / contiguous arrays, in which case the contiguous path
         // (which validates contiguity and throws for genuinely strided data,
         // as before) is taken.
-        memorySelection = derive_memory_selection(a);
+        auto info = a.request(/* writable = */ false);
+        memorySelection = derive_memory_selection(
+            py::reinterpret_borrow<py::object>(a), info);
     }
 
     store_chunk(r, a, offset, extent, flatten, std::move(memorySelection));
 }
 
-/** Derive an openPMD MemorySelection from a (view of a) numpy array.
+/** Derive an openPMD MemorySelection from a (view of a) buffer.
  *
  * openPMD memory selections describe a sub-region of a contiguous, row-major
  * memory buffer by its offset (in elements) within that buffer and the full
@@ -579,14 +585,18 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
  * `memoryCount` is the shape of the contiguous memory block that the data
  * pointer refers to).
  *
- * Multidimensional slicing of a row-major numpy array along all axes produces
- * a view whose strides are the *same* as the parent array's strides. From such
+ * Multidimensional slicing of a row-major buffer along all axes produces a
+ * view whose strides are the *same* as the parent buffer's strides. From such
  * a view we can recover:
- *   - the origin of the contiguous memory block (the deepest base array),
+ *   - the origin of the contiguous memory block (the deepest owner object),
  *   - the full shape of the memory block (from the view's strides and the
  *     block's element count),
  *   - the per-axis offset at which the view starts (by decomposing the data
  *     pointer delta against the block's row-major strides).
+ *
+ * Works on any PEP 3118 buffer (numpy arrays, memoryviews, `array.array`,
+ * raw bytes, custom exporters) via its `py::buffer_info`; there is no
+ * dependency on numpy semantics such as `.base`.
  *
  * Supported: sub-cuboid views such as `write_buffer[2:4, 2:4, 2:4]`, i.e.
  * `rho[0:2, 0:2, 0:2] = write_buffer[2:4, 2:4, 2:4]`.
@@ -598,9 +608,9 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
  * @return The memory selection {offset, extent}, or std::nullopt if the view
  *         covers the whole memory block (no selection needed).
  */
-inline std::optional<MemorySelection> derive_memory_selection(py::buffer &a)
+inline std::optional<MemorySelection>
+derive_memory_selection(py::object const &obj, py::buffer_info const &info)
 {
-    auto info = a.request(/* writable = */ false);
     py::ssize_t const ndim = info.ndim;
     if (ndim == 0)
     {
@@ -637,7 +647,7 @@ inline std::optional<MemorySelection> derive_memory_selection(py::buffer &a)
     // owns the contiguous backing memory). For numpy arrays NumPy collapses
     // nested views to a flat owner array; for memoryviews / generic buffers we
     // follow the buffer's `.obj` chain.
-    py::object owner_obj = deepest_owner(py::reinterpret_borrow<py::object>(a));
+    py::object owner_obj = deepest_owner(obj);
     py::buffer owner_buf;
     try
     {
@@ -970,7 +980,7 @@ store_chunk_span(RecordComponent &r, py::tuple const &slices)
     return store_chunk_span(r, offset, extent, flatten);
 }
 
-/** Load Chunk
+/** Load Chunk (generic buffer)
  *
  * Called with offset and extent that are already in the record component's
  * dimension.
@@ -978,57 +988,54 @@ store_chunk_span(RecordComponent &r, py::tuple const &slices)
  * Size checks of the requested chunk (spanned data is in valid bounds)
  * will be performed at C++ API part in RecordComponent::loadChunk .
  *
- * If the destination numpy array is a (possibly non-contiguous in its own
- * shape) view of a larger contiguous buffer, a memory selection is derived and
- * the dataset chunk is loaded directly into that sub-region through a single
- * `prepareLoadStore().memorySelection().load()` operation, avoiding an
+ * This overload works on any PEP 3118 buffer (`py::buffer`), not only numpy
+ * arrays: numpy arrays, memoryviews, `array.array`, raw bytes, and custom
+ * buffer exporters are all accepted. The buffer protocol is unpacked directly
+ * via `py::buffer_info`, so no round-trip through numpy (`py::array::ensure`)
+ * is required.
+ *
+ * If the destination buffer is a (possibly non-contiguous in its own shape)
+ * sub-cuboid view of a larger contiguous buffer, a memory selection is derived
+ * and the dataset chunk is loaded directly into that sub-region through a
+ * single `prepareLoadStore().memorySelection().load()` operation, avoiding an
  * intermediate buffer. e.g. loading into a strided view of a larger
  * ghost-cell-style buffer:
  *
  *   record_component.load_chunk(
  *       offset, extent, read_buffer[2:4, 2:4, 2:4])
  *
- * If the destination array is contiguous (or owns its memory), the ordinary
+ * If the destination buffer is contiguous (or owns its memory), the ordinary
  * contiguous load path is used.
  */
 inline void load_chunk(
     RecordComponent &r,
-    py::array &a,
+    py::buffer &buffer,
     Offset const &offset,
     Extent const &extent)
 {
-    // check array is large enough
+    auto info = buffer.request(/* writable = */ true);
+
+    // check buffer is large enough
     size_t s_load = 1u;
     size_t s_array = 1u;
     std::string str_extent_shape;
-    std::string str_array_shape;
+    std::string str_buffer_shape;
     for (auto &si : extent)
     {
         s_load *= si;
         str_extent_shape.append(" ").append(std::to_string(si));
     }
-    for (py::ssize_t d = 0; d < a.ndim(); ++d)
+    for (py::ssize_t d = 0; d < info.ndim; ++d)
     {
-        s_array *= a.shape()[d];
-        str_array_shape.append(" ").append(std::to_string(a.shape()[d]));
+        s_array *= info.shape[d];
+        str_buffer_shape.append(" ").append(std::to_string(info.shape[d]));
     }
 
-    /* we allow flattening of the result dimension
-    if( size_t(a.ndim()) > extent.size() )
-        throw py::index_error(
-            std::string("dimension of array (") +
-            std::to_string(a.ndim()) +
-            std::string("D) does not fit dimension of selection "
-                        "in record component (") +
-            std::to_string(extent.size()) +
-            std::string("D)")
-        );
-    */
     if (s_array < s_load)
     {
         throw py::index_error(
-            std::string("size of array (") + std::to_string(s_array) +
-            std::string("; shape:") + str_array_shape +
+            std::string("size of buffer (") + std::to_string(s_array) +
+            std::string("; shape:") + str_buffer_shape +
             std::string(
                 ") is smaller than size of selection "
                 "in record component (") +
@@ -1036,36 +1043,63 @@ inline void load_chunk(
             str_extent_shape + std::string(")"));
     }
 
-    auto memsel = derive_memory_selection(a);
+    auto memsel = derive_memory_selection(
+        py::reinterpret_borrow<py::object>(buffer), info);
     if (!memsel.has_value())
     {
-        check_buffer_is_contiguous(a);
+        check_buffer_is_contiguous(info);
     }
 
-    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
+    // datatype check: the buffer's PEP 3118 format string must map to the
+    // record component's datatype
+    Datatype const buffer_dtype = dtype_from_bufferformat(info.format);
+    if (buffer_dtype != r.getDatatype())
     {
         std::stringstream err;
-        err << "Attempting load into Python array of type '"
-            << dtype_from_numpy(a.dtype())
+        err << "Attempting load into Python buffer of type '" << buffer_dtype
             << "' from Record Component of type '" << r.getDatatype() << "'.";
         throw error::WrongAPIUsage(err.str());
     }
 
-    py::object owner_obj =
-        memsel.has_value()
-        ? deepest_owner(py::reinterpret_borrow<py::object>(a))
-        : py::reinterpret_borrow<py::object>(a);
-    py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
-    auto owner_info = owner_buf.request(/* writable = */ true);
+    py::object owner_obj = memsel.has_value()
+        ? deepest_owner(py::reinterpret_borrow<py::object>(buffer))
+        : py::reinterpret_borrow<py::object>(buffer);
+
+    // The backend expects the data pointer to refer to the origin of the
+    // contiguous memory block (with the selection given as {offset, extent});
+    // for memory selections that is the deepest owner's buffer pointer, for
+    // the contiguous path it is the buffer's own pointer.
+    void *data_ptr = info.ptr;
+    py::buffer owner_buf;
+    if (memsel.has_value())
+    {
+        owner_buf = py::cast<py::buffer>(owner_obj);
+        auto owner_info = owner_buf.request(/* writable = */ true);
+        data_ptr = owner_info.ptr;
+    }
 
     switchDatasetType<LoadChunkIntoPythonArray>(
         r.getDatatype(),
         r,
         owner_obj,
-        owner_info.ptr,
+        data_ptr,
         offset,
         extent,
         std::move(memsel));
+}
+
+/** Load Chunk (numpy array convenience overload)
+ *
+ * See the generic overload above; this just forwards a numpy array through the
+ * generic buffer path.
+ */
+inline void load_chunk(
+    RecordComponent &r,
+    py::array &a,
+    Offset const &offset,
+    Extent const &extent)
+{
+    load_chunk(r, static_cast<py::buffer &>(a), offset, extent);
 }
 
 /** Load Chunk
@@ -1357,21 +1391,8 @@ void init_RecordComponent(py::module &m)
                 else
                     extent = extent_in;
 
-                /*
-                 * Interpret the buffer as a numpy array (a zero-copy view for
-                 * numpy-backed buffers, which is the common case). This is
-                 * what allows memory selections to be derived from strided
-                 * buffers.
-                 */
-                py::array arr = py::array::ensure(buffer);
-                if (!arr)
-                {
-                    throw error::WrongAPIUsage(
-                        "[Record_Component::load_chunk()] Cannot interpret the "
-                        "passed buffer as a numpy array.");
-                }
                 std::vector<bool> flatten(ndim, false);
-                load_chunk(r, arr, offset, extent);
+                load_chunk(r, buffer, offset, extent);
             },
             py::arg("pre-allocated buffer"),
             py::arg_v(

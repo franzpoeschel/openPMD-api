@@ -1756,6 +1756,46 @@ class APITest(unittest.TestCase):
             expected[2:6, 2:6, 2:6] = source[0:4, 0:4, 0:4]
             np.testing.assert_array_equal(read_buffer, expected)
 
+    def testGenericBufferLoadChunk(self):
+        """
+        `Record_Component.load_chunk` must accept any PEP 3118 buffer, not
+        only numpy arrays. Regression test for the API breakage where the
+        buffer overload routed through `py::array::ensure` (numpy), which
+        rejects generic buffer objects that numpy cannot interpret.
+        """
+        import array
+
+        if not found_numpy:
+            return
+
+        for ext in (".bp", ".h5"):
+            if ext not in io.file_extensions:
+                continue
+            name = "unittest_py_generic_buffer_load" + ext
+            series = io.Series(name, io.Access.create)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            E_x.reset_dataset(io.Dataset(np.float64, [4, 4]))
+            E_x[:, :, :] = np.arange(16, dtype=np.float64).reshape(4, 4)
+            series.flush()
+            series.close()
+
+            # Load into a contiguous generic PEP 3118 buffer (array.array),
+            # which goes through load_chunk's buffer path, not numpy.
+            series = io.Series(name, io.Access.read_only)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            dst = array.array("d", [0.0] * 16)
+            E_x.load_chunk(dst, [0, 0], [4, 4])
+            series.flush()
+            self.assertEqual(list(dst), list(range(16)))
+
+            # Wrong datatype must be rejected cleanly (not a numpy TypeError).
+            with self.assertRaises(io.Error):
+                E_x.load_chunk(bytearray(16), [0, 0], [4, 4])
+                series.flush()
+            series.close()
+
     def testIterations(self):
         """Test querying a series' iterations and loop over them."""
 
