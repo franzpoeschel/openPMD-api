@@ -852,6 +852,79 @@ namespace
     }
 } // namespace
 
+namespace
+{
+    /**
+     * Create and select an HDF5 memory data space (memspace) for a chunk of
+     * `chunkExtent` cells.
+     *
+     * Without a memory selection, the chunk is a plain contiguous region, so
+     * the resulting memspace has exactly `chunkExtent` as its shape.
+     *
+     * With a memory selection, the (Python) data pointer refers to the *origin*
+     * of a contiguous, row-major buffer of shape `memorySelection->extent`, and
+     * the chunk is located at `memorySelection->offset` within that buffer. In
+     * this case the memspace is created with the full buffer shape and a
+     * sub-hyperslab of size `chunkExtent` is selected at
+     * `memorySelection->offset`, so that H5Dread / H5Dwrite scatter the file
+     * hyperslab to / gather it from the correct sub-region of the destination /
+     * source buffer.
+     *
+     * Shared between the HDF5 read and write paths.
+     *
+     * @return An owned HDF5 data space; the caller is responsible for closing
+     * it.
+     */
+    inline hid_t createMemspaceForChunk(
+        Extent const &chunkExtent,
+        std::optional<MemorySelection> const &memorySelection)
+    {
+        std::vector<hsize_t> block;
+        for (auto const &val : chunkExtent)
+            block.push_back(static_cast<hsize_t>(val));
+
+        if (!memorySelection.has_value())
+        {
+            return H5Screate_simple(
+                static_cast<int>(block.size()), block.data(), nullptr);
+        }
+
+        MemorySelection const &memSel = *memorySelection;
+        if (memSel.extent.size() != block.size())
+        {
+            throw error::WrongAPIUsage(
+                "HDF5: Memory selection dimensionality does not match chunk "
+                "dimensionality.");
+        }
+        std::vector<hsize_t> memDims;
+        for (auto const &val : memSel.extent)
+            memDims.push_back(static_cast<hsize_t>(val));
+        hid_t memspace = H5Screate_simple(
+            static_cast<int>(memDims.size()), memDims.data(), nullptr);
+        VERIFY(
+            memspace > 0,
+            "[HDF5] Internal error: Failed to create memspace during dataset "
+            "IO");
+        std::vector<hsize_t> memStart;
+        for (auto const &val : memSel.offset)
+            memStart.push_back(static_cast<hsize_t>(val));
+        std::vector<hsize_t> memStride(memStart.size(), 1);
+        std::vector<hsize_t> memCount(memStart.size(), 1);
+        herr_t status = H5Sselect_hyperslab(
+            memspace,
+            H5S_SELECT_SET,
+            memStart.data(),
+            memStride.data(),
+            memCount.data(),
+            block.data());
+        VERIFY(
+            status == 0,
+            "[HDF5] Internal error: Failed to select memory hyperslab during "
+            "dataset IO");
+        return memspace;
+    }
+} // namespace
+
 void HDF5IOHandlerImpl::createDataset(
     Writable *writable, Parameter<Operation::CREATE_DATASET> const &parameters)
 {
@@ -1918,12 +1991,6 @@ void HDF5IOHandlerImpl::writeDataset(
             "[HDF5] Writing into a dataset in a file opened as read only is "
             "not possible.");
 
-    if (parameters.memorySelection.has_value())
-    {
-        throw error::OperationUnsupportedInBackend(
-            "HDF5",
-            "Non-contiguous memory selections not supported in HDF5 backend.");
-    }
     File file = requireFile("writeDataset", writable, /* checkParent = */ true);
 
     herr_t status;
@@ -1998,8 +2065,8 @@ void HDF5IOHandlerImpl::writeDataset(
         std::vector<hsize_t> block;
         for (auto const &val : parameters.extent)
             block.push_back(static_cast<hsize_t>(val));
-        memspace = H5Screate_simple(
-            static_cast<int>(block.size()), block.data(), nullptr);
+        memspace = createMemspaceForChunk(
+            parameters.extent, parameters.memorySelection);
         defer_close_memspace = auxiliary::defer([&]() {
             status = H5Sclose(memspace); //
             if (status != 0)
@@ -2520,55 +2587,8 @@ void HDF5IOHandlerImpl::readDataset(
         for (auto const &val : parameters.extent)
             block.push_back(static_cast<hsize_t>(val));
 
-        if (parameters.memorySelection.has_value())
-        {
-            /*
-             * Memory selections on read: the data pointer refers to the
-             * origin of a contiguous memory buffer of shape
-             * memorySelection->extent. We therefore create the memory space
-             * with that full shape and select the sub-hyperslab (at
-             * memorySelection->offset, of size == chunk extent) within it, so
-             * that H5Dread scatters the file hyperslab into the correct
-             * location of the destination buffer.
-             */
-            MemorySelection const &memSel = *parameters.memorySelection;
-            if (memSel.extent.size() != block.size())
-            {
-                throw error::WrongAPIUsage(
-                    "HDF5: Memory selection dimensionality does not match "
-                    "chunk dimensionality.");
-            }
-            std::vector<hsize_t> memDims;
-            for (auto const &val : memSel.extent)
-                memDims.push_back(static_cast<hsize_t>(val));
-            memspace = H5Screate_simple(
-                static_cast<int>(memDims.size()), memDims.data(), nullptr);
-            VERIFY(
-                memspace > 0,
-                "[HDF5] Internal error: Failed to create memspace during "
-                "dataset read");
-            std::vector<hsize_t> memStart;
-            for (auto const &val : memSel.offset)
-                memStart.push_back(static_cast<hsize_t>(val));
-            std::vector<hsize_t> memStride(memStart.size(), 1);
-            std::vector<hsize_t> memCount(memStart.size(), 1);
-            status = H5Sselect_hyperslab(
-                memspace,
-                H5S_SELECT_SET,
-                memStart.data(),
-                memStride.data(),
-                memCount.data(),
-                block.data());
-            VERIFY(
-                status == 0,
-                "[HDF5] Internal error: Failed to select memory hyperslab "
-                "during dataset read");
-        }
-        else
-        {
-            memspace = H5Screate_simple(
-                static_cast<int>(block.size()), block.data(), nullptr);
-        }
+        memspace = createMemspaceForChunk(
+            parameters.extent, parameters.memorySelection);
         status = H5Sselect_hyperslab(
             filespace,
             H5S_SELECT_SET,
