@@ -397,6 +397,35 @@ struct LoadChunkIntoPythonArray
 
     static constexpr char const *errorMsg = "load_chunk()";
 };
+struct LoadChunkIntoPythonArrayWithMemorySelection
+{
+    template <typename T>
+    static void call(
+        RecordComponent &r,
+        py::object owning_handle,
+        void *data,
+        Offset const &offset,
+        Extent const &extent,
+        MemorySelection memorySelection)
+    {
+        std::shared_ptr<T> shared(
+            (T *)data,
+            [owning_handle =
+                 std::make_optional(std::move(owning_handle))](T *) mutable {
+                py::gil_scoped_acquire need_the_gil_for_this;
+                owning_handle.reset();
+            });
+        r.prepareLoadStore()
+            .offset(offset)
+            .extent(extent)
+            .withSharedPtr(std::move(shared))
+            .memorySelection(memorySelection)
+            .unsafeNoAutomaticFlush()
+            .load();
+    }
+
+    static constexpr char const *errorMsg = "load_chunk()";
+};
 struct LoadChunkIntoPythonBuffer
 {
     template <typename T>
@@ -1200,6 +1229,74 @@ inline void load_chunk(
         r.getDatatype(), r, a, offset, extent);
 }
 
+/** Load a chunk into a pre-allocated strided destination view.
+ *
+ * When the destination numpy array is a (possibly non-contiguous in its own
+ * shape) view of a larger contiguous buffer, this mirrors
+ * store_chunk_with_memory_selection(): the dataset chunk is loaded directly
+ * into the destination sub-region through a single
+ * `prepareLoadStore().memorySelection().load()` operation, avoiding an
+ * intermediate buffer.
+ *
+ * e.g. loading into a strided view of a larger ghost-cell-style buffer:
+ *
+ *   record_component.load_chunk(
+ *       offset, extent, read_buffer[2:4, 2:4, 2:4])
+ *
+ * If the destination array is contiguous (or owns its memory), the ordinary
+ * contiguous load path is used.
+ */
+inline void load_chunk_with_memory_selection(
+    RecordComponent &r,
+    py::array &a,
+    Offset const &offset,
+    Extent const &extent)
+{
+    auto memsel = derive_memory_selection(a);
+    if (!memsel.has_value())
+    {
+        load_chunk(r, a, offset, extent);
+        return;
+    }
+
+    if (size_t(a.ndim()) != extent.size())
+        throw py::index_error(
+            std::string("dimension of chunk (") + std::to_string(a.ndim()) +
+            std::string(
+                "D) does not fit dimension of selection "
+                "in record component (") +
+            std::to_string(extent.size()) + std::string("D)"));
+    for (py::ssize_t d = 0; d < a.ndim(); ++d)
+        if (extent[d] != std::uint64_t(a.shape()[d]))
+            throw py::index_error(
+                std::string("size of chunk (") + std::to_string(a.shape()[d]) +
+                std::string(") for axis ") + std::to_string(d) +
+                std::string(
+                    " does not match selection size in record component (") +
+                std::to_string(extent[d]) + std::string(")"));
+
+    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
+    {
+        std::stringstream err;
+        err << "Attempting load into Python array of type '"
+            << dtype_from_numpy(a.dtype())
+            << "' from Record Component of type '" << r.getDatatype() << "'.";
+        throw error::WrongAPIUsage(err.str());
+    }
+
+    py::array owner_arr = deepest_base_of(a);
+    void *const data = owner_arr.mutable_data();
+
+    switchDatasetType<LoadChunkIntoPythonArrayWithMemorySelection>(
+        r.getDatatype(),
+        r,
+        owner_arr.cast<py::object>(),
+        data,
+        offset,
+        extent,
+        std::move(*memsel));
+}
+
 /** Load Chunk
  *
  * Called with a py::tuple of slices.
@@ -1467,7 +1564,7 @@ void init_RecordComponent(py::module &m)
         .def(
             "load_chunk",
             [](RecordComponent &r,
-               py::buffer buffer,
+               py::array buffer,
                Offset const &offset_in,
                Extent const &extent_in) {
                 uint8_t ndim = r.getDimensionality();
@@ -1490,7 +1587,7 @@ void init_RecordComponent(py::module &m)
                     extent = extent_in;
 
                 std::vector<bool> flatten(ndim, false);
-                load_chunk(r, buffer, offset, extent);
+                load_chunk_with_memory_selection(r, buffer, offset, extent);
             },
             py::arg("pre-allocated buffer"),
             py::arg_v(

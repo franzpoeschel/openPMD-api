@@ -1733,6 +1733,51 @@ class APITest(unittest.TestCase):
         series.flush()
         series.close()
 
+    def test_memory_selection_read(self):
+        """
+        Test loading a chunk directly into a strided destination view of a
+        larger buffer (memory selection on read), i.e.:
+
+            record_component.load_chunk(offset, extent, read_buffer[...])
+
+        The loaded chunk is scattered into the destination sub-region through a
+        single backend 'READ_DATASET' operation, without an intermediate
+        buffer.
+
+        Memory selections on read are supported by the ADIOS2 and HDF5
+        backends.
+        """
+        if not found_numpy:
+            return
+
+        for ext in (".bp", ".h5"):
+            if ext not in io.file_extensions:
+                continue
+            name = "unittest_py_mem_selection_read" + ext
+            series = io.Series(name, io.Access.create)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            E_x.reset_dataset(io.Dataset(np.int64, [6, 6, 6]))
+            source = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
+            E_x[:, :, :] = source
+            series.flush()
+            series.close()
+
+            series = io.Series(name, io.Access.read_only)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            read_buffer = np.full((8, 8, 8), -1, dtype=np.int64)
+            # Load the dataset sub-cuboid [0:4,0:4,0:4] into
+            # read_buffer[2:6, 2:6, 2:6]: a strided destination view whose
+            # deepest base is read_buffer itself.
+            E_x.load_chunk(read_buffer[2:6, 2:6, 2:6], [0, 0, 0], [4, 4, 4])
+            series.flush()
+            series.close()
+
+            expected = np.full((8, 8, 8), -1, dtype=np.int64)
+            expected[2:6, 2:6, 2:6] = source[0:4, 0:4, 0:4]
+            np.testing.assert_array_equal(read_buffer, expected)
+
     def testIterations(self):
         """Test querying a series' iterations and loop over them."""
 

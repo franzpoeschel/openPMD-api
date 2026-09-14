@@ -49,6 +49,12 @@ void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
 void store_chunk_with_memory_selection(
     RecordComponent &r, py::array &a, py::tuple const &slices);
 
+void load_chunk_with_memory_selection(
+    RecordComponent &r,
+    py::array &a,
+    Offset const &offset,
+    Extent const &extent);
+
 namespace docstring
 {
 constexpr static char const *is_scalar = R"docstr(
