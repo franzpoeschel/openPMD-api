@@ -1253,6 +1253,13 @@ void JSONIOHandlerImpl::readDataset(
     auto &j = obtainJsonContents(writable);
     DatasetMode localMode = verifyDataset(parameters, j);
 
+    if (parameters.memorySelection.has_value())
+    {
+        throw error::OperationUnsupportedInBackend(
+            "JSON",
+            "Non-contiguous memory selections not supported in JSON backend.");
+    }
+
     switch (localMode)
     {
     case DatasetMode::Template:

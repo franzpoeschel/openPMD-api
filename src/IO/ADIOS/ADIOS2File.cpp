@@ -71,7 +71,7 @@ void DatasetReader::call(
     adios2::Variable<T> var = impl->verifyDataset<T>(
         bp.param.offset,
         bp.param.extent,
-        std::nullopt,
+        bp.param.memorySelection,
         IO,
         engine,
         bp.name,
@@ -85,6 +85,20 @@ void DatasetReader::call(
     }
     auto ptr = std::static_pointer_cast<T>(bp.param.data).get();
     engine.Get(var, ptr);
+    if (bp.param.memorySelection.has_value())
+    {
+        /*
+         * Conform to the write path: reset the memory selection so it does
+         * not leak into subsequent Get/Put calls. ADIOS2 versions that cannot
+         * reset a memory selection reject the selection already in
+         * verifyDataset(), so this branch is only ever reached with
+         * supporting versions.
+         */
+        if constexpr (openPMD::CanTheMemorySelectionBeReset)
+        {
+            var.SetMemorySelection();
+        }
+    }
 }
 
 template <class>
