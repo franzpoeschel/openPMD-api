@@ -36,3 +36,7 @@ namespace components_without_extent
 {
 auto components_without_extent() -> void;
 }
+namespace memory_selection_test
+{
+auto memory_selection_test() -> void;
+}

@@ -1667,19 +1667,17 @@ class APITest(unittest.TestCase):
         memory selection, i.e. `record[op_slices] = buffer[...]` where the RHS
         is a (multiply-)sliced view of the buffer.
 
-        Memory selections are currently supported by the ADIOS2 backend only;
-        HDF5 raises OperationUnsupportedInBackend.
+        Memory selections on write are supported by the ADIOS2 and HDF5
+        backends.
         """
         if not found_numpy:
             return
 
-        # only run on ADIOS-based backends (file extension ".bp")
-        if ".bp" not in io.file_extensions:
-            return
-
         writes = {}
         reads = {}
-        for ext in (".bp",):
+        for ext in (".bp", ".h5"):
+            if ext not in io.file_extensions:
+                continue
             name = "unittest_py_mem_selection" + ext
             series = io.Series(name, io.Access.create)
             i = series.iterations[0]
@@ -1688,8 +1686,7 @@ class APITest(unittest.TestCase):
             write_buffer = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
             # LHS selects a 2x2x2 cuboid of the dataset; RHS is a 2x2x2 view of a
             # (6,6,6) buffer -> both axes retain sub-cuboid strides, so this maps
-            # onto a single ADIOS2 memory-selection store without an intermediate
-            # copy.
+            # onto a single memory-selection store without an intermediate copy.
             E_x[2:4, 2:4, 2:4] = write_buffer[2:4, 2:4, 2:4]
             # also store another disjoint cuboid from the same buffer
             E_x[0:2, 0:2, 0:2] = write_buffer[4:6, 4:6, 4:6]
@@ -1704,34 +1701,15 @@ class APITest(unittest.TestCase):
             series.close()
             reads[ext] = data
 
-        for ext in (".bp",):
+        for ext in (".bp", ".h5"):
+            if ext not in reads:
+                continue
             write_buffer = writes[ext]
             data = reads[ext]
             expected = np.zeros((6, 6, 6), dtype=np.int64)
             expected[2:4, 2:4, 2:4] = write_buffer[2:4, 2:4, 2:4]
             expected[0:2, 0:2, 0:2] = write_buffer[4:6, 4:6, 4:6]
             np.testing.assert_array_equal(data, expected)
-
-    def test_memory_selection_write_hdf5_unsupported(self):
-        """
-        On HDF5, non-contiguous memory selections are unsupported; verify the
-        backend raises OperationUnsupportedInBackend rather than silently
-        mis-writing.
-        """
-        if not found_numpy:
-            return
-        if ".h5" not in io.file_extensions:
-            return
-        name = "unittest_py_mem_selection_hdf5.h5"
-        series = io.Series(name, io.Access.create)
-        i = series.iterations[0]
-        E_x = i.meshes["E"]["x"]
-        E_x.reset_dataset(io.Dataset(np.int64, [6, 6, 6]))
-        write_buffer = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
-        with self.assertRaises(Exception):
-            E_x[2:4, 2:4, 2:4] = write_buffer[2:4, 2:4, 2:4]
-        series.flush()
-        series.close()
 
     def test_memory_selection_read(self):
         """
