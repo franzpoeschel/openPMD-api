@@ -639,9 +639,8 @@ void memory_selection_read_test(std::string const &file_ending)
         E_x.prepareLoadStore()
             .withContiguousContainer(buffer)
             .memorySelection({{1, 1}, {buffer_rows, buffer_cols}})
-            .unsafeNoAutomaticFlush()
-            .load();
-        read.flush();
+            .load()
+            .get();
 
         // Check the interior sub-block (rows 1..mpi_size, cols 1..4) contains
         // the dataset values.

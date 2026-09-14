@@ -511,30 +511,15 @@ inline void store_chunk(
         throw error::WrongAPIUsage(err.str());
     }
 
-    if (memorySelection.has_value())
-    {
-        // Data pointer = origin of the memory block (the view's deepest base).
-        py::array owner_arr = deepest_base_of(a);
-        switchDatasetType<StoreChunkFromPythonArray>(
-            r.getDatatype(),
-            r,
-            owner_arr.cast<py::object>(),
-            owner_arr.mutable_data(),
-            offset,
-            extent,
-            std::move(memorySelection));
-    }
-    else
-    {
-        switchDatasetType<StoreChunkFromPythonArray>(
-            r.getDatatype(),
-            r,
-            a.cast<py::object>(),
-            a.mutable_data(),
-            offset,
-            extent,
-            std::nullopt);
-    }
+    py::array owner_arr = memorySelection.has_value() ? deepest_base_of(a) : a;
+    switchDatasetType<StoreChunkFromPythonArray>(
+        r.getDatatype(),
+        r,
+        owner_arr.cast<py::object>(),
+        owner_arr.mutable_data(),
+        offset,
+        extent,
+        std::move(memorySelection));
 }
 
 /** Store Chunk
@@ -1066,29 +1051,16 @@ inline void load_chunk(
         throw error::WrongAPIUsage(err.str());
     }
 
-    if (memsel.has_value())
-    {
-        py::array owner_arr = deepest_base_of(a);
-        switchDatasetType<LoadChunkIntoPythonArray>(
-            r.getDatatype(),
-            r,
-            owner_arr.cast<py::object>(),
-            owner_arr.mutable_data(),
-            offset,
-            extent,
-            std::move(memsel));
-    }
-    else
-    {
-        switchDatasetType<LoadChunkIntoPythonArray>(
-            r.getDatatype(),
-            r,
-            a.cast<py::object>(),
-            a.mutable_data(),
-            offset,
-            extent,
-            std::nullopt);
-    }
+    py::array owner_arr = memsel.has_value() ? deepest_base_of(a) : a;
+
+    switchDatasetType<LoadChunkIntoPythonArray>(
+        r.getDatatype(),
+        r,
+        owner_arr.cast<py::object>(),
+        owner_arr.mutable_data(),
+        offset,
+        extent,
+        std::move(memsel));
 }
 
 /** Load Chunk
