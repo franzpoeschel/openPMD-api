@@ -44,3 +44,7 @@ namespace file_state_lifetime
 {
 auto file_state_lifetime() -> void;
 }
+namespace memory_selection_test
+{
+auto memory_selection_test() -> void;
+}
