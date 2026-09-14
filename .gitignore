@@ -53,6 +53,7 @@ __pycache__
 cmake-build-*/
 spack-build*
 build/
+_build/
 
 # File-based project format:
 *.iws
