@@ -292,26 +292,21 @@ inline std::tuple<Offset, Extent, std::vector<bool>> parseJoinedTupleSlices(
  *
  * - not strided with paddings
  * - not a view in another buffer that results in striding
+ *
+ * @return The PEP 3118 buffer description of the array (strides in bytes).
  */
-inline void check_buffer_is_contiguous(py::array &a)
+inline py::buffer_info
+check_buffer_is_contiguous(py::array &a, bool writable = false)
 {
 
-    auto *view = new Py_buffer();
-    int flags = PyBUF_STRIDES | PyBUF_FORMAT;
-    if (PyObject_GetBuffer(a.ptr(), view, flags) != 0)
-    {
-        delete view;
-        throw py::error_already_set();
-    }
-    bool isContiguous = (PyBuffer_IsContiguous(view, 'C') != 0);
-    PyBuffer_Release(view);
-    delete view;
-
+    auto info = a.request(writable);
+    bool isContiguous = (PyBuffer_IsContiguous(info.view(), 'C') != 0);
     if (!isContiguous)
         throw py::index_error(
             "strides in chunk are inefficient, not implemented!");
     // @todo in order to implement stride handling, one needs to
     //       loop over the input data strides in store/load calls
+    return info;
 }
 
 namespace
@@ -321,11 +316,11 @@ struct StoreChunkFromPythonArray
     template <typename T>
     static void call(
         RecordComponent &r,
-        py::array &a,
+        py::object owning_handle,
+        void *data,
         Offset const &offset,
         Extent const &extent)
     {
-        void *data = a.mutable_data();
         // here, we store an owning handle in the lambda capture so that
         // temporary and lost-scope variables stay alive until we flush
         // note: this does not yet prevent the user, as in C++, to build
@@ -333,11 +328,45 @@ struct StoreChunkFromPythonArray
         std::shared_ptr<T> shared(
             (T *)data,
             [owning_handle =
-                 std::make_optional(a.cast<py::object>())](T *) mutable {
+                 std::make_optional(std::move(owning_handle))](T *) mutable {
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        r.storeChunk(std::move(shared), offset, extent);
+        r.prepareLoadStore()
+            .offset(offset)
+            .extent(extent)
+            .withSharedPtr(std::move(shared))
+            .unsafeNoAutomaticFlush()
+            .store();
+    }
+
+    static constexpr char const *errorMsg = "store_chunk()";
+};
+struct StoreChunkFromPythonArrayWithMemorySelection
+{
+    template <typename T>
+    static void call(
+        RecordComponent &r,
+        py::object owning_handle,
+        void *data,
+        Offset const &offset,
+        Extent const &extent,
+        MemorySelection memorySelection)
+    {
+        std::shared_ptr<T> shared(
+            (T *)data,
+            [owning_handle =
+                 std::make_optional(std::move(owning_handle))](T *) mutable {
+                py::gil_scoped_acquire need_the_gil_for_this;
+                owning_handle.reset();
+            });
+        r.prepareLoadStore()
+            .offset(offset)
+            .extent(extent)
+            .withSharedPtr(std::move(shared))
+            .memorySelection(memorySelection)
+            .unsafeNoAutomaticFlush()
+            .store();
     }
 
     static constexpr char const *errorMsg = "store_chunk()";
@@ -507,7 +536,12 @@ inline void store_chunk(
         throw error::WrongAPIUsage(err.str());
     }
     switchDatasetType<StoreChunkFromPythonArray>(
-        r.getDatatype(), r, a, offset, extent);
+        r.getDatatype(),
+        r,
+        a.cast<py::object>(),
+        a.mutable_data(),
+        offset,
+        extent);
 }
 
 /** Store Chunk
@@ -536,6 +570,373 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
     }
 
     store_chunk(r, a, offset, extent, flatten);
+}
+
+/** Derive an openPMD MemorySelection from a (view of a) numpy array.
+ *
+ * openPMD memory selections describe a sub-region of a contiguous, row-major
+ * memory buffer by its offset (in elements) within that buffer and the full
+ * shape of the buffer (cf. ParallelIOTest.cpp and the ADIOS2 backend's
+ * `SetMemorySelection`, which expects `{memoryStart, memoryCount}` where
+ * `memoryCount` is the shape of the contiguous memory block that the data
+ * pointer refers to).
+ *
+ * Multidimensional slicing of a row-major numpy array along all axes produces
+ * a view whose strides are the *same* as the parent array's strides. From such
+ * a view we can recover:
+ *   - the origin of the contiguous memory block (the deepest base array),
+ *   - the full shape of the memory block (from the view's strides and the
+ *     block's element count),
+ *   - the per-axis offset at which the view starts (by decomposing the data
+ *     pointer delta against the block's row-major strides).
+ *
+ * Supported: sub-cuboid views such as `write_buffer[2:4, 2:4, 2:4]`, i.e.
+ * `rho[0:2, 0:2, 0:2] = write_buffer[2:4, 2:4, 2:4]`.
+ *
+ * Unsupported and rejected (matching the pre-existing error, so existing tests
+ * keep passing): arbitrary strided views such as `[:, ::2]`, dropped axes /
+ * integer-indexed views where the block shape cannot be reconstructed.
+ *
+ * @return The memory selection {offset, extent}, or std::nullopt if the view
+ *         covers the whole memory block (no selection needed).
+ */
+inline std::optional<MemorySelection> derive_memory_selection(py::array &a)
+{
+    auto info = a.request(/* writable = */ false);
+    py::ssize_t const ndim = info.ndim;
+    if (ndim == 0)
+    {
+        return std::nullopt;
+    }
+    py::ssize_t const itemsize = info.itemsize;
+
+    /*
+     * If the array owns its data (base chain terminates at itself) and is
+     * contiguous in its own shape, it *is* the whole memory block: no memory
+     * selection is needed. This is the common `record[()] = np.ones(...)` case
+     * and must go down the contiguous fast path (which performs the proper
+     * dimensionality/shape checks, e.g. rejecting `np.ones((43,13,4))` for a
+     * 2-D record component).
+     */
+    {
+        bool is_contiguous_in_own_shape = true;
+        {
+            py::ssize_t expected = itemsize;
+            for (py::ssize_t d = ndim - 1; d >= 0; --d)
+            {
+                if (info.strides[d] != expected)
+                {
+                    is_contiguous_in_own_shape = false;
+                    break;
+                }
+                expected *= info.shape[d];
+            }
+        }
+        bool owns_data = false;
+        try
+        {
+            py::object base = a.attr("base");
+            owns_data = base.is_none();
+        }
+        catch (py::error_already_set const &)
+        {
+            owns_data = false;
+        }
+        if (owns_data && is_contiguous_in_own_shape)
+        {
+            return std::nullopt;
+        }
+    }
+
+    // Walk the base chain to the deepest base array (the memory-block owner).
+    // NumPy collapses nested views: the deepest base is always a flat (n,)
+    // array whose buffer covers the whole memory block.
+    py::object owner_obj = py::reinterpret_borrow<py::object>(a);
+    {
+        py::object current = py::reinterpret_borrow<py::object>(a);
+        while (true)
+        {
+            py::object base = current.attr("base");
+            if (base.is_none())
+            {
+                break;
+            }
+            owner_obj = base;
+            current = base;
+        }
+    }
+    py::array owner_arr;
+    try
+    {
+        owner_arr = py::cast<py::array>(owner_obj);
+    }
+    catch (py::cast_error const &)
+    {
+        throw py::index_error(
+            "strides in chunk are inefficient, not implemented!");
+    }
+    auto owner_info = owner_arr.request();
+    if (owner_info.itemsize != itemsize)
+    {
+        throw py::index_error(
+            "strides in chunk are inefficient, not implemented!");
+    }
+    std::size_t const block_elems = static_cast<std::size_t>(owner_info.size);
+    void *const origin = owner_info.ptr;
+
+    /*
+     * Reconstruct the memory block shape from the view's strides.
+     *
+     * For a C-contiguous block of shape B, stride[i] = prod_{j>i} B[j].
+     * If the view retains all axes (basic slicing of every axis), its strides
+     * equal the block's strides, so:
+     *   B[i] = stride[i] / stride[i+1]        (i < ndim-1)
+     *   B[ndim-1] = block_elems / prod_{i<ndim-1} B[i]
+     */
+    std::vector<std::uint64_t> view_strides_elem(ndim);
+    for (py::ssize_t d = 0; d < ndim; ++d)
+    {
+        view_strides_elem[d] =
+            std::uint64_t(info.strides[d]) / std::uint64_t(itemsize);
+        if (view_strides_elem[d] == 0 && info.shape[d] > 1)
+        {
+            // zero-sized / broadcast-like stride: not a sub-cuboid
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+    }
+    std::vector<std::uint64_t> block_shape(ndim, 1u);
+    {
+        std::uint64_t prod = 1u;
+        for (py::ssize_t d = 0; d + 1 < ndim; ++d)
+        {
+            if (view_strides_elem[d] % view_strides_elem[d + 1] != 0 ||
+                view_strides_elem[d] < view_strides_elem[d + 1])
+            {
+                throw py::index_error(
+                    "strides in chunk are inefficient, not implemented!");
+            }
+            block_shape[d] = view_strides_elem[d] / view_strides_elem[d + 1];
+            prod *= block_shape[d];
+        }
+        if (prod == 0 || block_elems % prod != 0)
+        {
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+        // The final dimension size must be consistent with the view's own
+        // innermost stride (which equals the block's innermost stride iff the
+        // block is C-contiguous and the view preserves the last axis).
+        block_shape[ndim - 1] = std::uint64_t(block_elems) / prod;
+        if (view_strides_elem[ndim - 1] != 1 && ndim > 1)
+        {
+            // C-contiguous block always has innermost stride 1 element.
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+    }
+
+    // Decompose the data-pointer delta into per-axis offsets against the
+    // block's row-major strides.
+    std::uint64_t const view_ptr = reinterpret_cast<std::uintptr_t>(info.ptr);
+    std::uint64_t const origin_ptr = reinterpret_cast<std::uintptr_t>(origin);
+    if (view_ptr < origin_ptr)
+    {
+        throw py::index_error(
+            "strides in chunk are inefficient, not implemented!");
+    }
+    std::uint64_t delta = (view_ptr - origin_ptr) / std::uint64_t(itemsize);
+
+    std::vector<std::uint64_t> block_strides(ndim, 1u);
+    {
+        std::uint64_t acc = 1u;
+        for (py::ssize_t d = ndim - 1; d >= 0; --d)
+        {
+            block_strides[d] = acc;
+            acc *= block_shape[d];
+        }
+    }
+
+    Offset mem_offset(ndim, 0u);
+    {
+        std::uint64_t rem = delta;
+        for (py::ssize_t d = 0; d < ndim; ++d)
+        {
+            std::uint64_t const stride = block_strides[d];
+            mem_offset[d] = stride == 0 ? 0 : rem / stride;
+            rem = stride == 0 ? 0 : rem % stride;
+        }
+        if (rem != 0)
+        {
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+    }
+
+    // Validate that the view fits within the reconstructed block at the
+    // computed offsets and that its strides match the block layout (this
+    // rejects interleaved views such as `[:, ::2]` or `data[:, 5]`, whose
+    // reconstruction is not a valid sub-cuboid).
+    for (py::ssize_t d = 0; d < ndim; ++d)
+    {
+        if (mem_offset[d] + std::uint64_t(info.shape[d]) > block_shape[d])
+        {
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+        // view strides must equal the block's contiguous strides
+        if (std::uint64_t(info.strides[d]) / std::uint64_t(itemsize) !=
+            block_strides[d])
+        {
+            throw py::index_error(
+                "strides in chunk are inefficient, not implemented!");
+        }
+    }
+
+    // If the view covers the whole block at offset 0, no selection is needed.
+    bool whole = true;
+    for (py::ssize_t d = 0; d < ndim; ++d)
+    {
+        if (mem_offset[d] != 0 ||
+            std::uint64_t(info.shape[d]) != block_shape[d])
+        {
+            whole = false;
+            break;
+        }
+    }
+    if (whole)
+    {
+        return std::nullopt;
+    }
+
+    return MemorySelection{
+        std::move(mem_offset), Extent(std::move(block_shape))};
+}
+
+/** Walk to the deepest base array and return its data pointer.
+ *
+ * Used by the memory-selection store path: the backend expects the data
+ * pointer to refer to the *origin* of the contiguous memory block, with the
+ * selection given as {offset, extent}.
+ */
+inline py::array deepest_base_of(py::array &a)
+{
+    py::object owner_obj = py::reinterpret_borrow<py::object>(a);
+    {
+        py::object current = py::reinterpret_borrow<py::object>(a);
+        while (true)
+        {
+            py::object base = current.attr("base");
+            if (base.is_none())
+            {
+                break;
+            }
+            owner_obj = base;
+            current = base;
+        }
+    }
+    return py::cast<py::array>(owner_obj);
+}
+
+/** Store Chunk with a memory selection.
+ *
+ * Called when the RHS array is a (possibly non-contiguous in its own shape)
+ * view of a larger contiguous buffer and the user selects a sub-cuboid of the
+ * dataset on the LHS, e.g.:
+ *
+ *   record_component[0:2, 0:2, 0:2] = write_buffer[2:4, 2:4, 2:4]
+ *
+ * @param r        The record component to store into.
+ * @param a        The RHS numpy array (view of a larger buffer).
+ * @param slices   The LHS `__setitem__` slices (dataset selection).
+ */
+inline void store_chunk_with_memory_selection(
+    RecordComponent &r, py::array &a, py::tuple const &slices)
+{
+    uint8_t const ndim = r.getDimensionality();
+    auto const full_extent = r.getExtent();
+
+    Offset offset;
+    Extent extent;
+    std::vector<bool> flatten;
+    if (auto joined_dimension = r.joinedDimension();
+        joined_dimension.has_value())
+    {
+        std::tie(offset, extent, flatten) = parseJoinedTupleSlices(
+            ndim, full_extent, slices, *joined_dimension, a);
+    }
+    else
+    {
+        std::tie(offset, extent, flatten) =
+            parseTupleSlices(ndim, full_extent, slices);
+    }
+
+    /*
+     * If any axis was flattened by integer indexing, or the view is contiguous
+     * in its own shape, fall back to the conventional path (which validates
+     * contiguity and will throw for genuinely strided data, as before).
+     */
+    size_t const numFlattenDims =
+        std::count(flatten.begin(), flatten.end(), true);
+    if (numFlattenDims > 0)
+    {
+        store_chunk(r, a, offset, extent, flatten);
+        return;
+    }
+
+    auto memsel = derive_memory_selection(a);
+    if (!memsel.has_value())
+    {
+        store_chunk(r, a, offset, extent, flatten);
+        return;
+    }
+
+    /*
+     * A memory selection is necessary. Verify shape compatibility between the
+     * RHS view and the dataset selection (mirrors store_chunk's checks).
+     */
+    auto const r_extent = r.getExtent();
+    if (size_t(a.ndim()) != r_extent.size())
+        throw py::index_error(
+            std::string("dimension of chunk (") + std::to_string(a.ndim()) +
+            std::string(
+                "D) does not fit dimension of selection "
+                "in record component (") +
+            std::to_string(r_extent.size()) + std::string("D)"));
+
+    for (py::ssize_t d = 0; d < a.ndim(); ++d)
+    {
+        if (extent[d] != std::uint64_t(a.shape()[d]))
+            throw py::index_error(
+                std::string("size of chunk (") + std::to_string(a.shape()[d]) +
+                std::string(") for axis ") + std::to_string(d) +
+                std::string(
+                    " does not match selection size in record "
+                    "component (") +
+                std::to_string(extent[d]) + std::string(")"));
+    }
+
+    if (!dtype_to_numpy(r.getDatatype()).is(a.dtype()))
+    {
+        std::stringstream err;
+        err << "Attempting store from Python array of type '"
+            << dtype_from_numpy(a.dtype())
+            << "' into Record Component of type '" << r.getDatatype() << "'.";
+        throw error::WrongAPIUsage(err.str());
+    }
+
+    // Data pointer = origin of the memory block (the view's deepest base).
+    py::array owner_arr = deepest_base_of(a);
+    void *const data = owner_arr.mutable_data();
+
+    switchDatasetType<StoreChunkFromPythonArrayWithMemorySelection>(
+        r.getDatatype(),
+        r,
+        owner_arr.cast<py::object>(),
+        data,
+        offset,
+        extent,
+        std::move(*memsel));
 }
 
 struct PythonDynamicMemoryView
