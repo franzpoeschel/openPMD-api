@@ -100,4 +100,9 @@ namespace bug_1655_bp5_writer_hangup
 auto bug_1655_bp5_writer_hangup() -> void;
 }
 
+namespace memory_selection_test
+{
+auto memory_selection_test() -> void;
+}
+
 #endif
