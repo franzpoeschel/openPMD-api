@@ -390,8 +390,8 @@ struct LoadChunkIntoPythonArray
  * Defined further below; forward declarations so the store/load entry points
  * above can use them.
  */
-inline std::optional<MemorySelection> derive_memory_selection(py::array &a);
-inline py::array deepest_base_of(py::array &a);
+inline std::optional<MemorySelection> derive_memory_selection(py::buffer &a);
+inline py::object deepest_owner(py::object const &obj);
 
 /** Store Chunk
  *
@@ -511,12 +511,16 @@ inline void store_chunk(
         throw error::WrongAPIUsage(err.str());
     }
 
-    py::array owner_arr = memorySelection.has_value() ? deepest_base_of(a) : a;
+    py::object owner_obj = memorySelection.has_value()
+        ? deepest_owner(py::reinterpret_borrow<py::object>(a))
+        : py::reinterpret_borrow<py::object>(a);
+    py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
+    auto owner_info = owner_buf.request(/* writable = */ true);
     switchDatasetType<StoreChunkFromPythonArray>(
         r.getDatatype(),
         r,
-        owner_arr.cast<py::object>(),
-        owner_arr.mutable_data(),
+        owner_obj,
+        owner_info.ptr,
         offset,
         extent,
         std::move(memorySelection));
@@ -594,7 +598,7 @@ store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices)
  * @return The memory selection {offset, extent}, or std::nullopt if the view
  *         covers the whole memory block (no selection needed).
  */
-inline std::optional<MemorySelection> derive_memory_selection(py::array &a)
+inline std::optional<MemorySelection> derive_memory_selection(py::buffer &a)
 {
     auto info = a.request(/* writable = */ false);
     py::ssize_t const ndim = info.ndim;
@@ -605,71 +609,46 @@ inline std::optional<MemorySelection> derive_memory_selection(py::array &a)
     py::ssize_t const itemsize = info.itemsize;
 
     /*
-     * If the array owns its data (base chain terminates at itself) and is
-     * contiguous in its own shape, it *is* the whole memory block: no memory
-     * selection is needed. This is the common `record[()] = np.ones(...)` case
-     * and must go down the contiguous fast path (which performs the proper
+     * If the buffer is contiguous in its own shape, it covers (a contiguous
+     * sub-block of) the memory block and no memory selection is needed: go
+     * down the contiguous fast path (which performs the proper
      * dimensionality/shape checks, e.g. rejecting `np.ones((43,13,4))` for a
      * 2-D record component).
      */
     {
-        bool is_contiguous_in_own_shape = true;
+        py::ssize_t expected = itemsize;
+        bool contiguous = true;
+        for (py::ssize_t d = ndim - 1; d >= 0; --d)
         {
-            py::ssize_t expected = itemsize;
-            for (py::ssize_t d = ndim - 1; d >= 0; --d)
+            if (info.strides[d] != expected)
             {
-                if (info.strides[d] != expected)
-                {
-                    is_contiguous_in_own_shape = false;
-                    break;
-                }
-                expected *= info.shape[d];
+                contiguous = false;
+                break;
             }
+            expected *= info.shape[d];
         }
-        bool owns_data = false;
-        try
-        {
-            py::object base = a.attr("base");
-            owns_data = base.is_none();
-        }
-        catch (py::error_already_set const &)
-        {
-            owns_data = false;
-        }
-        if (owns_data && is_contiguous_in_own_shape)
+        if (contiguous)
         {
             return std::nullopt;
         }
     }
 
-    // Walk the base chain to the deepest base array (the memory-block owner).
-    // NumPy collapses nested views: the deepest base is always a flat (n,)
-    // array whose buffer covers the whole memory block.
-    py::object owner_obj = py::reinterpret_borrow<py::object>(a);
-    {
-        py::object current = py::reinterpret_borrow<py::object>(a);
-        while (true)
-        {
-            py::object base = current.attr("base");
-            if (base.is_none())
-            {
-                break;
-            }
-            owner_obj = base;
-            current = base;
-        }
-    }
-    py::array owner_arr;
+    // Walk to the deepest owner of the memory block (the object that actually
+    // owns the contiguous backing memory). For numpy arrays NumPy collapses
+    // nested views to a flat owner array; for memoryviews / generic buffers we
+    // follow the buffer's `.obj` chain.
+    py::object owner_obj = deepest_owner(py::reinterpret_borrow<py::object>(a));
+    py::buffer owner_buf;
     try
     {
-        owner_arr = py::cast<py::array>(owner_obj);
+        owner_buf = py::cast<py::buffer>(owner_obj);
     }
     catch (py::cast_error const &)
     {
         throw py::index_error(
             "strides in chunk are inefficient, not implemented!");
     }
-    auto owner_info = owner_arr.request();
+    auto owner_info = owner_buf.request();
     if (owner_info.itemsize != itemsize)
     {
         throw py::index_error(
@@ -807,29 +786,50 @@ inline std::optional<MemorySelection> derive_memory_selection(py::array &a)
         std::move(mem_offset), Extent(std::move(block_shape))};
 }
 
-/** Walk to the deepest base array and return its data pointer.
+/** Walk to the deepest owner of a buffer's memory block.
  *
- * Used by the memory-selection store path: the backend expects the data
+ * Used by the memory-selection store/load paths: the backend expects the data
  * pointer to refer to the *origin* of the contiguous memory block, with the
  * selection given as {offset, extent}.
+ *
+ * Both numpy arrays (via their `.base` attribute) and generic buffer objects
+ * such as memoryviews (via their `.obj` attribute) can be nested views; walk
+ * the chain to the root object that owns the memory.
+ *
+ * @return The root owner as a Python object (an ndarray for numpy memory, or
+ *         the object exposed through a generic buffer).
  */
-inline py::array deepest_base_of(py::array &a)
+inline py::object deepest_owner(py::object const &obj)
 {
-    py::object owner_obj = py::reinterpret_borrow<py::object>(a);
+    py::object current = py::reinterpret_borrow<py::object>(obj);
+    while (true)
     {
-        py::object current = py::reinterpret_borrow<py::object>(a);
-        while (true)
+        py::object next;
+        if (py::isinstance<py::array>(current))
         {
-            py::object base = current.attr("base");
-            if (base.is_none())
+            // numpy array: follow `.base` (NumPy collapses nested views to a
+            // flat owner array)
+            next = current.attr("base");
+        }
+        else
+        {
+            // generic buffer (e.g. memoryview): follow `.obj`
+            try
+            {
+                next = current.attr("obj");
+            }
+            catch (py::error_already_set const &)
             {
                 break;
             }
-            owner_obj = base;
-            current = base;
         }
+        if (next.is_none())
+        {
+            break;
+        }
+        current = next;
     }
-    return py::cast<py::array>(owner_obj);
+    return current;
 }
 
 struct PythonDynamicMemoryView
@@ -1051,13 +1051,18 @@ inline void load_chunk(
         throw error::WrongAPIUsage(err.str());
     }
 
-    py::array owner_arr = memsel.has_value() ? deepest_base_of(a) : a;
+    py::object owner_obj =
+        memsel.has_value()
+        ? deepest_owner(py::reinterpret_borrow<py::object>(a))
+        : py::reinterpret_borrow<py::object>(a);
+    py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
+    auto owner_info = owner_buf.request(/* writable = */ true);
 
     switchDatasetType<LoadChunkIntoPythonArray>(
         r.getDatatype(),
         r,
-        owner_arr.cast<py::object>(),
-        owner_arr.mutable_data(),
+        owner_obj,
+        owner_info.ptr,
         offset,
         extent,
         std::move(memsel));
@@ -1330,7 +1335,7 @@ void init_RecordComponent(py::module &m)
         .def(
             "load_chunk",
             [](RecordComponent &r,
-               py::array buffer,
+               py::buffer buffer,
                Offset const &offset_in,
                Extent const &extent_in) {
                 uint8_t ndim = r.getDimensionality();
@@ -1352,8 +1357,21 @@ void init_RecordComponent(py::module &m)
                 else
                     extent = extent_in;
 
+                /*
+                 * Interpret the buffer as a numpy array (a zero-copy view for
+                 * numpy-backed buffers, which is the common case). This is
+                 * what allows memory selections to be derived from strided
+                 * buffers.
+                 */
+                py::array arr = py::array::ensure(buffer);
+                if (!arr)
+                {
+                    throw error::WrongAPIUsage(
+                        "[Record_Component::load_chunk()] Cannot interpret the "
+                        "passed buffer as a numpy array.");
+                }
                 std::vector<bool> flatten(ndim, false);
-                load_chunk(r, buffer, offset, extent);
+                load_chunk(r, arr, offset, extent);
             },
             py::arg("pre-allocated buffer"),
             py::arg_v(
