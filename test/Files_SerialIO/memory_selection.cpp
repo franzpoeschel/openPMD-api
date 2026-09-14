@@ -26,16 +26,11 @@
  * selection would otherwise silently leak into subsequent store operations of
  * the same variable (see https://github.com/ornladios/ADIOS2/pull/4169). The
  * reset capability was added upstream in ADIOS2 v2.11.0 and backported to
- * v2.10.1; older versions must reject memory selections instead. The HDF5 and
- * JSON backends never support them.
+ * v2.10.1; older versions must reject memory selections instead.
  *
- * Rejecting a memory selection inside the IO task (at flush time) used to
- * corrupt the whole output file: the throw from within writeDataset() caused
- * AbstractIOHandlerImpl::flush to clear the whole IO queue and rethrow
- * ("Clearing IO queue and passing on the exception"), dropping every other
- * pending chunk and the file's root attributes. The capability is known when
- * the chunk is enqueued, so storeChunk_impl() now checks it up front and
- * throws before anything is queued.
+ * The JSON backend does not support non-contiguous memory selections.
+ * The ADIOS2 and HDF5 backends do support memory selections, so the
+ * corresponding store must not throw there.
  */
 #include "SerialIOTests.hpp"
 
@@ -78,10 +73,12 @@ struct WriteResult
 WriteResult write_and_reject(std::string const &name)
 {
     Series s(name, Access::CREATE);
-    // HDF5 and JSON never support memory selections. ADIOS2 only supports them
-    // if its version can reset a memory selection (>= 2.10.1).
+    // HDF5 supports memory selections; JSON does not. ADIOS2 only supports
+    // them if its version can reset a memory selection (>= 2.10.1).
+    std::string const backend = s.backend();
     bool const backendSupports =
-        s.backend() == "ADIOS2" && adios2SupportsMemorySelection();
+        backend == "HDF5" || backend == "MPI_HDF5" ||
+        (backend == "ADIOS2" && adios2SupportsMemorySelection());
     s.setAttribute("some_global", "attribute");
 
     // Valid chunk that must not be lost.

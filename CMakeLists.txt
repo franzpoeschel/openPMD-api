@@ -866,6 +866,7 @@ if(openPMD_BUILD_TESTING)
                 test/Files_SerialIO/builder_sentinels.cpp
                 test/Files_SerialIO/joined_dim_buffer_api.cpp
                 test/Files_SerialIO/memory_selection.cpp
+                test/Files_SerialIO/memory_selection_test.cpp
             )
         elseif(${test_name} STREQUAL "ParallelIO" AND openPMD_HAVE_MPI)
             list(APPEND ${out_list}
