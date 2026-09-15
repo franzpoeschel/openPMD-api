@@ -38,13 +38,37 @@ namespace py = pybind11;
 using namespace openPMD;
 
 /*
- * Definitions for these functions `load_chunk` and `store_chunk` found in
- * python/RecordComponent.cpp.
+ * Definitions for these functions `load_chunk`, `store_chunk` and the lazy
+ * slicing helpers found in python/RecordComponent.cpp.
  * No need to pull them here, as they are not templates.
  */
 py::array load_chunk(RecordComponent &r, py::tuple const &slices);
 
 void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
+
+/** Create a lazily-evaluating load/store chunk handle for the given slices.
+ *
+ * Unlike `load_chunk`, this does not perform any I/O. The returned object
+ * implements the buffer protocol and `__array__`, so numpy converts it (and
+ * thereby triggers the actual load) transparently.
+ */
+py::object load_chunk_lazy(py::object self, py::tuple const &slices);
+py::object load_chunk_lazy_slice(py::object self, py::slice const &slice_obj);
+py::object load_chunk_lazy_int(py::object self, py::int_ const &slice_obj);
+
+/** Store `value` (a numpy array, generic buffer or another lazy chunk handle)
+ * into the record component at the selection described by `slices`.
+ *
+ * If `value` is a lazy chunk handle, it is resolved first (performing the
+ * load through openPMD) and the resulting array is stored. Otherwise the value
+ * is stored directly, deriving a memory selection from strided views.
+ */
+void store_chunk_object(
+    RecordComponent &r, py::tuple const &slices, py::object value);
+void store_chunk_object_slice(
+    RecordComponent &r, py::slice const &slice_obj, py::object value);
+void store_chunk_object_int(
+    RecordComponent &r, py::int_ const &slice_obj, py::object value);
 
 namespace docstring
 {
@@ -64,24 +88,29 @@ Class &&addRecordComponentSetGet(Class &&class_)
     class_
         .def(
             "__getitem__",
-            [](RecordComponent &r, py::tuple const &slices) {
-                return load_chunk(r, slices);
+            [](py::object self, py::tuple const &slices) {
+                return load_chunk_lazy(self, slices);
             },
             py::arg("tuple of index slices"))
         .def(
             "__getitem__",
-            [](RecordComponent &r, py::slice const &slice_obj) {
-                auto const slices = py::make_tuple(slice_obj);
-                return load_chunk(r, slices);
+            [](py::object self, py::slice const &slice_obj) {
+                return load_chunk_lazy_slice(self, slice_obj);
             },
             py::arg("slice"))
         .def(
             "__getitem__",
-            [](RecordComponent &r, py::int_ const &slice_obj) {
-                auto const slices = py::make_tuple(slice_obj);
-                return load_chunk(r, slices);
+            [](py::object self, py::int_ const &slice_obj) {
+                return load_chunk_lazy_int(self, slice_obj);
             },
             py::arg("axis index"))
+        .def(
+            "__iter__",
+            [](py::object self) {
+                // Repeated lazy single-row loads are done only when the user
+                // actually iterates; each row is loaded independently.
+                return self.attr("load")().attr("__iter__")();
+            })
 
         .def(
             "__setitem__",
@@ -108,6 +137,33 @@ Class &&addRecordComponentSetGet(Class &&class_)
                 store_chunk(r, a, slices);
             },
             py::arg("axis index"),
-            py::arg("array with values to assign"));
+            py::arg("array with values to assign"))
+        // RHS may be another lazy chunk handle or a generic buffer object:
+        // resolve it (performing the load through openPMD) and then store.
+        .def(
+            "__setitem__",
+            [](RecordComponent &r, py::tuple const &slices, py::object value) {
+                store_chunk_object(r, slices, std::move(value));
+            },
+            py::arg("tuple of index slices"),
+            py::arg("values to assign"))
+        .def(
+            "__setitem__",
+            [](RecordComponent &r,
+               py::slice const &slice_obj,
+               py::object value) {
+                store_chunk_object_slice(r, slice_obj, std::move(value));
+            },
+            py::arg("slice"),
+            py::arg("values to assign"))
+        .def(
+            "__setitem__",
+            [](RecordComponent &r,
+               py::int_ const &slice_obj,
+               py::object value) {
+                store_chunk_object_int(r, slice_obj, std::move(value));
+            },
+            py::arg("axis index"),
+            py::arg("values to assign"));
     return std::forward<Class>(class_);
 }

@@ -1796,6 +1796,69 @@ class APITest(unittest.TestCase):
                 series.flush()
             series.close()
 
+    def testLazyLoadStoreChunk(self):
+        """
+        `Record_Component.__getitem__` returns a lazy `Load_Store_Chunk`
+        handle: no I/O happens at slicing time, but the data is loaded (under
+        openPMD's control, before the assignment target is touched) as soon as
+        the handle is consumed by numpy (via the `__array__` protocol / the
+        buffer protocol / `np.asarray` / `.load()`).
+        """
+        if not found_numpy:
+            return
+
+        for ext in (".bp", ".h5"):
+            if ext not in io.file_extensions:
+                continue
+            name = "unittest_py_lazy_loadstore" + ext
+            series = io.Series(name, io.Access.create)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            E_x.reset_dataset(io.Dataset(np.int64, [6, 6, 6]))
+            source = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
+            E_x[:, :, :] = source
+            series.flush()
+            series.close()
+
+            series = io.Series(name, io.Access.read_only)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+
+            # Slicing does not perform I/O: it returns a lazy handle.
+            lazy = E_x[:, :, :]
+            self.assertSequenceEqual(tuple(lazy.shape), (6, 6, 6))
+            self.assertEqual(lazy.ndim, 3)
+            self.assertEqual(lazy.dtype, np.int64)
+
+            # np.asarray / np.array materializes the load.
+            data = np.asarray(lazy)
+            self.assertTrue(np.array_equal(data, source))
+
+            # buffer protocol (e.g. via memoryview)
+            mv = memoryview(E_x[:, :, :])
+            self.assertEqual(mv.format, np.dtype(np.int64).char)
+            self.assertSequenceEqual(mv.shape, (6, 6, 6))
+
+            # buffer as RHS of a numpy assignment -> the load runs before the
+            # assignment target is touched.
+            buffer = np.zeros((8, 8, 8), dtype=np.int64)
+            buffer[2:6, 2:6, 2:6] = E_x[2:6, 2:6, 2:6]
+            expected = np.zeros((8, 8, 8), dtype=np.int64)
+            expected[2:6, 2:6, 2:6] = source[2:6, 2:6, 2:6]
+            self.assertTrue(np.array_equal(buffer, expected))
+
+            # Sub-slicing a lazy handle keeps working (indexing the loaded
+            # array).
+            row = E_x[3, 3, 3]
+            self.assertEqual(int(np.asarray(row)), int(source[3, 3, 3]))
+
+            # Loading a lazy chunk after the Series was closed is a clean
+            # error, not a crash.
+            stale = E_x[:, :, :]
+            series.close()
+            with self.assertRaises(io.Error):
+                np.asarray(stale)
+
     def testIterations(self):
         """Test querying a series' iterations and loop over them."""
 
