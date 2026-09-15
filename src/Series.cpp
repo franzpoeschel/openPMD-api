@@ -1398,6 +1398,7 @@ std::future<void> Series::flush_impl(
             "Series::readIterations() to access the first Iteration. If this "
             "occurs in Access::READ_ONLY, then this is likely a bug.");
     }
+    get().m_preFlushHooks();
     IOHandler()->m_lastFlushSuccessful = true;
     try
     {

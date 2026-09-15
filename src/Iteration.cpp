@@ -368,6 +368,8 @@ void Iteration::flushVariableBased(
 
 void Iteration::flush(internal::FlushParams const &flushParams)
 {
+    get().m_preFlushHooks();
+
     Parameter<Operation::TOUCH> touch;
     IOHandler()->enqueue(IOTask(&writable(), touch));
     if (access::readOnly(IOHandler()->m_frontendAccess))
