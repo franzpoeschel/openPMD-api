@@ -209,6 +209,14 @@ namespace internal
      */
     template <typename T, typename Series_type>
     T &makeOwning(T &self, Series_type);
+
+    struct PreFlushHooks
+    {
+        std::deque<std::function<void()>> m_hooks;
+
+        void emplace(std::function<void()> hook);
+        void operator()();
+    };
 } // namespace internal
 
 namespace debug
@@ -464,6 +472,8 @@ public:
      * instance.
      */
     [[nodiscard]] uintptr_t memoryID() const;
+
+    void addPreFlushHook(std::function<void()> hook);
 
     // clang-format off
 OPENPMD_protected
@@ -767,6 +777,6 @@ Attributable::readVectorFloatingpoint(std::string const &key) const
         std::is_floating_point<T>::value,
         "Type of attribute must be floating point");
 
-    return getAttribute(key).get<std::vector<T> >();
+    return getAttribute(key).get<std::vector<T>>();
 }
 } // namespace openPMD
