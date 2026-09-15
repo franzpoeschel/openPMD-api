@@ -32,6 +32,7 @@
 
 #include <algorithm>
 #include <complex>
+#include <deque>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -59,6 +60,22 @@ namespace internal
         static_cast<parent_t &>(*this) = static_cast<parent_t const &>(other);
     }
 
+    void PreFlushHooks::emplace(std::function<void()> hook)
+    {
+        m_hooks.emplace_back(std::move(hook));
+    }
+
+    void PreFlushHooks::operator()()
+    {
+        // Swap all hooks out. If any contained hook flushes again, this avoids
+        // endless loops.
+        std::deque<std::function<void()>> hooks;
+        hooks.swap(m_hooks);
+        for (auto &hook : hooks)
+        {
+            std::move(hook)();
+        }
+    }
 } // namespace internal
 
 Attributable::Attributable()
@@ -348,6 +365,20 @@ uintptr_t Attributable::memoryID() const
     return reinterpret_cast<uintptr_t>(&retrieveSeries().Attributable::get());
 }
 
+void Attributable::addPreFlushHook(std::function<void()> hook)
+{
+    auto [iteration, series] = containingIteration();
+    if (iteration)
+    {
+        // iteration
+        (*iteration)->m_preFlushHooks.emplace(std::move(hook));
+    }
+    else
+    {
+        series->m_preFlushHooks.emplace(std::move(hook));
+    }
+}
+
 template <bool flush_entire_series>
 void Attributable::seriesFlush_impl(
     internal::FlushParams const &flushParams, bool flush_io_handler)
@@ -505,74 +536,73 @@ void Attributable::readAttributes(ReadMode mode)
             setAttribute(att, a.get<long double>());
             break;
         case DT::CFLOAT:
-            setAttribute(att, a.get<std::complex<float> >());
+            setAttribute(att, a.get<std::complex<float>>());
             break;
         case DT::CDOUBLE:
-            setAttribute(att, a.get<std::complex<double> >());
+            setAttribute(att, a.get<std::complex<double>>());
             break;
         case DT::CLONG_DOUBLE:
-            setAttribute(att, a.get<std::complex<long double> >());
+            setAttribute(att, a.get<std::complex<long double>>());
             break;
         case DT::STRING:
             setAttribute(att, a.get<std::string>());
             break;
         case DT::VEC_CHAR:
-            setAttribute(att, a.get<std::vector<char> >());
+            setAttribute(att, a.get<std::vector<char>>());
             break;
         case DT::VEC_SHORT:
-            setAttribute(att, a.get<std::vector<short> >());
+            setAttribute(att, a.get<std::vector<short>>());
             break;
         case DT::VEC_INT:
-            setAttribute(att, a.get<std::vector<int> >());
+            setAttribute(att, a.get<std::vector<int>>());
             break;
         case DT::VEC_LONG:
-            setAttribute(att, a.get<std::vector<long> >());
+            setAttribute(att, a.get<std::vector<long>>());
             break;
         case DT::VEC_LONGLONG:
-            setAttribute(att, a.get<std::vector<long long> >());
+            setAttribute(att, a.get<std::vector<long long>>());
             break;
         case DT::VEC_UCHAR:
-            setAttribute(att, a.get<std::vector<unsigned char> >());
+            setAttribute(att, a.get<std::vector<unsigned char>>());
             break;
         case DT::VEC_USHORT:
-            setAttribute(att, a.get<std::vector<unsigned short> >());
+            setAttribute(att, a.get<std::vector<unsigned short>>());
             break;
         case DT::VEC_UINT:
-            setAttribute(att, a.get<std::vector<unsigned int> >());
+            setAttribute(att, a.get<std::vector<unsigned int>>());
             break;
         case DT::VEC_ULONG:
-            setAttribute(att, a.get<std::vector<unsigned long> >());
+            setAttribute(att, a.get<std::vector<unsigned long>>());
             break;
         case DT::VEC_ULONGLONG:
-            setAttribute(att, a.get<std::vector<unsigned long long> >());
+            setAttribute(att, a.get<std::vector<unsigned long long>>());
             break;
         case DT::VEC_FLOAT:
-            guardUnitDimension(att, a.get<std::vector<float> >());
+            guardUnitDimension(att, a.get<std::vector<float>>());
             break;
         case DT::VEC_DOUBLE:
-            guardUnitDimension(att, a.get<std::vector<double> >());
+            guardUnitDimension(att, a.get<std::vector<double>>());
             break;
         case DT::VEC_LONG_DOUBLE:
-            guardUnitDimension(att, a.get<std::vector<long double> >());
+            guardUnitDimension(att, a.get<std::vector<long double>>());
             break;
         case DT::VEC_CFLOAT:
-            setAttribute(att, a.get<std::vector<std::complex<float> > >());
+            setAttribute(att, a.get<std::vector<std::complex<float>>>());
             break;
         case DT::VEC_CDOUBLE:
-            setAttribute(att, a.get<std::vector<std::complex<double> > >());
+            setAttribute(att, a.get<std::vector<std::complex<double>>>());
             break;
         case DT::VEC_CLONG_DOUBLE:
-            setAttribute(
-                att, a.get<std::vector<std::complex<long double> > >());
+            setAttribute(att, a.get<std::vector<std::complex<long double>>>());
             break;
         case DT::VEC_SCHAR:
-            setAttribute(att, a.get<std::vector<signed char> >());
+            setAttribute(att, a.get<std::vector<signed char>>());
             break;
         case DT::VEC_STRING:
-            setAttribute(att, a.get<std::vector<std::string> >());
+            setAttribute(att, a.get<std::vector<std::string>>());
             break;
         case DT::ARR_DBL_7:
-            setAttribute(att, a.get<std::array<double, 7> >());
+            setAttribute(att, a.get<std::array<double, 7>>());
             break;
         case DT::BOOL:
             setAttribute(att, a.get<bool>());
