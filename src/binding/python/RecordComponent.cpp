@@ -895,6 +895,97 @@ inline py::object deepest_owner(py::object const &obj)
     return current;
 }
 
+/*
+ * Shared helpers for addressing (possibly strided) Python buffers as targets
+ * of load/store operations.
+ *
+ * These are used by the lazy Load_Store_Chunk's `store()` / `into()` and by
+ * the pass-through `load_chunk()` so that the buffer validation and the
+ * memory-selection / deepest-owner / data-pointer bookkeeping live in exactly
+ * one place.
+ */
+
+/** Validate that a buffer's shape exactly matches an expected shape.
+ *
+ * Used for the lazy chunk's `store()` and `into()` (and cross-checking in
+ * `load_chunk`). Throws a `py::index_error` on mismatch.
+ */
+inline void check_buffer_shape(
+    py::buffer_info const &info, std::vector<py::ssize_t> const &shape)
+{
+    if (size_t(info.ndim) != shape.size())
+    {
+        throw py::index_error(
+            std::string("dimension of chunk (") + std::to_string(info.ndim) +
+            std::string(
+                "D) does not fit dimension of selection in record component "
+                "(") +
+            std::to_string(shape.size()) + std::string("D)"));
+    }
+    for (py::ssize_t d = 0; d < info.ndim; ++d)
+    {
+        if (info.shape[d] != shape[d])
+        {
+            throw py::index_error(
+                std::string("size of chunk (") + std::to_string(info.shape[d]) +
+                std::string(") for axis ") + std::to_string(d) +
+                std::string(" does not match selection size ") +
+                std::to_string(shape[d]));
+        }
+    }
+}
+
+/** The result of preparing a target buffer for a load/store operation. */
+struct PreparedBufferTarget
+{
+    /** The object that owns the memory the backend will read/write (the
+     *  deepest owner for memory selections, the buffer itself otherwise).
+     *  Also used as the keep-alive handle captured by the operation. */
+    py::object owner_obj;
+    /** The address the backend reads/writes: the origin of the contiguous
+     *  memory block for memory selections, the buffer's own pointer otherwise.
+     */
+    void *data_ptr = nullptr;
+};
+
+/** Derive a memory selection and resolve the address/handle for a buffer.
+ *
+ * @param buffer_obj The Python buffer object.
+ * @param info Its `py::buffer_info`.
+ * @param memsel The already-derived memory selection (from
+ *               `derive_memory_selection`), or std::nullopt if the buffer
+ *               covers the whole block.
+ */
+inline PreparedBufferTarget resolve_buffer_target(
+    py::object buffer_obj,
+    py::buffer_info const &info,
+    std::optional<MemorySelection> const &memsel)
+{
+    py::object owner_obj = memsel.has_value()
+        ? deepest_owner(buffer_obj)
+        : py::reinterpret_borrow<py::object>(buffer_obj);
+    void *data_ptr = info.ptr;
+    if (memsel.has_value())
+    {
+        py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
+        data_ptr = owner_buf.request(/* writable = */ true).ptr;
+    }
+    return PreparedBufferTarget{std::move(owner_obj), data_ptr};
+}
+
+/** Throw the user-facing error for using a lazy chunk after the Series has
+ *  been closed. */
+[[noreturn]] inline void throw_closed_series_error(std::string const &detail)
+{
+    throw error::WrongAPIUsage(
+        std::string(
+            "Cannot load a lazily-created chunk: the underlying Series has "
+            "already been closed. Load the chunk (e.g. via "
+            "`np.asarray(rc[...])`) "
+            "before closing the Series. ") +
+        detail);
+}
+
 /* ==== relocated lazy load/store chunk support ==== */
 namespace
 {
@@ -908,8 +999,8 @@ namespace
  */
 struct PythonLoadBufferOwner
 {
-    explicit PythonLoadBufferOwner(std::shared_ptr<void> data)
-        : data(std::move(data))
+    explicit PythonLoadBufferOwner(std::shared_ptr<void> buffer)
+        : data(std::move(buffer))
     {}
 
     std::shared_ptr<void> data;
@@ -1022,33 +1113,12 @@ public:
     void store(py::buffer const &buffer)
     {
         auto info = buffer.request(/* writable = */ true);
+        py::object buffer_obj = py::reinterpret_borrow<py::object>(buffer);
 
         // shape check: the buffer's shape must match the selection's shape
-        if (size_t(info.ndim) != m_shape.size())
-        {
-            throw py::index_error(
-                std::string("dimension of chunk (") +
-                std::to_string(info.ndim) +
-                std::string(
-                    "D) does not fit dimension of selection in record "
-                    "component (") +
-                std::to_string(m_shape.size()) + std::string("D)"));
-        }
-        for (py::ssize_t d = 0; d < info.ndim; ++d)
-        {
-            if (info.shape[d] != m_shape[d])
-            {
-                throw py::index_error(
-                    std::string("size of chunk (") +
-                    std::to_string(info.shape[d]) + std::string(") for axis ") +
-                    std::to_string(d) +
-                    std::string(" does not match selection size ") +
-                    std::to_string(m_shape[d]));
-            }
-        }
+        check_buffer_shape(info, m_shape);
 
-        auto memsel = derive_memory_selection(
-            py::reinterpret_borrow<py::object>(buffer), info);
+        auto memsel = derive_memory_selection(buffer_obj, info);
 
         // datatype check
         Datatype const buffer_dtype = dtype_from_bufferformat(info.format);
@@ -1061,23 +1131,12 @@ public:
             throw error::WrongAPIUsage(err.str());
         }
 
-        py::object owner_obj = memsel.has_value()
-            ? deepest_owner(py::reinterpret_borrow<py::object>(buffer))
-            : py::reinterpret_borrow<py::object>(buffer);
-        py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
-        auto owner_info = owner_buf.request(/* writable = */ true);
-
-        // Keep the (possibly nested, possibly temporary) buffer object alive
-        // until the store is performed (the owning_handle is captured by the
-        // shared_ptr's deleter in StoreChunkFromPythonArray).
-        py::object owning_handle =
-            deepest_owner(py::reinterpret_borrow<py::object>(buffer));
-
+        auto target = resolve_buffer_target(buffer_obj, info, memsel);
         switchDatasetType<StoreChunkFromPythonArray>(
             m_rc.getDatatype(),
             m_rc,
-            owner_obj,
-            owner_info.ptr,
+            target.owner_obj,
+            target.data_ptr,
             m_offset,
             m_extent,
             std::move(memsel));
@@ -1117,28 +1176,7 @@ public:
         auto info = buffer.request(/* writable = */ true);
 
         // shape check: the buffer's shape must match the selection's shape
-        if (size_t(info.ndim) != m_shape.size())
-        {
-            throw py::index_error(
-                std::string("dimension of chunk (") +
-                std::to_string(info.ndim) +
-                std::string(
-                    "D) does not fit dimension of selection in record "
-                    "component (") +
-                std::to_string(m_shape.size()) + std::string("D)"));
-        }
-        for (py::ssize_t d = 0; d < info.ndim; ++d)
-        {
-            if (info.shape[d] != m_shape[d])
-            {
-                throw py::index_error(
-                    std::string("size of chunk (") +
-                    std::to_string(info.shape[d]) + std::string(") for axis ") +
-                    std::to_string(d) +
-                    std::string(" does not match selection size ") +
-                    std::to_string(m_shape[d]));
-            }
-        }
+        check_buffer_shape(info, m_shape);
 
         auto memsel = derive_memory_selection(buffer_obj, info);
 
@@ -1153,36 +1191,22 @@ public:
             throw error::WrongAPIUsage(err.str());
         }
 
-        // The backend expects the data pointer to refer to the origin of the
-        // contiguous memory block (with the selection given as {offset,
-        // extent}); for memory selections that is the deepest owner's buffer
-        // pointer, for the contiguous path it is the buffer's own pointer.
-        py::object owner_obj = memsel.has_value()
-            ? deepest_owner(buffer_obj)
-            : py::reinterpret_borrow<py::object>(buffer_obj);
-        py::buffer owner_buf = py::cast<py::buffer>(owner_obj);
-        auto owner_info = owner_buf.request(/* writable = */ true);
-        void *data_ptr = memsel.has_value() ? owner_info.ptr : info.ptr;
+        auto target = resolve_buffer_target(buffer_obj, info, memsel);
 
         try
         {
             switchDatasetType<LoadChunkIntoBufferSynchronously>(
                 m_rc.getDatatype(),
                 m_rc,
-                owner_obj,
-                data_ptr,
+                target.owner_obj,
+                target.data_ptr,
                 m_offset,
                 m_extent,
                 std::move(memsel));
         }
         catch (error::Internal const &e)
         {
-            throw error::WrongAPIUsage(
-                std::string(
-                    "Cannot load a lazily-created chunk: the underlying "
-                    "Series has already been closed. Load the chunk (e.g. "
-                    "via `np.asarray(rc[...])`) before closing the Series. ") +
-                e.what());
+            throw_closed_series_error(e.what());
         }
         catch (std::runtime_error const &e)
         {
@@ -1194,11 +1218,7 @@ public:
             std::string const msg = e.what();
             if (msg.find("closed") != std::string::npos)
             {
-                throw error::WrongAPIUsage(
-                    "Cannot load a lazily-created chunk: the underlying "
-                    "Series has already been closed. Load the chunk (e.g. "
-                    "via `np.asarray(rc[...])`) before closing the Series. " +
-                    msg);
+                throw_closed_series_error(msg);
             }
             throw;
         }
@@ -1234,12 +1254,7 @@ private:
         }
         catch (error::Internal const &e)
         {
-            throw error::WrongAPIUsage(
-                std::string(
-                    "Cannot load a lazily-created chunk: the underlying "
-                    "Series has already been closed. Load the chunk (e.g. "
-                    "via `np.asarray(rc[...])`) before closing the Series. ") +
-                e.what());
+            throw_closed_series_error(e.what());
         }
         m_data = std::move(buffer);
 
@@ -1492,6 +1507,7 @@ inline void load_chunk(
     Extent const &extent)
 {
     auto info = buffer.request(/* writable = */ true);
+    py::object buffer_obj = py::reinterpret_borrow<py::object>(buffer);
 
     // check buffer is large enough
     size_t s_load = 1u;
@@ -1521,8 +1537,7 @@ inline void load_chunk(
             str_extent_shape + std::string(")"));
     }
 
-    auto memsel = derive_memory_selection(
-        py::reinterpret_borrow<py::object>(buffer), info);
+    auto memsel = derive_memory_selection(buffer_obj, info);
     if (!memsel.has_value())
     {
         check_buffer_is_contiguous(info);
@@ -1539,28 +1554,12 @@ inline void load_chunk(
         throw error::WrongAPIUsage(err.str());
     }
 
-    py::object owner_obj = memsel.has_value()
-        ? deepest_owner(py::reinterpret_borrow<py::object>(buffer))
-        : py::reinterpret_borrow<py::object>(buffer);
-
-    // The backend expects the data pointer to refer to the origin of the
-    // contiguous memory block (with the selection given as {offset, extent});
-    // for memory selections that is the deepest owner's buffer pointer, for
-    // the contiguous path it is the buffer's own pointer.
-    void *data_ptr = info.ptr;
-    py::buffer owner_buf;
-    if (memsel.has_value())
-    {
-        owner_buf = py::cast<py::buffer>(owner_obj);
-        auto owner_info = owner_buf.request(/* writable = */ true);
-        data_ptr = owner_info.ptr;
-    }
-
+    auto target = resolve_buffer_target(buffer_obj, info, memsel);
     switchDatasetType<LoadChunkIntoPythonArray>(
         r.getDatatype(),
         r,
-        owner_obj,
-        data_ptr,
+        target.owner_obj,
+        target.data_ptr,
         offset,
         extent,
         std::move(memsel));
