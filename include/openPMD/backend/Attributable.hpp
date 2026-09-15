@@ -209,6 +209,14 @@ namespace internal
      */
     template <typename T, typename Series_type>
     T &makeOwning(T &self, Series_type);
+
+    struct PreFlushHooks
+    {
+        std::deque<std::function<void()>> m_hooks;
+
+        void emplace(std::function<void()> hook);
+        void operator()();
+    };
 } // namespace internal
 
 namespace debug
@@ -465,17 +473,7 @@ public:
      */
     [[nodiscard]] uintptr_t memoryID() const;
 
-    /**
-     * Query whether this Series was opened with the sync-flush option
-     * (Series option "flush_immediately" / OPENPMD_FLUSH_IMMEDIATELY), i.e.
-     * whether load/store operations of the legacy chunk API are flushed
-     * immediately upon being called. Note that operations of the chaining
-     * API (prepareLoadStore()) are not affected unless
-     * unsafeNoAutomaticFlush() is used.
-     *
-     * @return true if the sync-flush option is active.
-     */
-    [[nodiscard]] bool flushImmediately() const;
+    void addPreFlushHook(std::function<void()> hook);
 
     // clang-format off
 OPENPMD_protected
@@ -779,6 +777,6 @@ Attributable::readVectorFloatingpoint(std::string const &key) const
         std::is_floating_point<T>::value,
         "Type of attribute must be floating point");
 
-    return getAttribute(key).get<std::vector<T> >();
+    return getAttribute(key).get<std::vector<T>>();
 }
 } // namespace openPMD

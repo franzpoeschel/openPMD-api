@@ -274,6 +274,8 @@ namespace internal
             std::optional<chunk_assignment::RankMeta> m_bufferedRead;
         };
         RankTableData m_rankTable;
+
+        PreFlushHooks m_preFlushHooks;
     }; // SeriesData
 
     class SeriesInternal;

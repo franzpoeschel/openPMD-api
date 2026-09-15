@@ -148,6 +148,8 @@ namespace internal
          * Otherwise empty.
          */
         std::optional<DeferredParseAccess> m_deferredParseAccess{};
+
+        PreFlushHooks m_preFlushHooks;
     };
 } // namespace internal
 
