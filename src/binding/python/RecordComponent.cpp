@@ -1465,33 +1465,39 @@ inline void load_chunk(
     load_chunk(r, static_cast<py::buffer &>(a), offset, extent);
 }
 
-auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>
+auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
 {
-    auto res =
-        std::make_shared<PythonLazyLoadStoreChunk>(make_lazy_chunk(rc, slices));
-    std::weak_ptr<PythonLazyLoadStoreChunk> as_weak_ptr = res;
-    auto flush_hook = [lazy_load = std::move(as_weak_ptr)]() {
-        auto locked = lazy_load.lock();
-        if (!locked)
+    auto res = py::cast(make_lazy_chunk(rc, slices));
+    auto flush_hook = [lazy_load = py::weakref(res)]() {
+        py::gil_scoped_acquire gil;
+        py::object referent = lazy_load(); // dereference the weakref
+        if (referent.is_none())
         {
-            return;
+            return; // object already collected
         }
-        locked->load();
+        auto &lazy_load_recovered =
+            py::cast<PythonLazyLoadStoreChunk &>(referent);
+        // std::cout << "LOADING DATA FROM HOOK FOR '"
+        //           << lazy_load_recovered.operationBuilder()
+        //                  .getComponentHandle()
+        //                  .myPath()
+        //                  .openPMDPath()
+        //           << "'." << std::endl;
+        py::gil_scoped_release release;
+        lazy_load_recovered.load();
     };
     rc.addPreFlushHook(std::move(flush_hook));
     return res;
 }
-
 auto load_chunk_lazy_slice(RecordComponent &rc, py::slice const &slice_obj)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>
+    -> py::object
 {
     auto const slices = py::make_tuple(slice_obj);
     return load_chunk_lazy(rc, slices);
 }
 
 auto load_chunk_lazy_int(RecordComponent &rc, py::int_ const &slice_obj)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>
+    -> py::object
 {
     auto const slices = py::make_tuple(slice_obj);
     return load_chunk_lazy(rc, slices);
