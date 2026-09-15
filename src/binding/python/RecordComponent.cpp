@@ -30,6 +30,7 @@
 #include "openPMD/Datatype.hpp"
 #include "openPMD/DatatypeHelpers.hpp"
 #include "openPMD/Error.hpp"
+#include "openPMD/LoadStoreChunk.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series.hpp"
 #include "openPMD/backend/BaseRecordComponent.hpp"
@@ -320,11 +321,9 @@ struct StoreChunkFromPythonArray
 {
     template <typename T>
     static void call(
-        RecordComponent &r,
-        py::object owning_handle,
+        ConfigureLoadStore operationBuilder,
+        py::object owning_handle_for_array,
         void *data,
-        Offset const &offset,
-        Extent const &extent,
         std::optional<MemorySelection> memorySelection)
     {
         // here, we store an owning handle in the lambda capture so that
@@ -333,14 +332,12 @@ struct StoreChunkFromPythonArray
         // a race condition by manipulating the data that was passed
         std::shared_ptr<T> shared(
             (T *)data,
-            [owning_handle =
-                 std::make_optional(std::move(owning_handle))](T *) mutable {
+            [owning_handle = std::make_optional(
+                 std::move(owning_handle_for_array))](T *) mutable {
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        auto config =
-            r.prepareLoadStore().offset(offset).extent(extent).withSharedPtr(
-                std::move(shared));
+        auto config = operationBuilder.withSharedPtr(std::move(shared));
         if (memorySelection.has_value())
         {
             config.memorySelection(std::move(*memorySelection));
@@ -399,23 +396,19 @@ struct LoadChunkIntoBufferSynchronously
 {
     template <typename T>
     static void call(
-        RecordComponent &r,
-        py::object owning_handle,
+        ConfigureLoadStore operationBuilder,
+        py::object owning_handle_for_array,
         void *data,
-        Offset const &offset,
-        Extent const &extent,
         std::optional<MemorySelection> memorySelection)
     {
         std::shared_ptr<T> shared(
             (T *)data,
-            [owning_handle =
-                 std::make_optional(std::move(owning_handle))](T *) mutable {
+            [owning_handle = std::make_optional(
+                 std::move(owning_handle_for_array))](T *) mutable {
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        auto config =
-            r.prepareLoadStore().offset(offset).extent(extent).withSharedPtr(
-                std::move(shared));
+        auto config = operationBuilder.withSharedPtr(std::move(shared));
         if (memorySelection.has_value())
         {
             config.memorySelection(std::move(*memorySelection));
@@ -435,16 +428,6 @@ struct LoadChunkIntoBufferSynchronously
 inline std::optional<MemorySelection>
 derive_memory_selection(py::object const &obj, py::buffer_info const &info);
 inline py::object deepest_owner(py::object const &obj);
-
-/*
- * Defined further below; forward declaration so the lazy chunk's `.into()`
- * can load directly into a caller-provided buffer.
- */
-inline void load_chunk(
-    RecordComponent &r,
-    py::buffer &buffer,
-    Offset const &offset,
-    Extent const &extent);
 
 /** Store Chunk
  *
@@ -575,11 +558,9 @@ inline void store_chunk(
     auto owner_info = owner_buf.request(/* writable = */ true);
     switchDatasetType<StoreChunkFromPythonArray>(
         r.getDatatype(),
-        r,
+        r.prepareLoadStore().offset(offset).extent(extent),
         owner_obj,
         owner_info.ptr,
-        offset,
-        extent,
         std::move(memorySelection));
 }
 
@@ -1035,40 +1016,42 @@ class PythonLazyLoadStoreChunk
 {
 public:
     PythonLazyLoadStoreChunk(
-        RecordComponent rc,
-        py::object keepalive,
-        Offset offset,
-        Extent extent,
-        std::vector<py::ssize_t> shape)
-        : m_rc(std::move(rc))
-        , m_keepalive(std::move(keepalive))
-        , m_offset(std::move(offset))
-        , m_extent(std::move(extent))
+        ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape)
+        : m_operationBuilder(std::move(operationBuilder))
         , m_shape(std::move(shape))
     {}
 
-    /** The record component this chunk refers to */
-    auto getRecordComponent() -> RecordComponent &
-    {
-        return m_rc;
-    }
-    auto const &offset() const
-    {
-        return m_offset;
-    }
-    auto const &extent() const
-    {
-        return m_extent;
-    }
+    PythonLazyLoadStoreChunk(
+        RecordComponent &rc,
+        Offset offset,
+        Extent extent,
+        std::vector<py::ssize_t> shape)
+        : PythonLazyLoadStoreChunk(
+              rc.prepareLoadStore()
+                  .offset(std::move(offset))
+                  .extent(std::move(extent)),
+              std::move(shape))
+    {}
+
     auto const &shape() const
     {
         return m_shape;
     }
 
+    auto const &operationBuilder() const
+    {
+        return m_operationBuilder;
+    }
+
+    auto &operationBuilder()
+    {
+        return m_operationBuilder;
+    }
+
     /** The datatype of the underlying record component */
     auto getDatatype() const -> Datatype
     {
-        return m_rc.getDatatype();
+        return m_operationBuilder.getComponentHandle().getDatatype();
     }
 
     /**
@@ -1122,23 +1105,21 @@ public:
 
         // datatype check
         Datatype const buffer_dtype = dtype_from_bufferformat(info.format);
-        if (buffer_dtype != m_rc.getDatatype())
+        if (buffer_dtype != getDatatype())
         {
             std::stringstream err;
             err << "Attempting store from Python buffer of type '"
                 << buffer_dtype << "' into Record Component of type '"
-                << m_rc.getDatatype() << "'.";
+                << getDatatype() << "'.";
             throw error::WrongAPIUsage(err.str());
         }
 
         auto target = resolve_buffer_target(buffer_obj, info, memsel);
         switchDatasetType<StoreChunkFromPythonArray>(
-            m_rc.getDatatype(),
-            m_rc,
+            getDatatype(),
+            operationBuilder(),
             target.owner_obj,
             target.data_ptr,
-            m_offset,
-            m_extent,
             std::move(memsel));
     }
 
@@ -1182,12 +1163,12 @@ public:
 
         // datatype check
         Datatype const buffer_dtype = dtype_from_bufferformat(info.format);
-        if (buffer_dtype != m_rc.getDatatype())
+        if (buffer_dtype != getDatatype())
         {
             std::stringstream err;
             err << "Attempting load into Python buffer of type '"
                 << buffer_dtype << "' from Record Component of type '"
-                << m_rc.getDatatype() << "'.";
+                << getDatatype() << "'.";
             throw error::WrongAPIUsage(err.str());
         }
 
@@ -1196,12 +1177,10 @@ public:
         try
         {
             switchDatasetType<LoadChunkIntoBufferSynchronously>(
-                m_rc.getDatatype(),
-                m_rc,
+                getDatatype(),
+                operationBuilder(),
                 target.owner_obj,
                 target.data_ptr,
-                m_offset,
-                m_extent,
                 std::move(memsel));
         }
         catch (error::Internal const &e)
@@ -1228,10 +1207,13 @@ public:
 private:
     auto doLoad() -> py::array
     {
-        auto dtype = m_rc.getDatatype();
+        auto dtype = getDatatype();
         // Use the chaining API's allocating load (with automatic flush upon
         // evaluation): it allocates the buffer, enqueues the read and fills
         // the buffer when the returned DeferredComputation is evaluated.
+        //
+        // TODO: The garbage collector should keep the Series alive as long as
+        // the handle lives.
         //
         // Loading a chunk requires the underlying Series to still be open. If
         // the Series was closed before the lazy chunk is resolved, the
@@ -1242,12 +1224,10 @@ private:
         std::shared_ptr<void> buffer;
         try
         {
-            auto config =
-                m_rc.prepareLoadStore().offset(m_offset).extent(m_extent);
-            auto loadVar = config.loadVariant();
+            auto loadVar = operationBuilder().loadVariant();
             auto shared = loadVar(); // evaluates: flushes (executes the read)
             buffer = std::visit(
-                [](auto &&ptr) -> std::shared_ptr<void> {
+                [](auto &ptr) -> std::shared_ptr<void> {
                     return std::static_pointer_cast<void>(std::move(ptr));
                 },
                 shared);
@@ -1262,6 +1242,8 @@ private:
         // memory through a PythonLoadBufferOwner. The returned array keeps the
         // owner -- and hence the buffer -- alive; no reference cycle is
         // created with this lazy chunk.
+        //
+        // TODO check if this duplicates bits from the old allocating Python API
         py::object owner =
             py::cast(std::make_shared<PythonLoadBufferOwner>(m_data));
         py::array arr(
@@ -1277,8 +1259,8 @@ private:
     {
         // C-contiguous row-major strides
         std::vector<py::ssize_t> strides(m_shape.size());
-        py::ssize_t acc = static_cast<py::ssize_t>(
-            openPMD::detail::dtypeSize(m_rc.getDatatype()));
+        py::ssize_t acc =
+            static_cast<py::ssize_t>(openPMD::detail::dtypeSize(getDatatype()));
         for (size_t d = m_shape.size(); d > 0; --d)
         {
             strides[d - 1] = acc;
@@ -1287,10 +1269,7 @@ private:
         return strides;
     }
 
-    RecordComponent m_rc;
-    py::object m_keepalive; // keeps the Series alive
-    Offset m_offset;
-    Extent m_extent;
+    ConfigureLoadStore m_operationBuilder;
     std::vector<py::ssize_t> m_shape;
     std::optional<py::array> m_cache;
     std::shared_ptr<void> m_data; // owns the loaded buffer
@@ -1304,11 +1283,11 @@ namespace
  * integer-indexed (flattened) axes removed, matching what a numpy array over
  * the selection would look like.
  */
-inline PythonLazyLoadStoreChunk make_lazy_chunk(
-    RecordComponent &r, py::object keepalive, py::tuple const &slices)
+inline PythonLazyLoadStoreChunk
+make_lazy_chunk(RecordComponent &rc, py::tuple const &slices)
 {
-    uint8_t ndim = r.getDimensionality();
-    auto const full_extent = r.getExtent();
+    uint8_t ndim = rc.getDimensionality();
+    auto const full_extent = rc.getExtent();
 
     Offset offset;
     Extent extent;
@@ -1327,11 +1306,7 @@ inline PythonLazyLoadStoreChunk make_lazy_chunk(
     }
 
     return PythonLazyLoadStoreChunk(
-        r,
-        std::move(keepalive),
-        std::move(offset),
-        std::move(extent),
-        std::move(shape));
+        rc, std::move(offset), std::move(extent), std::move(shape));
 }
 } // namespace
 
@@ -1579,22 +1554,22 @@ inline void load_chunk(
     load_chunk(r, static_cast<py::buffer &>(a), offset, extent);
 }
 
-py::object load_chunk_lazy(py::object self, py::tuple const &slices)
+py::object load_chunk_lazy(RecordComponent &rc, py::tuple const &slices)
 {
-    auto &r = self.cast<RecordComponent &>();
-    return py::cast(make_lazy_chunk(r, self, slices));
+    return py::cast(make_lazy_chunk(rc, slices));
 }
 
-py::object load_chunk_lazy_slice(py::object self, py::slice const &slice_obj)
+py::object
+load_chunk_lazy_slice(RecordComponent &rc, py::slice const &slice_obj)
 {
     auto const slices = py::make_tuple(slice_obj);
-    return load_chunk_lazy(self, slices);
+    return load_chunk_lazy(rc, slices);
 }
 
-py::object load_chunk_lazy_int(py::object self, py::int_ const &slice_obj)
+py::object load_chunk_lazy_int(RecordComponent &rc, py::int_ const &slice_obj)
 {
     auto const slices = py::make_tuple(slice_obj);
-    return load_chunk_lazy(self, slices);
+    return load_chunk_lazy(rc, slices);
 }
 
 void store_chunk_object(
@@ -1673,17 +1648,19 @@ void init_RecordComponent(py::module &m)
             [](PythonLazyLoadStoreChunk const &self) {
                 return dtype_to_numpy(self.getDatatype());
             })
-        .def_property_readonly(
-            "offset",
-            [](PythonLazyLoadStoreChunk const &self) { return self.offset(); })
-        .def_property_readonly(
-            "extent",
-            [](PythonLazyLoadStoreChunk const &self) { return self.extent(); })
+        // .def_property_readonly(
+        //     "offset",
+        //     [](PythonLazyLoadStoreChunk const &self) { return self.offset();
+        //     })
+        // .def_property_readonly(
+        //     "extent",
+        //     [](PythonLazyLoadStoreChunk const &self) { return self.extent();
+        //     })
         .def(
             "__array__",
             [](PythonLazyLoadStoreChunk &self,
                py::object dtype,
-               py::object copy) -> py::object {
+               const py::object &copy) -> py::object {
                 // numpy calls __array__(dtype=..., copy=...) whenever it
                 // consumes the object (np.asarray, assignment RHS, ...).
                 // This is the point where the lazy load is actually performed.

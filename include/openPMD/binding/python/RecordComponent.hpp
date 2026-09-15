@@ -37,6 +37,12 @@
 namespace py = pybind11;
 using namespace openPMD;
 
+inline void load_chunk(
+    RecordComponent &r,
+    py::buffer &buffer,
+    Offset const &offset,
+    Extent const &extent);
+
 /*
  * Definitions for these functions `store_chunk` and the lazy slicing helpers
  * found in python/RecordComponent.cpp.
@@ -50,9 +56,11 @@ void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
  * implements the buffer protocol and `__array__`, so numpy converts it (and
  * thereby triggers the actual load) transparently.
  */
-py::object load_chunk_lazy(py::object self, py::tuple const &slices);
-py::object load_chunk_lazy_slice(py::object self, py::slice const &slice_obj);
-py::object load_chunk_lazy_int(py::object self, py::int_ const &slice_obj);
+py::object load_chunk_lazy(RecordComponent &self, py::tuple const &slices);
+py::object
+load_chunk_lazy_slice(RecordComponent &self, py::slice const &slice_obj);
+py::object
+load_chunk_lazy_int(RecordComponent &self, py::int_ const &slice_obj);
 
 /** Store `value` (a numpy array, generic buffer or another lazy chunk handle)
  * into the record component at the selection described by `slices`.
@@ -86,25 +94,28 @@ Class &&addRecordComponentSetGet(Class &&class_)
     class_
         .def(
             "__getitem__",
-            [](py::object self, py::tuple const &slices) {
+            [](RecordComponent &self, py::tuple const &slices) {
                 return load_chunk_lazy(self, slices);
             },
+            py::keep_alive<0, 1>(),
             py::arg("tuple of index slices"))
         .def(
             "__getitem__",
-            [](py::object self, py::slice const &slice_obj) {
+            [](RecordComponent &self, py::slice const &slice_obj) {
                 return load_chunk_lazy_slice(self, slice_obj);
             },
+            py::keep_alive<0, 1>(),
             py::arg("slice"))
         .def(
             "__getitem__",
-            [](py::object self, py::int_ const &slice_obj) {
+            [](RecordComponent &self, py::int_ const &slice_obj) {
                 return load_chunk_lazy_int(self, slice_obj);
             },
+            py::keep_alive<0, 1>(),
             py::arg("axis index"))
         .def(
             "__iter__",
-            [](py::object self) {
+            [](py::object const &self) {
                 // Repeated lazy single-row loads are done only when the user
                 // actually iterates; each row is loaded independently.
                 return self.attr("load")().attr("__iter__")();
