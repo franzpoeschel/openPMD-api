@@ -1157,7 +1157,9 @@ class APITest(unittest.TestCase):
         w = electrons["weighting"][io.Record_Component.SCALAR]
 
         # some original data
-        data_pos_y_org = pos["y"][()]
+        #   `pos["y"][()]` now returns a lazy Load_Store_Chunk; materialize it
+        #   right away so the snapshot survives the series.close() below.
+        data_pos_y_org = np.asarray(pos["y"][()])
         series.flush()
 
         # Pickle
@@ -1858,6 +1860,68 @@ class APITest(unittest.TestCase):
             series.close()
             with self.assertRaises(io.Error):
                 np.asarray(stale)
+
+    def testLazyInto(self):
+        """
+        `Load_Store_Chunk.into(buffer)` loads the chunk's data directly into a
+        caller-provided buffer through a single backend operation (no
+        intermediate numpy array):
+
+          - a contiguous / owning buffer            -> ordinary contiguous load
+          - a strided sub-cuboid view of a buffer   -> memory-selection load
+        """
+        if not found_numpy:
+            return
+
+        for ext in (".bp", ".h5"):
+            if ext not in io.file_extensions:
+                continue
+            name = "unittest_py_lazy_into" + ext
+            series = io.Series(name, io.Access.create)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            E_x.reset_dataset(io.Dataset(np.int64, [6, 6, 6]))
+            source = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
+            E_x[:, :, :] = source
+            series.flush()
+            series.close()
+
+            series = io.Series(name, io.Access.read_only)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+
+            # Contiguous target buffer: zero-copy contiguous load, and .into()
+            # returns the caller's buffer (so it can be chained/captured).
+            dst = np.zeros((6, 6, 6), dtype=np.int64)
+            ret = E_x[:, :, :].into(dst)
+            self.assertIs(ret, dst)
+            self.assertTrue(np.array_equal(dst, source))
+
+            # Strided sub-cuboid view of a larger buffer: memory selection.
+            big = np.full((8, 8, 8), -1, dtype=np.int64)
+            E_x[2:6, 2:6, 2:6].into(big[2:6, 2:6, 2:6])
+            expected = np.full((8, 8, 8), -1, dtype=np.int64)
+            expected[2:6, 2:6, 2:6] = source[2:6, 2:6, 2:6]
+            self.assertTrue(np.array_equal(big, expected))
+
+            # Generic PEP 3118 buffer (array.array): buffer path, not numpy.
+            import array as array_mod
+
+            dst_arr = array_mod.array("q", [0] * (4 * 4 * 4))
+            E_x[1:5, 1:5, 1:5].into(dst_arr)
+            self.assertEqual(
+                list(dst_arr), list(source[1:5, 1:5, 1:5].ravel())
+            )
+
+            # Wrong shape / dimension is rejected cleanly.
+            with self.assertRaises(IndexError):
+                E_x[:, :, :].into(np.zeros((6, 6), dtype=np.int64))
+
+            # Loading a lazy chunk after close is a clean error.
+            stale = E_x[:, :, :]
+            series.close()
+            with self.assertRaises(io.Error):
+                stale.into(np.zeros((6, 6, 6), dtype=np.int64))
 
     def testIterations(self):
         """Test querying a series' iterations and loop over them."""

@@ -38,12 +38,10 @@ namespace py = pybind11;
 using namespace openPMD;
 
 /*
- * Definitions for these functions `load_chunk`, `store_chunk` and the lazy
- * slicing helpers found in python/RecordComponent.cpp.
+ * Definitions for these functions `store_chunk` and the lazy slicing helpers
+ * found in python/RecordComponent.cpp.
  * No need to pull them here, as they are not templates.
  */
-py::array load_chunk(RecordComponent &r, py::tuple const &slices);
-
 void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
 
 /** Create a lazily-evaluating load/store chunk handle for the given slices.
