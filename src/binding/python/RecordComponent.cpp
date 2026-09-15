@@ -1466,20 +1466,32 @@ inline void load_chunk(
 }
 
 auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices)
-    -> PythonLazyLoadStoreChunk
+    -> std::shared_ptr<PythonLazyLoadStoreChunk>
 {
-    return make_lazy_chunk(rc, slices);
+    auto res =
+        std::make_shared<PythonLazyLoadStoreChunk>(make_lazy_chunk(rc, slices));
+    std::weak_ptr<PythonLazyLoadStoreChunk> as_weak_ptr = res;
+    auto flush_hook = [lazy_load = std::move(as_weak_ptr)]() {
+        auto locked = lazy_load.lock();
+        if (!locked)
+        {
+            return;
+        }
+        locked->load();
+    };
+    rc.addPreFlushHook(std::move(flush_hook));
+    return res;
 }
 
 auto load_chunk_lazy_slice(RecordComponent &rc, py::slice const &slice_obj)
-    -> PythonLazyLoadStoreChunk
+    -> std::shared_ptr<PythonLazyLoadStoreChunk>
 {
     auto const slices = py::make_tuple(slice_obj);
     return load_chunk_lazy(rc, slices);
 }
 
 auto load_chunk_lazy_int(RecordComponent &rc, py::int_ const &slice_obj)
-    -> PythonLazyLoadStoreChunk
+    -> std::shared_ptr<PythonLazyLoadStoreChunk>
 {
     auto const slices = py::make_tuple(slice_obj);
     return load_chunk_lazy(rc, slices);
