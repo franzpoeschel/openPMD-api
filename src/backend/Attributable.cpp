@@ -67,13 +67,14 @@ namespace internal
 
     void PreFlushHooks::operator()()
     {
-        // Swap all hooks out. If any contained hook flushes again, this avoids
-        // endless loops.
-        std::deque<std::function<void()>> hooks;
-        hooks.swap(m_hooks);
-        for (auto &hook : hooks)
+        // unsigned i = 0;
+        // std::cout << "HAVE " << m_hooks.size() << " HOOKS." << std::endl;
+        while (!m_hooks.empty())
         {
-            std::move(hook)();
+            // std::cout << "RUNNING HOOK " << i++ << std::endl;
+            auto task = std::move(*m_hooks.begin());
+            m_hooks.pop_front();
+            std::move(task)();
         }
     }
 } // namespace internal

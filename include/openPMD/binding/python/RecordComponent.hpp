@@ -172,11 +172,11 @@ void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
  * thereby triggers the actual load) transparently.
  */
 auto load_chunk_lazy(RecordComponent &self, py::tuple const &slices)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>;
+    -> py::object;
 auto load_chunk_lazy_slice(RecordComponent &self, py::slice const &slice_obj)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>;
+    -> py::object;
 auto load_chunk_lazy_int(RecordComponent &self, py::int_ const &slice_obj)
-    -> std::shared_ptr<PythonLazyLoadStoreChunk>;
+    -> py::object;
 
 /** Store `value` (a numpy array, generic buffer or another lazy chunk handle)
  * into the record component at the selection described by `slices`.
