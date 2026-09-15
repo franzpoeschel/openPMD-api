@@ -37,6 +37,121 @@
 namespace py = pybind11;
 using namespace openPMD;
 
+/*
+ * A lazily-evaluating handle to a chunk load/store operation.
+ *
+ * Created by `Record_Component.__getitem__`. It captures the record component,
+ * the resolved offset/extent and the shape that a numpy array covering the
+ * selection would have (with integer-indexed axes already dropped, cf.
+ * `flatten`).
+ *
+ * No I/O happens at construction time. I/O happens on first access:
+ *   - as a buffer (PEP 3118, via `def_buffer`) when numpy or `memoryview`
+ *     consumes the object, e.g. as the source of an assignment or
+ *     `np.asarray(rc[...])`
+ *   - via the `__array__` protocol (preferred by numpy)
+ *   - via `.load()` returning a numpy array owning the loaded data
+ *
+ * The object keeps the surrounding `Series` alive for as long as it exists,
+ * and the loaded buffer is cached, so the returned array stays valid even
+ * after the record component / series is out of scope.
+ *
+ * When such an object is used on the *right hand side* of a numpy assignment,
+ * numpy converts it (via `__array__` / the buffer protocol) to a numpy array
+ * *before* the assignment target is touched, so the load is performed under
+ * openPMD's control immediately.
+ */
+class PythonLazyLoadStoreChunk
+{
+public:
+    PythonLazyLoadStoreChunk(
+        ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape);
+
+    PythonLazyLoadStoreChunk(
+        RecordComponent &rc,
+        Offset offset,
+        Extent extent,
+        std::vector<py::ssize_t> shape);
+
+    auto const &shape() const;
+
+    auto const &operationBuilder() const;
+
+    auto &operationBuilder();
+
+    /** The datatype of the underlying record component */
+    auto getDatatype() const -> Datatype;
+
+    /**
+     * Perform the load (if not yet done) and return a numpy array owning the
+     * loaded data.
+     *
+     * The result is cached; subsequent calls (including through the buffer
+     * protocol / `__array__`) return the same array.
+     */
+    auto load() -> py::array &;
+
+    /** Buffer protocol export: run the load on first access.
+     *
+     * The returned `py::buffer_info` points into the (cached) numpy array,
+     * which is kept alive by the exporting object itself (the Python object
+     * wrapping `*this`), so the memory stays valid for the memoryview's whole
+     * lifetime.
+     */
+    py::buffer_info getBuffer();
+
+    /**
+     * Store data from `buffer` into the record component at this chunk's
+     * offset/extent.
+     *
+     * @param buffer Any PEP 3118 buffer (numpy array, memoryview, array.array,
+     *               ...). The buffer's shape must match the selection's shape;
+     *               a (possibly strided) sub-cuboid view is handled with a
+     *               memory selection.
+     */
+    void store(py::buffer const &buffer);
+
+    /**
+     * Load this chunk's data directly into `buffer`.
+     *
+     * Unlike `.load()`, which allocates a fresh numpy array and copies the
+     * loaded data into it, `.into()` loads the dataset chunk *directly* into
+     * a caller-provided buffer through a single backend operation:
+     *
+     *   - a contiguous buffer (or a whole owning buffer) uses the ordinary
+     *     contiguous load path with no intermediate copy;
+     *   - a (possibly non-contiguous in its own shape) sub-cuboid view of a
+     *     larger buffer uses a *memory selection*, loading the chunk directly
+     *     into that sub-region with one `READ_DATASET` and no intermediate.
+     *
+     * Unlike the `load_chunk` pass-through API, the load is performed
+     * synchronously: after this call returns, the buffer is fully populated
+     * (an automatic flush runs during the evaluation), matching the semantics
+     * of `.load()`.
+     *
+     * The buffer's shape must match this chunk's selection shape. The buffer
+     * is returned, so the call can be chained:
+     *
+     *   rc[:, :, :] .into(my_buffer)          # contiguous, zero-copy
+     *   rc[2:4, 2:4, 2:4] .into(dst[2:4,...]) # memory selection
+     *
+     * @param buffer_obj Any writable PEP 3118 buffer (numpy array, memoryview,
+     *                   array.array, ...).
+     * @return The `buffer` itself.
+     */
+    py::object into(py::object const &buffer_obj);
+
+private:
+    auto doLoad() -> py::array;
+
+    auto strides_from_extent() -> std::vector<py::ssize_t>;
+
+    ConfigureLoadStore m_operationBuilder;
+    std::vector<py::ssize_t> m_shape;
+    std::optional<py::array> m_cache;
+    std::shared_ptr<void> m_data; // owns the loaded buffer
+};
+
 inline void load_chunk(
     RecordComponent &r,
     py::buffer &buffer,
@@ -56,11 +171,12 @@ void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
  * implements the buffer protocol and `__array__`, so numpy converts it (and
  * thereby triggers the actual load) transparently.
  */
-py::object load_chunk_lazy(RecordComponent &self, py::tuple const &slices);
-py::object
-load_chunk_lazy_slice(RecordComponent &self, py::slice const &slice_obj);
-py::object
-load_chunk_lazy_int(RecordComponent &self, py::int_ const &slice_obj);
+auto load_chunk_lazy(RecordComponent &self, py::tuple const &slices)
+    -> PythonLazyLoadStoreChunk;
+auto load_chunk_lazy_slice(RecordComponent &self, py::slice const &slice_obj)
+    -> PythonLazyLoadStoreChunk;
+auto load_chunk_lazy_int(RecordComponent &self, py::int_ const &slice_obj)
+    -> PythonLazyLoadStoreChunk;
 
 /** Store `value` (a numpy array, generic buffer or another lazy chunk handle)
  * into the record component at the selection described by `slices`.
