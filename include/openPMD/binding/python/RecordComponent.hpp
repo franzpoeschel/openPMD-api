@@ -144,16 +144,13 @@ public:
     py::object into(py::object const &buffer_obj);
 
 private:
-    void doLoad(bool do_flush);
-
-    auto createPythonArray() -> py::array &;
+    auto doLoad(bool do_flush) -> py::array &;
 
     auto strides_from_extent() -> std::vector<py::ssize_t>;
 
     ConfigureLoadStore m_operationBuilder;
     std::vector<py::ssize_t> m_shape;
     std::optional<py::array> m_cache;
-    std::shared_ptr<void> m_data; // owns the loaded buffer
 };
 
 inline void load_chunk(
