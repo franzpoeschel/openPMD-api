@@ -64,16 +64,11 @@ using namespace openPMD;
 class PythonLazyLoadStoreChunk
 {
 public:
-    PythonLazyLoadStoreChunk(
-        ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape);
+    PythonLazyLoadStoreChunk(ConfigureLoadStore operationBuilder);
 
-    PythonLazyLoadStoreChunk(
-        RecordComponent &rc,
-        Offset offset,
-        Extent extent,
-        std::vector<py::ssize_t> shape);
+    PythonLazyLoadStoreChunk(RecordComponent &rc, Offset offset, Extent extent);
 
-    auto const &shape() const;
+    auto shape();
 
     auto const &operationBuilder() const;
 
@@ -149,7 +144,7 @@ private:
     auto strides_from_extent() -> std::vector<py::ssize_t>;
 
     ConfigureLoadStore m_operationBuilder;
-    std::vector<py::ssize_t> m_shape;
+    // std::vector<py::ssize_t> m_shape;
     std::optional<py::array> m_cache;
 };
 

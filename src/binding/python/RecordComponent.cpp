@@ -985,26 +985,16 @@ inline PreparedBufferTarget resolve_buffer_target(
 }
 
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
-    ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape)
-    : m_operationBuilder(std::move(operationBuilder)), m_shape(std::move(shape))
+    ConfigureLoadStore operationBuilder)
+    : m_operationBuilder(std::move(operationBuilder))
 {}
 
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
-    RecordComponent &rc,
-    Offset offset,
-    Extent extent,
-    std::vector<py::ssize_t> shape)
-    : PythonLazyLoadStoreChunk(
-          rc.prepareLoadStore()
-              .offset(std::move(offset))
-              .extent(std::move(extent)),
-          std::move(shape))
+    RecordComponent &rc, Offset offset, Extent extent)
+    : PythonLazyLoadStoreChunk(rc.prepareLoadStore()
+                                   .offset(std::move(offset))
+                                   .extent(std::move(extent)))
 {}
-
-auto const &PythonLazyLoadStoreChunk::shape() const
-{
-    return m_shape;
-}
 
 auto const &PythonLazyLoadStoreChunk::operationBuilder() const
 {
@@ -1014,6 +1004,14 @@ auto const &PythonLazyLoadStoreChunk::operationBuilder() const
 auto &PythonLazyLoadStoreChunk::operationBuilder()
 {
     return m_operationBuilder;
+}
+
+auto PythonLazyLoadStoreChunk::shape()
+{
+    auto extent = operationBuilder().computeExtent();
+    std::vector<ptrdiff_t> shape(extent.size());
+    std::copy(std::begin(extent), std::end(extent), std::begin(shape));
+    return shape;
 }
 
 auto PythonLazyLoadStoreChunk::getDatatype() const -> Datatype
@@ -1043,7 +1041,7 @@ void PythonLazyLoadStoreChunk::store(py::buffer const &buffer)
     py::object buffer_obj = py::reinterpret_borrow<py::object>(buffer);
 
     // shape check: the buffer's shape must match the selection's shape
-    check_buffer_shape(info, m_shape);
+    check_buffer_shape(info, shape());
 
     auto memsel = derive_memory_selection(buffer_obj, info);
 
@@ -1072,7 +1070,7 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
     auto info = buffer.request(/* writable = */ true);
 
     // shape check: the buffer's shape must match the selection's shape
-    check_buffer_shape(info, m_shape);
+    check_buffer_shape(info, shape());
 
     auto memsel = derive_memory_selection(buffer_obj, info);
 
@@ -1147,13 +1145,14 @@ auto PythonLazyLoadStoreChunk::doLoad(bool do_flush) -> py::array &
 auto PythonLazyLoadStoreChunk::strides_from_extent() -> std::vector<py::ssize_t>
 {
     // C-contiguous row-major strides
-    std::vector<py::ssize_t> strides(m_shape.size());
+    auto shape_ = shape();
+    std::vector<py::ssize_t> strides(shape_.size());
     py::ssize_t acc =
         static_cast<py::ssize_t>(openPMD::detail::dtypeSize(getDatatype()));
-    for (size_t d = m_shape.size(); d > 0; --d)
+    for (size_t d = shape_.size(); d > 0; --d)
     {
         strides[d - 1] = acc;
-        acc *= m_shape[d - 1];
+        acc *= shape_[d - 1];
     }
     return strides;
 }
@@ -1188,8 +1187,7 @@ make_lazy_chunk(RecordComponent &rc, py::tuple const &slices)
         }
     }
 
-    return PythonLazyLoadStoreChunk(
-        rc, std::move(offset), std::move(extent), std::move(shape));
+    return PythonLazyLoadStoreChunk(rc, std::move(offset), std::move(extent));
 }
 } // namespace
 
@@ -1541,7 +1539,7 @@ void init_RecordComponent(py::module &m)
         .def_buffer(&PythonLazyLoadStoreChunk::getBuffer)
         .def_property_readonly(
             "shape",
-            [](PythonLazyLoadStoreChunk const &self) {
+            [](PythonLazyLoadStoreChunk &self) {
                 py::list shape;
                 for (auto s : self.shape())
                 {
@@ -1551,9 +1549,7 @@ void init_RecordComponent(py::module &m)
             })
         .def_property_readonly(
             "ndim",
-            [](PythonLazyLoadStoreChunk const &self) {
-                return self.shape().size();
-            })
+            [](PythonLazyLoadStoreChunk &self) { return self.shape().size(); })
         .def_property_readonly(
             "dtype",
             [](PythonLazyLoadStoreChunk const &self) {
@@ -1632,7 +1628,7 @@ void init_RecordComponent(py::module &m)
             py::arg("target buffer"))
         .def(
             "__repr__",
-            [](PythonLazyLoadStoreChunk const &self) {
+            [](PythonLazyLoadStoreChunk &self) {
                 std::stringstream stream;
                 stream << "<openPMD.Load_Store_Chunk of type '"
                        << self.getDatatype() << "' and with shape (";
@@ -1654,7 +1650,7 @@ void init_RecordComponent(py::module &m)
                 py::array arr = self.load();
                 return py::iter(arr);
             })
-        .def("__len__", [](PythonLazyLoadStoreChunk const &self) {
+        .def("__len__", [](PythonLazyLoadStoreChunk &self) {
             if (self.shape().empty())
             {
                 return (py::ssize_t)1;
