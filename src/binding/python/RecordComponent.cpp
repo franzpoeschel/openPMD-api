@@ -33,6 +33,7 @@
 #include "openPMD/LoadStoreChunk.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series.hpp"
+#include "openPMD/auxiliary/Future.hpp"
 #include "openPMD/backend/BaseRecordComponent.hpp"
 
 #include "openPMD/binding/python/Common.hpp"
@@ -349,14 +350,20 @@ struct StoreChunkFromPythonArray
 };
 struct LoadChunkIntoPythonArray
 {
+    enum class automatic_flush : std::uint8_t
+    {
+        none,
+        legacy,
+        chaining
+    };
+
     template <typename T>
-    static void call(
-        RecordComponent &r,
+    static auto call(
+        ConfigureLoadStore operation,
         py::object owning_handle,
         void *data,
-        Offset const &offset,
-        Extent const &extent,
-        std::optional<MemorySelection> memorySelection)
+        std::optional<MemorySelection> memorySelection,
+        automatic_flush auto_flush) -> auxiliary::DeferredComputation<void>
     {
         // here, we store an owning handle in the lambda capture so that
         // temporary and lost-scope variables stay alive until we flush
@@ -369,14 +376,24 @@ struct LoadChunkIntoPythonArray
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        auto config =
-            r.prepareLoadStore().offset(offset).extent(extent).withSharedPtr(
-                std::move(shared));
+        auto config = operation.withSharedPtr(std::move(shared));
         if (memorySelection.has_value())
         {
             config.memorySelection(std::move(*memorySelection));
         }
-        config.unsafeNoAutomaticFlush(true).load().get();
+        switch (auto_flush)
+        {
+
+        case automatic_flush::none:
+            config.unsafeNoAutomaticFlush(false);
+            break;
+        case automatic_flush::legacy:
+            config.unsafeNoAutomaticFlush(true);
+            break;
+        case automatic_flush::chaining:
+            break;
+        }
+        return config.load();
     }
 
     static constexpr char const *errorMsg = "load_chunk()";
@@ -967,27 +984,6 @@ inline PreparedBufferTarget resolve_buffer_target(
         detail);
 }
 
-/* ==== relocated lazy load/store chunk support ==== */
-namespace
-{
-/*
- * Small Python-exposed owner object that keeps a raw buffer alive.
- *
- * Used as the `base` of numpy arrays created from lazily loaded chunks: the
- * array holds a reference to this object instead of holding a reference to the
- * lazy chunk (which would create a reference cycle). Destroying the last
- * reference to the array releases this object and thereby the loaded buffer.
- */
-struct PythonLoadBufferOwner
-{
-    explicit PythonLoadBufferOwner(std::shared_ptr<void> buffer)
-        : data(std::move(buffer))
-    {}
-
-    std::shared_ptr<void> data;
-};
-} // namespace
-
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
     ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape)
     : m_operationBuilder(std::move(operationBuilder)), m_shape(std::move(shape))
@@ -1027,8 +1023,7 @@ auto PythonLazyLoadStoreChunk::getDatatype() const -> Datatype
 
 auto PythonLazyLoadStoreChunk::load() -> py::array &
 {
-    doLoad(true);
-    return createPythonArray();
+    return doLoad(true);
 }
 
 void PythonLazyLoadStoreChunk::enqueueLoad()
@@ -1123,76 +1118,30 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
     return py::reinterpret_borrow<py::object>(buffer_obj);
 }
 
-void PythonLazyLoadStoreChunk::doLoad(bool do_flush)
+auto PythonLazyLoadStoreChunk::doLoad(bool do_flush) -> py::array &
 {
-    if (m_data)
-    {
-        return;
-    }
-    // Use the chaining API's allocating load (with automatic flush upon
-    // evaluation): it allocates the buffer, enqueues the read and fills
-    // the buffer when the returned DeferredComputation is evaluated.
-    //
-    // TODO: The garbage collector should keep the Series alive as long as
-    // the handle lives.
-    //
-    // Loading a chunk requires the underlying Series to still be open. If
-    // the Series was closed before the lazy chunk is resolved, the
-    // ConfigureLoadStore machinery throws (cf. the IOHandler guard in
-    // ConfigureLoadStore::deferFlush); catch that and rethrow it with a
-    // user-friendly message instead of crashing or handing out
-    // uninitialized memory.
-    std::shared_ptr<void> buffer;
-    try
-    {
-        auto operation = operationBuilder();
-        if (!do_flush)
-        {
-            // In this case, the returned buffer will not yet be written.
-            operation.unsafeNoAutomaticFlush(false);
-        }
-        auto loadVar = operation.loadVariant();
-        auto shared = loadVar(); // evaluates: flushes (executes the read)
-        buffer = std::visit(
-            [](auto &ptr) -> std::shared_ptr<void> {
-                return std::static_pointer_cast<void>(std::move(ptr));
-            },
-            shared);
-    }
-    catch (error::Internal const &e)
-    {
-        throw_closed_series_error(e.what());
-    }
-    m_data = std::move(buffer);
-}
-
-auto PythonLazyLoadStoreChunk::createPythonArray() -> py::array &
-{
-    if (!m_data)
-    {
-        throw error::Internal(
-            "Tried creating a Python buffer before any data has been loaded.");
-    }
     if (m_cache.has_value())
     {
         return *m_cache;
     }
     auto dtype = getDatatype();
-    // Wrap the loaded buffer in a numpy array that (transitively) owns the
-    // memory through a PythonLoadBufferOwner. The returned array keeps the
-    // owner -- and hence the buffer -- alive; no reference cycle is
-    // created with this lazy chunk.
-    //
-    // TODO check if this duplicates bits from the old allocating Python API
-    py::object owner =
-        py::cast(std::make_shared<PythonLoadBufferOwner>(m_data));
-    py::array arr(
-        dtype_to_numpy(dtype),
-        py::array::ShapeContainer(m_shape),
-        py::array::ShapeContainer(strides_from_extent()),
-        m_data.get(),
-        owner);
-    return m_cache.emplace(std::move(arr));
+    auto operation = operationBuilder();
+    auto extent = operation.computeExtent();
+    std::vector<ptrdiff_t> shape(extent.size());
+    std::copy(std::begin(extent), std::end(extent), std::begin(shape));
+    auto dtype_as_numpy = dtype_to_numpy(dtype);
+    auto &res = m_cache.emplace(dtype_as_numpy, shape);
+
+    switchDatasetType<LoadChunkIntoPythonArray>(
+        dtype,
+        std::move(operation),
+        res.cast<py::object>(),
+        res.mutable_data(),
+        std::nullopt,
+        do_flush ? LoadChunkIntoPythonArray::automatic_flush::chaining
+                 : LoadChunkIntoPythonArray::automatic_flush::none)
+        .get();
+    return res;
 }
 
 auto PythonLazyLoadStoreChunk::strides_from_extent() -> std::vector<py::ssize_t>
@@ -1466,12 +1415,12 @@ inline void load_chunk(
     auto target = resolve_buffer_target(buffer_obj, info, memsel);
     switchDatasetType<LoadChunkIntoPythonArray>(
         r.getDatatype(),
-        r,
+        r.prepareLoadStore().offset(offset).extent(extent),
         target.owner_obj,
         target.data_ptr,
-        offset,
-        extent,
-        std::move(memsel));
+        std::move(memsel),
+        LoadChunkIntoPythonArray::automatic_flush::legacy)
+        .get();
 }
 
 /** Load Chunk (numpy array convenience overload)
@@ -1490,24 +1439,33 @@ inline void load_chunk(
 
 auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
 {
-    auto res = py::cast(make_lazy_chunk(rc, slices));
-    auto flush_hook = [lazy_load = py::weakref(res)]() {
-        py::gil_scoped_acquire gil;
-        py::object referent = lazy_load(); // dereference the weakref
-        if (referent.is_none())
+    // Build the lazy handle as a shared_ptr so we can keep the same C++
+    // object alive both as the Python-visible return value and inside the
+    // flush hook without holding any Python object in core openPMD C++ state.
+    auto lazy_load =
+        std::make_shared<PythonLazyLoadStoreChunk>(make_lazy_chunk(rc, slices));
+    auto res = py::cast(lazy_load);
+    // Capture the C++ object (shared_ptr) rather than a Python handle: the
+    // hook is stored in core openPMD C++ state (PreFlushHooks) whose lifetime
+    // is not tied to the Python GIL. Holding a py::object / py::weakref there
+    // means its destructor may run without the GIL, tripping pybind11's
+    // PyGILState_Check() assertion (and py::weakref is a borrowing handle that
+    // dangles once the referent is collected). A shared_ptr keeps *this alive
+    // with no Python object in the hook, so dereferencing is safe and the load
+    // is performed through the C++ side.
+    auto flush_hook = [lazy_load_weak = std::weak_ptr(lazy_load)]() {
+        auto referent = lazy_load_weak.lock();
+        if (!referent)
         {
             return; // object already collected
         }
-        auto &lazy_load_recovered =
-            py::cast<PythonLazyLoadStoreChunk &>(referent);
-        // std::cout << "LOADING DATA FROM HOOK FOR '"
-        //           << lazy_load_recovered.operationBuilder()
-        //                  .getComponentHandle()
-        //                  .myPath()
-        //                  .openPMDPath()
-        //           << "'." << std::endl;
-        py::gil_scoped_release release;
-        lazy_load_recovered.enqueueLoad();
+        std::cout << "LOADING DATA FROM HOOK FOR '"
+                  << referent->operationBuilder()
+                         .getComponentHandle()
+                         .myPath()
+                         .openPMDPath()
+                  << "'." << std::endl;
+        referent->enqueueLoad();
     };
     rc.addPreFlushHook(std::move(flush_hook));
     return res;
@@ -1576,10 +1534,9 @@ void store_chunk_object_int(
 
 void init_RecordComponent(py::module &m)
 {
-    py::class_<PythonLoadBufferOwner, std::shared_ptr<PythonLoadBufferOwner>>(
-        m, "_Load_Buffer_Owner");
-
-    py::class_<PythonLazyLoadStoreChunk>(
+    py::class_<
+        PythonLazyLoadStoreChunk,
+        std::shared_ptr<PythonLazyLoadStoreChunk>>(
         m, "Load_Store_Chunk", py::buffer_protocol())
         .def_buffer(&PythonLazyLoadStoreChunk::getBuffer)
         .def_property_readonly(
