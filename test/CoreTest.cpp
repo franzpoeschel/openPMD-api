@@ -1311,29 +1311,47 @@ TEST_CASE("unsafe_no_automatic_flush_immediate_flush_test", "[core]")
 {
     /*
      * The chaining API (prepareLoadStore) normally bypasses the immediate
-     * flush setting for safety. When unsafeNoAutomaticFlush() is used, it
-     * should fall back to the legacy flushing semantics, i.e. honor
-     * OPENPMD_FLUSH_IMMEDIATELY.
+     * flush setting for safety. When unsafeNoAutomaticFlush() is used with
+     * the immediate-flush setting enabled (consider_immediate_flush_setting
+     * == true), it should fall back to the legacy flushing semantics, i.e.
+     * honor OPENPMD_FLUSH_IMMEDIATELY. When disabled, the operation keeps
+     * the chaining API's deferred (buffered) behavior.
      */
     Series o = Series("./new_openpmd_output.json", Access::CREATE);
     MeshRecordComponent mrc = o.iterations[1].meshes["E"]["x"];
     mrc.resetDataset(Dataset(determineDatatype<uint16_t>(), {42}));
     std::shared_ptr<uint16_t> storeData = std::make_shared<uint16_t>(44);
 #if openPMD_USE_INVASIVE_TESTS
-    // immediate flush enabled -> chunk is written right away
+    // legacy flushed semantics -> immediate flush enabled -> chunk is
+    // written right away
     o.IOHandler()->m_flush_immediately = true;
     mrc.prepareLoadStore()
         .offset(Offset{0})
         .extent(Extent{1})
         .withSharedPtr(storeData)
-        .unsafeNoAutomaticFlush(false)
+        .unsafeNoAutomaticFlush(true)
         .store()
         .get();
     REQUIRE(mrc.get().m_chunks.empty());
     o.flush();
 
-    // immediate flush disabled -> chunk is buffered until flush()
+    // legacy flushed semantics -> immediate flush disabled -> chunk is
+    // buffered until flush()
     o.IOHandler()->m_flush_immediately = false;
+    mrc.prepareLoadStore()
+        .offset(Offset{0})
+        .extent(Extent{1})
+        .withSharedPtr(storeData)
+        .unsafeNoAutomaticFlush(true)
+        .store();
+    REQUIRE(mrc.get().m_chunks.size() == 1);
+    o.flush();
+    REQUIRE(mrc.get().m_chunks.empty());
+
+    // chaining semantics (consider_immediate_flush_setting == false) always
+    // defers: even with the immediate flush setting enabled the chunk is
+    // buffered until an explicit flush.
+    o.IOHandler()->m_flush_immediately = true;
     mrc.prepareLoadStore()
         .offset(Offset{0})
         .extent(Extent{1})
