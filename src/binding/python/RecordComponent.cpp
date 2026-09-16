@@ -1027,12 +1027,13 @@ auto PythonLazyLoadStoreChunk::getDatatype() const -> Datatype
 
 auto PythonLazyLoadStoreChunk::load() -> py::array &
 {
-    if (m_cache)
-    {
-        return *m_cache;
-    }
-    m_cache = doLoad();
-    return *m_cache;
+    doLoad(true);
+    return createPythonArray();
+}
+
+void PythonLazyLoadStoreChunk::enqueueLoad()
+{
+    doLoad(false);
 }
 
 py::buffer_info PythonLazyLoadStoreChunk::getBuffer()
@@ -1122,9 +1123,12 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
     return py::reinterpret_borrow<py::object>(buffer_obj);
 }
 
-auto PythonLazyLoadStoreChunk::doLoad() -> py::array
+void PythonLazyLoadStoreChunk::doLoad(bool do_flush)
 {
-    auto dtype = getDatatype();
+    if (m_data)
+    {
+        return;
+    }
     // Use the chaining API's allocating load (with automatic flush upon
     // evaluation): it allocates the buffer, enqueues the read and fills
     // the buffer when the returned DeferredComputation is evaluated.
@@ -1141,7 +1145,13 @@ auto PythonLazyLoadStoreChunk::doLoad() -> py::array
     std::shared_ptr<void> buffer;
     try
     {
-        auto loadVar = operationBuilder().loadVariant();
+        auto operation = operationBuilder();
+        if (!do_flush)
+        {
+            // In this case, the returned buffer will not yet be written.
+            operation.unsafeNoAutomaticFlush(false);
+        }
+        auto loadVar = operation.loadVariant();
         auto shared = loadVar(); // evaluates: flushes (executes the read)
         buffer = std::visit(
             [](auto &ptr) -> std::shared_ptr<void> {
@@ -1154,7 +1164,20 @@ auto PythonLazyLoadStoreChunk::doLoad() -> py::array
         throw_closed_series_error(e.what());
     }
     m_data = std::move(buffer);
+}
 
+auto PythonLazyLoadStoreChunk::createPythonArray() -> py::array &
+{
+    if (!m_data)
+    {
+        throw error::Internal(
+            "Tried creating a Python buffer before any data has been loaded.");
+    }
+    if (m_cache.has_value())
+    {
+        return *m_cache;
+    }
+    auto dtype = getDatatype();
     // Wrap the loaded buffer in a numpy array that (transitively) owns the
     // memory through a PythonLoadBufferOwner. The returned array keeps the
     // owner -- and hence the buffer -- alive; no reference cycle is
@@ -1169,7 +1192,7 @@ auto PythonLazyLoadStoreChunk::doLoad() -> py::array
         py::array::ShapeContainer(strides_from_extent()),
         m_data.get(),
         owner);
-    return arr;
+    return m_cache.emplace(std::move(arr));
 }
 
 auto PythonLazyLoadStoreChunk::strides_from_extent() -> std::vector<py::ssize_t>
@@ -1484,7 +1507,7 @@ auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
         //                  .openPMDPath()
         //           << "'." << std::endl;
         py::gil_scoped_release release;
-        lazy_load_recovered.load();
+        lazy_load_recovered.enqueueLoad();
     };
     rc.addPreFlushHook(std::move(flush_hook));
     return res;

@@ -91,6 +91,8 @@ public:
      */
     auto load() -> py::array &;
 
+    void enqueueLoad();
+
     /** Buffer protocol export: run the load on first access.
      *
      * The returned `py::buffer_info` points into the (cached) numpy array,
@@ -142,7 +144,9 @@ public:
     py::object into(py::object const &buffer_obj);
 
 private:
-    auto doLoad() -> py::array;
+    void doLoad(bool do_flush);
+
+    auto createPythonArray() -> py::array &;
 
     auto strides_from_extent() -> std::vector<py::ssize_t>;
 
