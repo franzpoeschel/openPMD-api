@@ -985,15 +985,16 @@ inline PreparedBufferTarget resolve_buffer_target(
 }
 
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
-    ConfigureLoadStore operationBuilder)
-    : m_operationBuilder(std::move(operationBuilder))
+    ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape)
+    : m_operationBuilder(std::move(operationBuilder)), m_shape(std::move(shape))
 {}
 
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
-    RecordComponent &rc, Offset offset, Extent extent)
+    RecordComponent &rc, Offset offset, Extent extent, std::vector<py::ssize_t> shape)
     : PythonLazyLoadStoreChunk(rc.prepareLoadStore()
                                    .offset(std::move(offset))
-                                   .extent(std::move(extent)))
+                                   .extent(std::move(extent)),
+                               std::move(shape))
 {}
 
 auto const &PythonLazyLoadStoreChunk::operationBuilder() const
@@ -1006,12 +1007,9 @@ auto &PythonLazyLoadStoreChunk::operationBuilder()
     return m_operationBuilder;
 }
 
-auto PythonLazyLoadStoreChunk::shape()
+auto const &PythonLazyLoadStoreChunk::shape() const
 {
-    auto extent = operationBuilder().computeExtent();
-    std::vector<ptrdiff_t> shape(extent.size());
-    std::copy(std::begin(extent), std::end(extent), std::begin(shape));
-    return shape;
+    return m_shape;
 }
 
 auto PythonLazyLoadStoreChunk::getDatatype() const -> Datatype
@@ -1124,11 +1122,8 @@ auto PythonLazyLoadStoreChunk::doLoad(bool do_flush) -> py::array &
     }
     auto dtype = getDatatype();
     auto operation = operationBuilder();
-    auto extent = operation.computeExtent();
-    std::vector<ptrdiff_t> shape(extent.size());
-    std::copy(std::begin(extent), std::end(extent), std::begin(shape));
     auto dtype_as_numpy = dtype_to_numpy(dtype);
-    auto &res = m_cache.emplace(dtype_as_numpy, shape);
+    auto &res = m_cache.emplace(dtype_as_numpy, m_shape);
 
     switchDatasetType<LoadChunkIntoPythonArray>(
         dtype,
@@ -1140,21 +1135,6 @@ auto PythonLazyLoadStoreChunk::doLoad(bool do_flush) -> py::array &
                  : LoadChunkIntoPythonArray::automatic_flush::none)
         .get();
     return res;
-}
-
-auto PythonLazyLoadStoreChunk::strides_from_extent() -> std::vector<py::ssize_t>
-{
-    // C-contiguous row-major strides
-    auto shape_ = shape();
-    std::vector<py::ssize_t> strides(shape_.size());
-    py::ssize_t acc =
-        static_cast<py::ssize_t>(openPMD::detail::dtypeSize(getDatatype()));
-    for (size_t d = shape_.size(); d > 0; --d)
-    {
-        strides[d - 1] = acc;
-        acc *= shape_[d - 1];
-    }
-    return strides;
 }
 
 namespace
@@ -1187,7 +1167,8 @@ make_lazy_chunk(RecordComponent &rc, py::tuple const &slices)
         }
     }
 
-    return PythonLazyLoadStoreChunk(rc, std::move(offset), std::move(extent));
+    return PythonLazyLoadStoreChunk(
+        rc, std::move(offset), std::move(extent), std::move(shape));
 }
 } // namespace
 
@@ -1457,6 +1438,13 @@ auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
         {
             return; // object already collected
         }
+        // The hook is invoked from core openPMD C++ state (PreFlushHooks) while
+        // the Python binding for Series.flush() has released the GIL
+        // (py::gil_scoped_release in Series.cpp). enqueueLoad() -> doLoad()
+        // constructs py::array / py::dtype objects, which require the GIL.
+        // The hook only holds shared_ptr (no Python objects), so acquiring the
+        // GIL here is safe and must not be leaked into the core flush path.
+        py::gil_scoped_acquire acquire_gil;
         std::cout << "LOADING DATA FROM HOOK FOR '"
                   << referent->operationBuilder()
                          .getComponentHandle()
