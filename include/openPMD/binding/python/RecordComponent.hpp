@@ -64,11 +64,17 @@ using namespace openPMD;
 class PythonLazyLoadStoreChunk
 {
 public:
-    PythonLazyLoadStoreChunk(ConfigureLoadStore operationBuilder);
+    PythonLazyLoadStoreChunk(
+        ConfigureLoadStore operationBuilder,
+        std::vector<py::ssize_t> shape);
 
-    PythonLazyLoadStoreChunk(RecordComponent &rc, Offset offset, Extent extent);
+    PythonLazyLoadStoreChunk(
+        RecordComponent &rc,
+        Offset offset,
+        Extent extent,
+        std::vector<py::ssize_t> shape);
 
-    auto shape();
+    auto const &shape() const;
 
     auto const &operationBuilder() const;
 
@@ -141,10 +147,12 @@ public:
 private:
     auto doLoad(bool do_flush) -> py::array &;
 
-    auto strides_from_extent() -> std::vector<py::ssize_t>;
-
     ConfigureLoadStore m_operationBuilder;
-    // std::vector<py::ssize_t> m_shape;
+    /** The shape of the numpy array covering the selection, with
+     *  integer-indexed (flattened) axes already removed. This is what a numpy
+     *  array over the selection would look like; the actual loaded extent
+     *  (computeExtent()) keeps one-element dimensions for flattened axes. */
+    std::vector<py::ssize_t> m_shape;
     std::optional<py::array> m_cache;
 };
 
