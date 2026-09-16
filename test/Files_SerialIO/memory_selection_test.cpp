@@ -106,7 +106,6 @@ void memory_selection_write_and_read(std::string const &file_ending)
             .extent({3, 3})
             .withContiguousContainer(read_buffer)
             .memorySelection({{1, 1}, {5, 5}})
-            .unsafeNoAutomaticFlush()
             .load()
             .get();
     }

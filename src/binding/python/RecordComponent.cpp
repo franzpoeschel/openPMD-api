@@ -342,7 +342,7 @@ struct StoreChunkFromPythonArray
         {
             config.memorySelection(std::move(*memorySelection));
         }
-        config.unsafeNoAutomaticFlush().store().get();
+        config.unsafeNoAutomaticFlush(true).store().get();
     }
 
     static constexpr char const *errorMsg = "store_chunk()";
@@ -376,7 +376,7 @@ struct LoadChunkIntoPythonArray
         {
             config.memorySelection(std::move(*memorySelection));
         }
-        config.unsafeNoAutomaticFlush().load().get();
+        config.unsafeNoAutomaticFlush(true).load().get();
     }
 
     static constexpr char const *errorMsg = "load_chunk()";
