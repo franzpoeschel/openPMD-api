@@ -498,7 +498,7 @@ void available_chunks_test(std::string const &file_ending)
             .withContiguousContainer(ydata_firstandlastrow)
             .offset({0, 3ul * mpi_rank})
             .extent({1, 3})
-            .unsafeNoAutomaticFlush()
+            .unsafeNoAutomaticFlush(true)
             .store()
             .get();
         E_y.prepareLoadStore()
@@ -506,7 +506,7 @@ void available_chunks_test(std::string const &file_ending)
             .extent({3, 3})
             .withContiguousContainer(ydata)
             .memorySelection({{1, 1}, {5, 5}})
-            .unsafeNoAutomaticFlush()
+            .unsafeNoAutomaticFlush(true)
             .store()
             .get();
         // if condition checks if this PR is available in ADIOS2:
@@ -517,7 +517,7 @@ void available_chunks_test(std::string const &file_ending)
                 .withContiguousContainer(ydata_firstandlastrow)
                 .offset({4, 3ul * mpi_rank})
                 .extent({1, 3})
-                .unsafeNoAutomaticFlush()
+                .unsafeNoAutomaticFlush(true)
                 .store()
                 .get();
         }

@@ -324,7 +324,7 @@ std::shared_ptr<void> RecordComponent::loadChunkAllocate_impl(
         .offset(std::move(o))
         .extent(std::move(e))
         .withSharedPtr_impl_mut(newData, dtype)
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .load()
         .get();
     return newData;
@@ -942,7 +942,7 @@ std::shared_ptr<T> RecordComponent::loadChunk(Offset o, Extent e)
         operation.extent(std::move(e));
     }
 
-    return operation.unsafeNoAutomaticFlush().load<T>().get();
+    return operation.unsafeNoAutomaticFlush(true).load<T>().get();
 }
 
 namespace detail
@@ -1084,7 +1084,7 @@ void RecordComponent::loadChunk(std::shared_ptr<T> data, Offset o, Extent e)
     }
 
     operation.withSharedPtr(std::move(data))
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .load()
         .get();
 }
@@ -1096,7 +1096,7 @@ void RecordComponent::loadChunkRaw(T *ptr, Offset offset, Extent extent)
         .offset(std::move(offset))
         .extent(std::move(extent))
         .withRawPtr(ptr)
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .load()
         .get();
 }
@@ -1108,7 +1108,7 @@ void RecordComponent::storeChunk(std::shared_ptr<T> data, Offset o, Extent e)
         .offset(std::move(o))
         .extent(std::move(e))
         .withSharedPtr(std::move(data))
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .store()
         .get();
 }
@@ -1121,7 +1121,7 @@ void RecordComponent::storeChunk(
         .offset(std::move(o))
         .extent(std::move(e))
         .withUniquePtr(std::move(data))
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .store()
         .get();
 }
@@ -1133,7 +1133,7 @@ void RecordComponent::storeChunkRaw(T const *ptr, Offset offset, Extent extent)
         .offset(std::move(offset))
         .extent(std::move(extent))
         .withRawPtr(ptr)
-        .unsafeNoAutomaticFlush()
+        .unsafeNoAutomaticFlush(true)
         .store()
         .get();
 }
