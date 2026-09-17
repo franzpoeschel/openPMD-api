@@ -64,12 +64,12 @@ void memory_selection_write_and_read(std::string const &file_ending)
         auto E_x = it.meshes["E"]["x"];
         E_x.resetDataset(Dataset(Datatype::INT, {5, 5}));
         // store the 3x3 interior of the buffer into dataset[1:4, 1:4]
-        E_x.prepareLoadStore()
-            .offset({1, 1})
-            .extent({3, 3})
-            .withContiguousContainer(buffer)
-            .memorySelection({{1, 1}, {5, 5}})
-            .store();
+        auto store_operation = E_x.prepareLoadStore()
+                                   .offset({1, 1})
+                                   .extent({3, 3})
+                                   .withContiguousContainer(buffer)
+                                   .memorySelection({{1, 1}, {5, 5}})
+                                   .store();
         write.close();
     }
 
@@ -107,8 +107,8 @@ void memory_selection_write_and_read(std::string const &file_ending)
             .withContiguousContainer(read_buffer)
             .memorySelection({{1, 1}, {5, 5}})
             .unsafeNoAutomaticFlush()
-            .load();
-        read.flush();
+            .load()
+            .get();
     }
     // the interior was filled, the border remains untouched
     for (int i = 0; i < 5; ++i)
