@@ -1343,7 +1343,8 @@ TEST_CASE("unsafe_no_automatic_flush_immediate_flush_test", "[core]")
         .extent(Extent{1})
         .withSharedPtr(storeData)
         .unsafeNoAutomaticFlush(true)
-        .store();
+        .store()
+        .get();
     REQUIRE(mrc.get().m_chunks.size() == 1);
     o.flush();
     REQUIRE(mrc.get().m_chunks.empty());
