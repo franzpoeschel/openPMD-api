@@ -133,6 +133,21 @@ auto DeferredComputation<T>::operator()() -> T
 }
 
 template <typename T>
+template <typename U>
+auto DeferredComputation<T>::append_to(
+    DeferredComputation<U> other) && -> DeferredComputation<TupleCat_t<U, T>>
+{
+    return {
+        [myself = std::make_shared<DeferredComputation<T>>(std::move(*this)),
+         theotherguy = std::make_shared<DeferredComputation<U>>(
+             std::move(other))]() mutable {
+            return std::tuple_cat(
+                EnsureTuple_t<U>(std::move(*theotherguy).get()),
+                EnsureTuple_t<T>(std::move(*myself).get()));
+        }};
+}
+
+template <typename T>
 void DeferredComputation<T>::invalidate() &&
 {
     std::visit(

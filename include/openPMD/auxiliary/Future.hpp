@@ -1,5 +1,6 @@
 #pragma once
 
+#include "openPMD/auxiliary/TypeTraits.hpp"
 #include <functional>
 #include <type_traits>
 #include <variant>
@@ -117,6 +118,10 @@ public:
      * @return The result of the computation
      */
     auto operator()() -> T;
+
+    template <typename U>
+    auto append_to(DeferredComputation<U> other)
+        && -> DeferredComputation<TupleCat_t<U, T>>;
 
     /** Discard the computation without executing it
      */
