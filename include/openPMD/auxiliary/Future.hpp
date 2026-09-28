@@ -155,3 +155,5 @@ public:
     [[nodiscard]] auto valid() const noexcept -> bool;
 };
 } // namespace openPMD::auxiliary
+
+#include "openPMD/auxiliary/Future.tpp"
