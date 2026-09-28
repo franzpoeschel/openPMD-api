@@ -6,6 +6,10 @@
 
 #include <iostream>
 
+// comment
+
+#include "openPMD/DatatypeMacros.hpp"
+
 namespace openPMD::auxiliary::detail
 {
 template <typename T>
@@ -171,4 +175,29 @@ auto DeferredComputation<T>::valid() const noexcept -> bool
             [](detail::CachedValue<T> const &) { return true; }},
         this->m_task);
 }
+
+// These are not instantiations, we just tell including code that these
+// instantiations already exist in the library
+extern template class DeferredComputation<void>;
+// need to change include order for also declaring this one..
+// extern template class
+// DeferredComputation<RecordComponent::shared_ptr_dataset_types>;
+extern template class DeferredComputation<std::string>; // used in tests
+
+// need this for clang-tidy
+#define OPENPMD_ARRAY(type) type[]
+#define OPENPMD_APPLY_TEMPLATE(template_, type) template_<type>
+
+#define INSTANTIATE_FUTURE(dtype)                                              \
+    extern template class DeferredComputation<OPENPMD_APPLY_TEMPLATE(          \
+        std::shared_ptr, dtype)>;
+#define INSTANTIATE_FUTURE_WITH_AND_WITHOUT_EXTENT(type)                       \
+    INSTANTIATE_FUTURE(type) INSTANTIATE_FUTURE(OPENPMD_ARRAY(type))
+OPENPMD_FOREACH_NONVECTOR_DATATYPE(INSTANTIATE_FUTURE_WITH_AND_WITHOUT_EXTENT)
+#undef INSTANTIATE_FUTURE
+#undef INSTANTIATE_FUTURE_WITH_AND_WITHOUT_EXTENT
+#undef OPENPMD_ARRAY
+#undef OPENPMD_APPLY_TEMPLATE
 } // namespace openPMD::auxiliary
+
+#include "openPMD/UndefDatatypeMacros.hpp"
