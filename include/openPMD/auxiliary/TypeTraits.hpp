@@ -27,6 +27,7 @@
 #include <complex>
 #include <cstddef> // size_t
 #include <memory>
+#include <tuple>
 #include <variant>
 #include <vector>
 
@@ -54,6 +55,18 @@ namespace detail
 
     template <typename T, size_t n>
     struct IsArray<std::array<T, n>>
+    {
+        static constexpr bool value = true;
+    };
+
+    template <typename T>
+    struct IsTuple
+    {
+        static constexpr bool value = false;
+    };
+
+    template <typename... Args>
+    struct IsTuple<std::tuple<Args...>>
     {
         static constexpr bool value = true;
     };
@@ -150,6 +163,35 @@ inline constexpr bool IsArray_v = detail::IsArray<T>::value;
 
 template <typename T>
 inline constexpr bool IsPointer_v = detail::IsPointer<T>::value;
+
+template <typename T>
+inline constexpr bool IsTuple_v = detail::IsTuple<T>::value;
+
+template <typename T>
+using EnsureTuple_t = std::conditional_t<IsTuple_v<T>, T, std::tuple<T>>;
+
+namespace detail
+{
+    template <typename... Args>
+    struct TupleCat;
+
+    template <typename First, typename... Rest>
+    struct TupleCat<First, Rest...>
+    {
+        using type = decltype(std::tuple_cat(
+            std::declval<EnsureTuple_t<First>>(),
+            std::declval<typename TupleCat<Rest...>::type>()));
+    };
+
+    template <>
+    struct TupleCat<>
+    {
+        using type = std::tuple<>;
+    };
+} // namespace detail
+
+template <typename... Args>
+using TupleCat_t = typename detail::TupleCat<Args...>::type;
 
 template <typename T>
 using IsPointer_t = typename detail::IsPointer<T>::type;
