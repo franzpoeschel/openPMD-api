@@ -990,11 +990,15 @@ PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
 {}
 
 PythonLazyLoadStoreChunk::PythonLazyLoadStoreChunk(
-    RecordComponent &rc, Offset offset, Extent extent, std::vector<py::ssize_t> shape)
-    : PythonLazyLoadStoreChunk(rc.prepareLoadStore()
-                                   .offset(std::move(offset))
-                                   .extent(std::move(extent)),
-                               std::move(shape))
+    RecordComponent &rc,
+    Offset offset,
+    Extent extent,
+    std::vector<py::ssize_t> shape)
+    : PythonLazyLoadStoreChunk(
+          rc.prepareLoadStore()
+              .offset(std::move(offset))
+              .extent(std::move(extent)),
+          std::move(shape))
 {}
 
 auto const &PythonLazyLoadStoreChunk::operationBuilder() const
@@ -1611,6 +1615,8 @@ void init_RecordComponent(py::module &m)
         .def(
             "into",
             [](PythonLazyLoadStoreChunk &self, py::object buffer_obj) {
+                // ensure that self is destroyed after this operation
+                // no load into internal buffer should occur
                 return self.into(std::move(buffer_obj));
             },
             py::arg("target buffer"))
