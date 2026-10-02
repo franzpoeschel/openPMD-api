@@ -69,6 +69,13 @@ struct InvalidatableFile
     std::string *operator->() const;
 
     explicit operator bool() const;
+
+    /*
+     *
+     * Enables using InvalidatableFile in ordered containers like std::set
+     * for consistent ordering across parallel processes.
+     */
+    bool operator<(InvalidatableFile const &f) const;
 };
 } // namespace openPMD
 
@@ -81,15 +88,5 @@ struct hash<openPMD::InvalidatableFile>
     using result_type = std::size_t;
 
     result_type operator()(argument_type const &s) const noexcept;
-};
-
-template <>
-struct less<openPMD::InvalidatableFile>
-{
-    using first_argument_type = openPMD::InvalidatableFile;
-    using second_argument_type = first_argument_type;
-    using result_type = bool;
-    result_type
-    operator()(first_argument_type const &, second_argument_type const &) const;
 };
 } // namespace std
