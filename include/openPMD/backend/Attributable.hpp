@@ -475,6 +475,18 @@ public:
 
     void addPreFlushHook(std::function<void()> hook);
 
+    /**
+     * Query whether this Series was opened with the sync-flush option
+     * (Series option "flush_immediately" / OPENPMD_FLUSH_IMMEDIATELY), i.e.
+     * whether load/store operations of the legacy chunk API are flushed
+     * immediately upon being called. Note that operations of the chaining
+     * API (prepareLoadStore()) are not affected unless
+     * unsafeNoAutomaticFlush() is used.
+     *
+     * @return true if the sync-flush option is active.
+     */
+    [[nodiscard]] bool flushImmediately() const;
+
     // clang-format off
 OPENPMD_protected
     // clang-format on
