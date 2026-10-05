@@ -52,9 +52,11 @@ using namespace openPMD;
 
 TEST_CASE("joined_dim_buffer_api", "[serial][json]")
 {
+// need to run this test in a backend that supports joined dimensions
+#if openPMD_HAVE_ADIOS2
     using type = float;
     constexpr size_t N = 8;
-    std::string const name = "../samples/joinedDimBufferApi.json";
+    std::string const name = "../samples/joinedDimBufferApi.bp5";
 
     std::vector<type> data(N);
     std::iota(data.begin(), data.end(), 0.f);
@@ -83,4 +85,5 @@ TEST_CASE("joined_dim_buffer_api", "[serial][json]")
         REQUIRE_THROWS_AS(
             epx.loadChunk(sptr, {0}, {-1u}), error::WrongAPIUsage);
     }
+#endif
 }
