@@ -65,8 +65,7 @@ class PythonLazyLoadStoreChunk
 {
 public:
     PythonLazyLoadStoreChunk(
-        ConfigureLoadStore operationBuilder,
-        std::vector<py::ssize_t> shape);
+        ConfigureLoadStore operationBuilder, std::vector<py::ssize_t> shape);
 
     PythonLazyLoadStoreChunk(
         RecordComponent &rc,
@@ -102,6 +101,8 @@ public:
      * lifetime.
      */
     py::buffer_info getBuffer();
+
+    py::array extractArray() &&;
 
     /**
      * Store data from `buffer` into the record component at this chunk's
