@@ -176,8 +176,8 @@ void store_chunk(RecordComponent &r, py::array &a, py::tuple const &slices);
  * implements the buffer protocol and `__array__`, so numpy converts it (and
  * thereby triggers the actual load) transparently.
  */
-auto load_chunk_lazy(RecordComponent &self, py::tuple const &slices)
-    -> py::object;
+template <typename... DimArgs>
+auto load_chunk_lazy(RecordComponent &self, DimArgs &&...) -> py::object;
 auto load_chunk_lazy_slice(RecordComponent &self, py::slice const &slice_obj)
     -> py::object;
 auto load_chunk_lazy_int(RecordComponent &self, py::int_ const &slice_obj)
