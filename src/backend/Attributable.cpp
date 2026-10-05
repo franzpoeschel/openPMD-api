@@ -380,6 +380,16 @@ void Attributable::addPreFlushHook(std::function<void()> hook)
     }
 }
 
+bool Attributable::flushImmediately() const
+{
+    auto ioHandler = IOHandler();
+    if (!ioHandler)
+    {
+        return false;
+    }
+    return ioHandler->m_flush_immediately;
+}
+
 template <bool flush_entire_series>
 void Attributable::seriesFlush_impl(
     internal::FlushParams const &flushParams, bool flush_io_handler)
