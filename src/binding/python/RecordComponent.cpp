@@ -403,11 +403,9 @@ struct LoadChunkIntoPythonArray
  * Synchronous, auto-flushing variant of the load-into-buffer used by the
  * lazy chunk's `.into()` method.
  *
- * Unlike LoadChunkIntoPythonArray (which defers the flush via
- * unsafeNoAutomaticFlush() and requires an explicit series flush afterwards),
- * this evaluates the returned DeferredComputation immediately, so the buffer
- * is fully populated when `.into()` returns -- matching the semantics of the
- * allocating `.load()` variant.
+ * The operation is deferred as per the usual openPMD semantics. Since the
+ * target buffer is Python-provided, there can be no memory corruptions from
+ * early use, just logic errors.
  */
 struct LoadChunkIntoBufferSynchronously
 {
@@ -425,13 +423,15 @@ struct LoadChunkIntoBufferSynchronously
                 py::gil_scoped_acquire need_the_gil_for_this;
                 owning_handle.reset();
             });
-        auto config = operationBuilder.withSharedPtr(std::move(shared));
+        auto config = operationBuilder.withSharedPtr(std::move(shared))
+                          .unsafeNoAutomaticFlush(true);
         if (memorySelection.has_value())
         {
             config.memorySelection(std::move(*memorySelection));
         }
-        // evaluate immediately (runs the automatic flush)
-        config.load()();
+        // evaluate immediately (runs the automatic flush if immediate flushing
+        // is configured)
+        config.load().get();
     }
 
     static constexpr char const *errorMsg = "Load_Store_Chunk.into()";
@@ -1120,6 +1120,9 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
         }
         throw;
     }
+    // put something in the cache to indicate that this operation is done and
+    // does not need to be loaded for a second time
+    m_cache = std::make_optional<py::array>();
     return py::reinterpret_borrow<py::object>(buffer_obj);
 }
 
