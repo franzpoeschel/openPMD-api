@@ -1037,6 +1037,11 @@ py::buffer_info PythonLazyLoadStoreChunk::getBuffer()
     return arr.request();
 }
 
+py::array PythonLazyLoadStoreChunk::extractArray() &&
+{
+    return std::move(doLoad(true));
+}
+
 void PythonLazyLoadStoreChunk::store(py::buffer const &buffer)
 {
     auto info = buffer.request(/* writable = */ true);
@@ -1422,6 +1427,11 @@ inline void load_chunk(
 
 auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
 {
+    if (rc.flushImmediately())
+    {
+        auto lazy_load = make_lazy_chunk(rc, slices);
+        return std::move(lazy_load).extractArray();
+    }
     // Build the lazy handle as a shared_ptr so we can keep the same C++
     // object alive both as the Python-visible return value and inside the
     // flush hook without holding any Python object in core openPMD C++ state.
