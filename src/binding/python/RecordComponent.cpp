@@ -1182,6 +1182,17 @@ make_lazy_chunk(RecordComponent &rc, py::tuple const &slices)
     return PythonLazyLoadStoreChunk(
         rc, std::move(offset), std::move(extent), std::move(shape));
 }
+
+inline PythonLazyLoadStoreChunk
+make_lazy_chunk(RecordComponent &rc, Offset offset, Extent extent)
+{
+    std::vector<py::ssize_t> shape;
+    shape.reserve(extent.size());
+    std::copy(extent.begin(), extent.end(), std::back_inserter(shape));
+
+    return PythonLazyLoadStoreChunk(
+        rc, std::move(offset), std::move(extent), std::move(shape));
+}
 } // namespace
 
 struct PythonDynamicMemoryView
@@ -1428,18 +1439,19 @@ inline void load_chunk(
     load_chunk(r, static_cast<py::buffer &>(a), offset, extent);
 }
 
-auto load_chunk_lazy(RecordComponent &rc, py::tuple const &slices) -> py::object
+template <typename... DimArgs>
+auto load_chunk_lazy(RecordComponent &rc, DimArgs &&...dimArgs) -> py::object
 {
     if (rc.flushImmediately())
     {
-        auto lazy_load = make_lazy_chunk(rc, slices);
+        auto lazy_load = make_lazy_chunk(rc, std::forward<DimArgs>(dimArgs)...);
         return std::move(lazy_load).extractArray();
     }
     // Build the lazy handle as a shared_ptr so we can keep the same C++
     // object alive both as the Python-visible return value and inside the
     // flush hook without holding any Python object in core openPMD C++ state.
-    auto lazy_load =
-        std::make_shared<PythonLazyLoadStoreChunk>(make_lazy_chunk(rc, slices));
+    auto lazy_load = std::make_shared<PythonLazyLoadStoreChunk>(
+        make_lazy_chunk(rc, std::forward<DimArgs>(dimArgs)...));
     auto res = py::cast(lazy_load);
     // Capture the C++ object (shared_ptr) rather than a Python handle: the
     // hook is stored in core openPMD C++ state (PreFlushHooks) whose lifetime
@@ -1880,14 +1892,7 @@ void init_RecordComponent(py::module &m)
                 else
                     extent = extent_in;
 
-                std::vector<ptrdiff_t> shape(extent.size());
-                std::copy(
-                    std::begin(extent), std::end(extent), std::begin(shape));
-                auto const dtype = dtype_to_numpy(r.getDatatype());
-                auto a = py::array(dtype, shape);
-                load_chunk(r, a, offset, extent);
-
-                return a;
+                return load_chunk_lazy(r, offset, extent);
             },
             py::arg_v(
                 "offset", Offset(1, 0u), "np.zeros(Record_Component.shape)"),
