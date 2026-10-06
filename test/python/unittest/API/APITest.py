@@ -1678,7 +1678,7 @@ class APITest(unittest.TestCase):
         writes = {}
         reads = {}
         for ext in (".bp", ".h5"):
-            if ext not in io.file_extensions:
+            if ext[1:] not in io.file_extensions:
                 continue
             name = "unittest_py_mem_selection" + ext
             series = io.Series(name, io.Access.create)
@@ -1689,16 +1689,18 @@ class APITest(unittest.TestCase):
             # LHS selects a 2x2x2 cuboid of the dataset; RHS is a 2x2x2 view of a
             # (6,6,6) buffer -> both axes retain sub-cuboid strides, so this maps
             # onto a single memory-selection store without an intermediate copy.
-            E_x[2:4, 2:4, 2:4] = write_buffer[2:4, 2:4, 2:4]
+            E_x[2:4, 2:4, 2:4] = -write_buffer[2:4, 2:4, 2:4]
             # also store another disjoint cuboid from the same buffer
-            E_x[0:2, 0:2, 0:2] = write_buffer[4:6, 4:6, 4:6]
+            E_x[0:2, 0:2, 0:2] = write_buffer[4:6, 4:6, 4:6] * 2
             series.flush()
             series.close()
             writes[ext] = write_buffer
 
+            # Read back directly into a pre-allocated buffer via `.into()`.
             series = io.Series(name, io.Access.read_only)
             i = series.iterations[0]
-            data = i.meshes["E"]["x"][:, :, :].copy()
+            data = np.zeros((6, 6, 6), dtype=np.int64)
+            i.meshes["E"]["x"][:, :, :].into(data)
             series.flush()
             series.close()
             reads[ext] = data
@@ -1708,21 +1710,26 @@ class APITest(unittest.TestCase):
                 continue
             write_buffer = writes[ext]
             data = reads[ext]
-            expected = np.zeros((6, 6, 6), dtype=np.int64)
-            expected[2:4, 2:4, 2:4] = write_buffer[2:4, 2:4, 2:4]
-            expected[0:2, 0:2, 0:2] = write_buffer[4:6, 4:6, 4:6]
-            np.testing.assert_array_equal(data, expected)
+            # Only the explicitly written sub-cuboids are defined; the rest of
+            # the dataset was never written, so its contents are undefined.
+            np.testing.assert_array_equal(
+                data[2:4, 2:4, 2:4], -write_buffer[2:4, 2:4, 2:4]
+            )
+            np.testing.assert_array_equal(
+                data[0:2, 0:2, 0:2], write_buffer[4:6, 4:6, 4:6] * 2
+            )
 
     def test_memory_selection_read(self):
         """
         Test loading a chunk directly into a strided destination view of a
         larger buffer (memory selection on read), i.e.:
 
-            record_component.load_chunk(offset, extent, read_buffer[...])
+            record_component[op_slices].into(read_buffer[...])
 
         The loaded chunk is scattered into the destination sub-region through a
         single backend 'READ_DATASET' operation, without an intermediate
-        buffer.
+        buffer. The Series is opened with deferred flushing so that `.into()`
+        maps onto that backend operation instead of first loading eagerly.
 
         Memory selections on read are supported by the ADIOS2 and HDF5
         backends.
@@ -1731,7 +1738,7 @@ class APITest(unittest.TestCase):
             return
 
         for ext in (".bp", ".h5"):
-            if ext not in io.file_extensions:
+            if ext[1:] not in io.file_extensions:
                 continue
             name = "unittest_py_mem_selection_read" + ext
             series = io.Series(name, io.Access.create)
@@ -1743,14 +1750,18 @@ class APITest(unittest.TestCase):
             series.flush()
             series.close()
 
-            series = io.Series(name, io.Access.read_only)
+            series = io.Series(
+                name,
+                io.Access.read_only,
+                '{"flush_immediately": false}',
+            )
             i = series.iterations[0]
             E_x = i.meshes["E"]["x"]
             read_buffer = np.full((8, 8, 8), -1, dtype=np.int64)
             # Load the dataset sub-cuboid [0:4,0:4,0:4] into
             # read_buffer[2:6, 2:6, 2:6]: a strided destination view whose
             # deepest base is read_buffer itself.
-            E_x.load_chunk(read_buffer[2:6, 2:6, 2:6], [0, 0, 0], [4, 4, 4])
+            E_x[0:4, 0:4, 0:4].into(read_buffer[2:6, 2:6, 2:6])
             series.flush()
             series.close()
 
@@ -1765,41 +1776,47 @@ class APITest(unittest.TestCase):
         buffer overload routed through `py::array::ensure` (numpy), which
         rejects generic buffer objects that numpy cannot interpret.
         """
-        import array
+        import array as arrayMod
 
         if not found_numpy:
             return
 
         for ext in (".bp", ".h5"):
-            if ext not in io.file_extensions:
+            if ext[1:] not in io.file_extensions:
                 continue
             name = "unittest_py_generic_buffer_load" + ext
             series = io.Series(name, io.Access.create)
             i = series.iterations[0]
             E_x = i.meshes["E"]["x"]
             E_x.reset_dataset(io.Dataset(np.float64, [4, 4]))
-            E_x[:, :, :] = np.arange(16, dtype=np.float64).reshape(4, 4)
+            E_x[:, :] = np.arange(16, dtype=np.float64).reshape(4, 4)
             series.flush()
             series.close()
 
             # Load into a contiguous generic PEP 3118 buffer (array.array),
-            # which goes through load_chunk's buffer path, not numpy.
-            series = io.Series(name, io.Access.read_only)
+            # which goes through the buffer path, not numpy. Deferred flushing
+            # makes `.into()` use the direct backend load.
+            series = io.Series(
+                name,
+                io.Access.read_only,
+                '{"flush_immediately": false}',
+            )
             i = series.iterations[0]
             E_x = i.meshes["E"]["x"]
-            dst = array.array("d", [0.0] * 16)
-            E_x.load_chunk(dst, [0, 0], [4, 4])
+            dst = arrayMod.array("d", [0.0] * 16)
+            E_x[0:4, 0:4].into(dst)
             series.flush()
             self.assertEqual(list(dst), list(range(16)))
 
             # Wrong datatype must be rejected cleanly (not a numpy TypeError).
             with self.assertRaises(io.Error):
-                E_x.load_chunk(bytearray(16), [0, 0], [4, 4])
+                E_x[0:4, 0:4].into(np.zeros((4, 4), dtype=np.int32))
                 series.flush()
             series.close()
 
     def testLazyLoadStoreChunk(self):
         """
+        With deferred flushing (`flush_immediately: false`),
         `Record_Component.__getitem__` returns a lazy `Load_Store_Chunk`
         handle: no I/O happens at slicing time, but the data is loaded (under
         openPMD's control, before the assignment target is touched) as soon as
@@ -1810,7 +1827,7 @@ class APITest(unittest.TestCase):
             return
 
         for ext in (".bp", ".h5"):
-            if ext not in io.file_extensions:
+            if ext[1:] not in io.file_extensions:
                 continue
             name = "unittest_py_lazy_loadstore" + ext
             series = io.Series(name, io.Access.create)
@@ -1822,7 +1839,11 @@ class APITest(unittest.TestCase):
             series.flush()
             series.close()
 
-            series = io.Series(name, io.Access.read_only)
+            series = io.Series(
+                name,
+                io.Access.read_only,
+                '{"flush_immediately": false}',
+            )
             i = series.iterations[0]
             E_x = i.meshes["E"]["x"]
 
@@ -1869,12 +1890,18 @@ class APITest(unittest.TestCase):
 
           - a contiguous / owning buffer            -> ordinary contiguous load
           - a strided sub-cuboid view of a buffer   -> memory-selection load
+
+        This test uses deferred flushing so that `.into()` maps onto that
+        direct backend operation. In immediate-flushing mode (the Python
+        default) the data is loaded eagerly and `.into()` copies the already
+        loaded data instead; that case is covered by the other tests that call
+        `.into()` with the default options.
         """
         if not found_numpy:
             return
 
         for ext in (".bp", ".h5"):
-            if ext not in io.file_extensions:
+            if ext[1:] not in io.file_extensions:
                 continue
             name = "unittest_py_lazy_into" + ext
             series = io.Series(name, io.Access.create)
@@ -1886,7 +1913,11 @@ class APITest(unittest.TestCase):
             series.flush()
             series.close()
 
-            series = io.Series(name, io.Access.read_only)
+            series = io.Series(
+                name,
+                io.Access.read_only,
+                '{"flush_immediately": false}',
+            )
             i = series.iterations[0]
             E_x = i.meshes["E"]["x"]
 
@@ -1894,12 +1925,14 @@ class APITest(unittest.TestCase):
             # returns the caller's buffer (so it can be chained/captured).
             dst = np.zeros((6, 6, 6), dtype=np.int64)
             ret = E_x[:, :, :].into(dst)
+            series.flush()
             self.assertIs(ret, dst)
             self.assertTrue(np.array_equal(dst, source))
 
             # Strided sub-cuboid view of a larger buffer: memory selection.
             big = np.full((8, 8, 8), -1, dtype=np.int64)
             E_x[2:6, 2:6, 2:6].into(big[2:6, 2:6, 2:6])
+            series.flush()
             expected = np.full((8, 8, 8), -1, dtype=np.int64)
             expected[2:6, 2:6, 2:6] = source[2:6, 2:6, 2:6]
             self.assertTrue(np.array_equal(big, expected))
@@ -1909,6 +1942,7 @@ class APITest(unittest.TestCase):
 
             dst_arr = array_mod.array("q", [0] * (4 * 4 * 4))
             E_x[1:5, 1:5, 1:5].into(dst_arr)
+            series.flush()
             self.assertEqual(
                 list(dst_arr), list(source[1:5, 1:5, 1:5].ravel())
             )
@@ -1922,6 +1956,55 @@ class APITest(unittest.TestCase):
             series.close()
             with self.assertRaises(io.Error):
                 stale.into(np.zeros((6, 6, 6), dtype=np.int64))
+
+    def testIntoImmediate(self):
+        """
+        In immediate-flushing mode (the Python default), slicing /
+        `load_chunk()` eagerly loads the data and returns a numpy-array-like
+        object that still offers `.into()`. The object must stay fully
+        transparent to numpy (`.copy()`, arithmetic, reductions).
+        """
+        if not found_numpy:
+            return
+
+        for ext in (".bp", ".h5"):
+            if ext[1:] not in io.file_extensions:
+                continue
+            name = "unittest_py_into_immediate" + ext
+            series = io.Series(name, io.Access.create)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+            E_x.reset_dataset(io.Dataset(np.int64, [6, 6, 6]))
+            source = np.arange(6 * 6 * 6, dtype=np.int64).reshape(6, 6, 6)
+            E_x[:, :, :] = source
+            series.flush()
+            series.close()
+
+            series = io.Series(name, io.Access.read_only)
+            i = series.iterations[0]
+            E_x = i.meshes["E"]["x"]
+
+            chunk = E_x[:, :, :]
+            # same object API as ndarray
+            self.assertTrue(np.array_equal(np.asarray(chunk), source))
+            self.assertTrue(np.array_equal(chunk.copy(), source))
+            self.assertTrue(np.array_equal(chunk + 1, source + 1))
+            self.assertEqual(int(chunk.sum()), int(source.sum()))
+
+            # .into() loads into a pre-allocated buffer (a copy in this mode)
+            dst = np.zeros((6, 6, 6), dtype=np.int64)
+            ret = chunk.into(dst)
+            self.assertIs(ret, dst)
+            self.assertTrue(np.array_equal(dst, source))
+
+            # strided destination view
+            big = np.full((8, 8, 8), -1, dtype=np.int64)
+            E_x[2:6, 2:6, 2:6].into(big[2:6, 2:6, 2:6])
+            expected = np.full((8, 8, 8), -1, dtype=np.int64)
+            expected[2:6, 2:6, 2:6] = source[2:6, 2:6, 2:6]
+            self.assertTrue(np.array_equal(big, expected))
+
+            series.close()
 
     def testIterations(self):
         """Test querying a series' iterations and loop over them."""
