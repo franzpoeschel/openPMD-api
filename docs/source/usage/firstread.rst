@@ -285,6 +285,27 @@ Python
 
 Don't forget that we still need to ``flush()``.
 
+In-place loads
+^^^^^^^^^^^^^^
+
+If the data should be loaded into an already-allocated buffer instead of a
+freshly allocated array, use ``Record_Component.into()`` on a slice.
+The target must be a writable buffer (numpy array, ``memoryview``,
+``array.array``, ...) matching the selection's shape; a strided sub-view of a
+larger buffer is handled through a single backend memory-selection read:
+
+.. code-block:: python3
+
+   # allocate the target once ...
+   buffer = np.zeros(E_x.shape, dtype=E_x.dtype)
+   # ... and load the chunk directly into it (no intermediate array)
+   E_x[:, :, :].into(buffer)
+
+``into()`` returns the target buffer, so it can be chained or captured.
+Both ``E_x[...]`` (deferred flushing) and ``E_x.load_chunk(...)`` return an
+object that offers ``into()``. In immediate-flushing mode (the Python default)
+the data is loaded eagerly and ``into()`` copies it into the target.
+
 Flush Chunk
 -----------
 

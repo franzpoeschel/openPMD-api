@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import sys
 
+import numpy
+
 import openpmd_api as io
 
 # pass-through for ADIOS2 engine parameters
@@ -23,14 +25,16 @@ if __name__ == "__main__":
         print("Current iteration {}".format(index))
         electronPositions = iteration.particles["e"]["position"]
         loadedChunks = []
-        shapes = []
         dimensions = ["x", "y", "z"]
 
         for i in range(3):
             dim = dimensions[i]
             rc = electronPositions[dim]
-            loadedChunks.append(rc.load_chunk([0], rc.shape))
-            shapes.append(rc.shape)
+            # Pre-allocate the target buffer and load the chunk directly into
+            # it via `.into()`.
+            chunk = numpy.zeros(rc.shape, dtype=rc.dtype)
+            rc[:].into(chunk)
+            loadedChunks.append(chunk)
 
         # Closing the iteration loads all data and releases the current
         # streaming step.
@@ -41,7 +45,6 @@ if __name__ == "__main__":
         # data is now available for printing
         for i in range(3):
             dim = dimensions[i]
-            shape = shapes[i]
             print("dim: {}".format(dim))
             chunk = loadedChunks[i]
             print(chunk)
