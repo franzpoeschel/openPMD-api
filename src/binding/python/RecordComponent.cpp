@@ -48,6 +48,7 @@
 #include <cstring>
 #include <exception>
 #include <iostream>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -903,14 +904,29 @@ inline py::object deepest_owner(py::object const &obj)
  * one place.
  */
 
-/** Validate that a buffer's shape exactly matches an expected shape.
+/** Validate that a buffer's shape matches an expected shape.
  *
  * Used for the lazy chunk's `store()` and `into()` (and cross-checking in
  * `load_chunk`). Throws a `py::index_error` on mismatch.
+ *
+ * A buffer whose shape matches exactly is accepted. Additionally, a flat
+ * (0-D or 1-D) buffer covering the same number of elements is accepted, so
+ * that generic buffers (e.g. `array.array`, `bytearray`/`memoryview`) can be
+ * used for in-place loads/stores regardless of the selection's
+ * dimensionality.
  */
 inline void check_buffer_shape(
     py::buffer_info const &info, std::vector<py::ssize_t> const &shape)
 {
+    if (info.ndim <= 1)
+    {
+        std::size_t const expected_size = std::accumulate(
+            shape.begin(), shape.end(), std::size_t{1}, std::multiplies<>());
+        if (static_cast<std::size_t>(info.size) == expected_size)
+        {
+            return;
+        }
+    }
     if (size_t(info.ndim) != shape.size())
     {
         throw py::index_error(
@@ -1081,8 +1097,12 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
 
     if (m_cache.has_value())
     {
-        // do not need to load again
-        buffer_obj.attr("__setitem__")(*this->m_cache);
+        // The data has already been loaded into the cache (e.g. via `.load()`
+        // or because we are in immediate-flushing mode); just copy it into the
+        // caller's buffer. `copy_into` handles numpy arrays, memoryviews and
+        // generic PEP 3118 buffers (and returns the target).
+        py::module::import("openpmd_api.LoadStoreArray")
+            .attr("copy_into")(*this->m_cache, buffer_obj);
         return buffer_obj;
     }
 
@@ -1127,9 +1147,11 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
         }
         throw;
     }
-    // put something in the cache to indicate that this operation is done and
-    // does not need to be loaded for a second time
-    m_cache = std::make_optional<py::array>();
+    // In immediate-flushing mode the cache already holds the loaded data, so
+    // the branch above already handled `.into()` as a copy. In deferred mode
+    // the load has now been enqueued into the caller's buffer; do not fill the
+    // cache with a dummy (that would make later `.load()`/buffer access return
+    // empty data).
     return py::reinterpret_borrow<py::object>(buffer_obj);
 }
 
@@ -1480,8 +1502,16 @@ auto load_chunk_lazy(RecordComponent &rc, DimArgs &&...dimArgs) -> py::object
 {
     if (rc.flushImmediately())
     {
+        // Immediate-flush mode (the default in the Python API): the data is
+        // loaded eagerly. Return an ndarray subclass that additionally exposes
+        // `.into()` so that the in-place load entry point is available in this
+        // mode as well, while the result stays fully transparent to numpy
+        // (unlike returning the C++ handle, which would break `.copy()`,
+        // arithmetic and reductions of the legacy `load_chunk` API).
         auto lazy_load = make_lazy_chunk(rc, std::forward<DimArgs>(dimArgs)...);
-        return std::move(lazy_load).extractArray();
+        py::array arr = std::move(lazy_load).extractArray();
+        return py::module::import("openpmd_api.LoadStoreArray")
+            .attr("as_load_store_array")(std::move(arr));
     }
     // Build the lazy handle as a shared_ptr so we can keep the same C++
     // object alive both as the Python-visible return value and inside the

@@ -6,6 +6,7 @@ from .DataFrame import (
     iterations_to_dataframe,
     particles_to_dataframe,
 )
+from .LoadStoreArray import LoadStoreArray  # noqa: F401
 from .openpmd_api_cxx import *  # noqa
 
 __version__ = cxx.__version__
