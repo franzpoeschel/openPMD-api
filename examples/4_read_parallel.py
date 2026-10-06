@@ -12,6 +12,7 @@ License: LGPLv3+
 # on import: calls MPI_Init_thread()
 # exit hook: calls MPI_Finalize()
 from mpi4py import MPI
+import numpy
 import openpmd_api as io
 
 if __name__ == "__main__":
@@ -35,7 +36,16 @@ if __name__ == "__main__":
     chunk_extent = [2, 2, 1]
 
     if comm.rank < 13:
-        chunk_data = E_x.load_chunk(chunk_offset, chunk_extent)
+        # Pre-allocate the target buffer and load the chunk directly into it
+        # via `.into()`. This avoids an intermediate allocation and, for
+        # strided destination views, maps onto a single backend memory-selection
+        # read.
+        chunk_data = numpy.zeros(chunk_extent, dtype=E_x.dtype)
+        E_x[
+            chunk_offset[0] : chunk_offset[0] + chunk_extent[0],
+            chunk_offset[1] : chunk_offset[1] + chunk_extent[1],
+            chunk_offset[2] : chunk_offset[2] + chunk_extent[2],
+        ].into(chunk_data)
 
     if 0 == comm.rank:
         print(
