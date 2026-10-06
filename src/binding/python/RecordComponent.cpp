@@ -1079,6 +1079,13 @@ py::object PythonLazyLoadStoreChunk::into(py::object const &buffer_obj)
     // shape check: the buffer's shape must match the selection's shape
     check_buffer_shape(info, shape());
 
+    if (m_cache.has_value())
+    {
+        // do not need to load again
+        buffer_obj.attr("__setitem__")(*this->m_cache);
+        return buffer_obj;
+    }
+
     auto memsel = derive_memory_selection(buffer_obj, info);
 
     // datatype check
