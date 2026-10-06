@@ -1142,18 +1142,47 @@ auto PythonLazyLoadStoreChunk::doLoad(bool do_flush) -> py::array &
     auto dtype = getDatatype();
     auto operation = operationBuilder();
     auto dtype_as_numpy = dtype_to_numpy(dtype);
-    auto &res = m_cache.emplace(dtype_as_numpy, m_shape);
+    // Build the array in a local first: only move it into the cache once the
+    // load has actually succeeded. Otherwise a failing load (e.g. after the
+    // Series has been closed) would leave an uninitialized array in the cache
+    // that later accesses would silently return.
+    //
+    // Note: `py::array` storage is deliberately left uninitialized. If the
+    // dataset on disk is only partially written, the backend only fills the
+    // regions that actually exist, so the corresponding parts of the loaded
+    // buffer are undefined as well.
+    py::array res(dtype_as_numpy, m_shape);
 
-    switchDatasetType<LoadChunkIntoPythonArray>(
-        dtype,
-        std::move(operation),
-        res.cast<py::object>(),
-        res.mutable_data(),
-        std::nullopt,
-        do_flush ? LoadChunkIntoPythonArray::automatic_flush::chaining
-                 : LoadChunkIntoPythonArray::automatic_flush::none)
-        .get();
-    return res;
+    try
+    {
+        switchDatasetType<LoadChunkIntoPythonArray>(
+            dtype,
+            std::move(operation),
+            res.cast<py::object>(),
+            res.mutable_data(),
+            std::nullopt,
+            do_flush ? LoadChunkIntoPythonArray::automatic_flush::chaining
+                     : LoadChunkIntoPythonArray::automatic_flush::none)
+            .get();
+    }
+    catch (error::Internal const &e)
+    {
+        throw_closed_series_error(e.what());
+    }
+    catch (std::runtime_error const &e)
+    {
+        // With openPMD_USE_INVASIVE_TESTS, pushing a chunk into a closed
+        // iteration raises a plain runtime_error before the deferred-flush
+        // machinery can produce the clean error::Internal above. Translate
+        // that into the same user-friendly Wrong API usage error.
+        std::string const msg = e.what();
+        if (msg.find("closed") != std::string::npos)
+        {
+            throw_closed_series_error(msg);
+        }
+        throw;
+    }
+    return m_cache.emplace(std::move(res));
 }
 
 namespace
