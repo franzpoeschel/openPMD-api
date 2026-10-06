@@ -120,6 +120,21 @@ Iteration &Iteration::close(bool _flush)
 {
     auto &it = get();
     StepStatus flag = getStepStatus();
+
+    /*
+     * An explicit `close(flush = true)` is a flush point: materialize any
+     * deferred loads (pre-flush hooks, e.g. from the Python lazy chunk API)
+     * while the iteration is still open. This must happen before the close
+     * status is updated below, since loading into a closed iteration is
+     * rejected. (When closing as part of `Series::close()`, `_flush` is false
+     * and the later series-level flush skips the hooks so that unconsumed
+     * handles simply become stale.)
+     */
+    if (_flush && !closed())
+    {
+        it.m_preFlushHooks();
+    }
+
     // update close status
     switch (it.m_closed)
     {
@@ -368,7 +383,18 @@ void Iteration::flushVariableBased(
 
 void Iteration::flush(internal::FlushParams const &flushParams)
 {
-    get().m_preFlushHooks();
+    /*
+     * Pre-flush hooks (used by the Python lazy chunk API to materialize
+     * deferred loads at flush points) must not run for an iteration that is
+     * already closed: closing a Series closes its iterations first and then
+     * flushes them, and attempting the load then would fail. Skipping the
+     * hooks leaves the corresponding handles unconsumed, so that using them
+     * afterwards reports a clean "Series already closed" error instead.
+     */
+    if (!closed())
+    {
+        get().m_preFlushHooks();
+    }
 
     Parameter<Operation::TOUCH> touch;
     IOHandler()->enqueue(IOTask(&writable(), touch));
