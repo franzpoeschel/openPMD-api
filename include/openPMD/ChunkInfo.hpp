@@ -20,6 +20,12 @@
  */
 #pragma once
 
-// Compatibility header. For now forwards to the non-MPI variant; selection of
-// the MPI variant is added in a follow-up commit.
+// Compatibility header. Selects the MPI or non-MPI variant of the ChunkInfo
+// declarations.
+#include "openPMD/config.hpp"
+
+#if openPMD_HAVE_MPI
+#include "openPMD/ChunkInfo_mpi.hpp"
+#else
 #include "openPMD/ChunkInfo_nompi.hpp"
+#endif
