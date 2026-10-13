@@ -3,6 +3,36 @@
 MPI
 ===
 
+Non-MPI Headers
+---------------
+
+A build of openPMD-api that was compiled with MPI support can still be consumed
+by a downstream code that does not use MPI itself, without requiring the MPI
+headers (``<mpi.h>``) to be available.
+
+For this, the public headers are split into an MPI and a non-MPI variant:
+
+* The non-MPI variant uses the suffix ``_nompi``, e.g.
+  ``openPMD/Series_nompi.hpp``, ``openPMD/ChunkInfo_nompi.hpp``,
+  ``openPMD/auxiliary/JSON_nompi.hpp`` and
+  ``openPMD/auxiliary/Filesystem_nompi.hpp``. These headers never include
+  ``<mpi.h>``.
+* The MPI variant uses the suffix ``_mpi`` (e.g. ``Series_mpi.hpp``). It adds
+  the MPI-specific declarations, i.e. the constructors and overloads that take
+  an ``MPI_Comm``.
+
+Non-MPI downstream code should include the ``_nompi`` headers directly, for
+example::
+
+    #include <openPMD/Series_nompi.hpp>
+    #include <openPMD/auxiliary/JSON_nompi.hpp>
+
+Within the library, ``openPMD::Series`` is a type alias that resolves to
+``openPMD::Series_mpi`` in MPI builds and to ``openPMD::Series_nompi``
+otherwise. The compatibility headers without suffix (e.g.
+``openPMD/Series.hpp``) select the appropriate variant and should be used by
+code that either always uses MPI or does not care.
+
 Collective Behavior
 -------------------
 
