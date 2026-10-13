@@ -26,7 +26,7 @@
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 #include "openPMD/IO/FlushParametersInternal.hpp"
 #include "openPMD/ThrowError.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_mpi.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Memory.hpp"

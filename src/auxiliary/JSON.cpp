@@ -23,7 +23,7 @@
 #include "openPMD/auxiliary/JSON_internal.hpp"
 
 #include "openPMD/Error.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/auxiliary/toml11_wrapper.hpp"

@@ -35,7 +35,7 @@
 #include "openPMD/Streaming.hpp"
 #include "openPMD/ThrowError.hpp"
 #include "openPMD/auxiliary/Environment.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_nompi.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"

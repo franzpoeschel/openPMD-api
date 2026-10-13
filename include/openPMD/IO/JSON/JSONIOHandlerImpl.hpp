@@ -25,7 +25,7 @@
 #include "openPMD/IO/AbstractIOHandlerImpl.hpp"
 #include "openPMD/IO/Access.hpp"
 #include "openPMD/IO/JSON/JSONFilePosition.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_nompi.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 #include "openPMD/backend/Variant_internal.hpp"
 #include "openPMD/config.hpp"

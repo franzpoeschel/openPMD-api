@@ -28,7 +28,7 @@
 #include "openPMD/Series.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_nompi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/auxiliary/TypeTraits.hpp"
 #include "openPMD/auxiliary/Variant.hpp"

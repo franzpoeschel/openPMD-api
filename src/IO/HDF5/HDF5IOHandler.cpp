@@ -39,7 +39,7 @@
 #include "openPMD/IO/HDF5/HDF5Auxiliary.hpp"
 #include "openPMD/IO/HDF5/HDF5FilePosition.hpp"
 #include "openPMD/IO/IOTask.hpp"
-#include "openPMD/auxiliary/Filesystem.hpp"
+#include "openPMD/auxiliary/Filesystem_nompi.hpp"
 #include "openPMD/auxiliary/JSONMatcher.hpp"
 #include "openPMD/auxiliary/Mpi.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
