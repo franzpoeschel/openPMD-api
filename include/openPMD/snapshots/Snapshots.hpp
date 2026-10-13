@@ -49,7 +49,7 @@ namespace openPMD
 class Snapshots : public Attributable
 {
 private:
-    friend class Series;
+    friend class Series_nompi;
 
     std::shared_ptr<AbstractSnapshotsContainer> m_snapshots;
 

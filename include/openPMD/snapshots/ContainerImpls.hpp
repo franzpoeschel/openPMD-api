@@ -35,7 +35,7 @@ namespace openPMD
 class StatefulSnapshotsContainer : public AbstractSnapshotsContainer
 {
 private:
-    friend class Series;
+    friend class Series_nompi;
 
     struct Members
     {
@@ -130,7 +130,7 @@ public:
 class RandomAccessIteratorContainer : public AbstractSnapshotsContainer
 {
 private:
-    friend class Series;
+    friend class Series_nompi;
     using Container_t = Iterations;
     Container_t m_cont;
     RandomAccessIteratorContainer(Iterations cont);

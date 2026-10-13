@@ -150,7 +150,7 @@ Iteration &Iteration::close(bool _flush)
         else
         {
             // flush things manually
-            Series s = retrieveSeries();
+            Series_nompi s = retrieveSeries();
             // figure out my iteration number
             auto begin = s.indexOf(*this);
             auto end = begin;
@@ -173,7 +173,7 @@ Iteration &Iteration::close(bool _flush)
 
 Iteration &Iteration::open()
 {
-    Series s = retrieveSeries();
+    Series_nompi s = retrieveSeries();
     auto &it = get();
     // figure out my iteration number
     auto begin = s.indexOf(*this);
@@ -271,7 +271,7 @@ void Iteration::flushFileBased(
 {
     /* Find the root point [Series] of this file,
      * meshesPath and particlesPath are stored there */
-    Series s = retrieveSeries();
+    Series_nompi s = retrieveSeries();
 
     if (!written())
     {
@@ -382,12 +382,12 @@ void Iteration::flush(internal::FlushParams const &flushParams)
     {
         /* Find the root point [Series] of this file,
          * meshesPath and particlesPath are stored there */
-        Series s = retrieveSeries();
+        Series_nompi s = retrieveSeries();
 
         auto set_and_get_mp_path =
             [&](char const *attrName,
                 char const *defaultVal,
-                Series &(Series::*set)(std::string const &)) -> std::string {
+                Series_nompi &(Series_nompi::*set)(std::string const &)) -> std::string {
             if (s.containsAttribute(attrName))
             {
                 return s.getAttribute(attrName).get<std::string>();
@@ -402,7 +402,7 @@ void Iteration::flush(internal::FlushParams const &flushParams)
         if (!meshes.empty() || s.containsAttribute("meshesPath"))
         {
             auto meshesPath = set_and_get_mp_path(
-                "meshesPath", "meshes/", &Series::setMeshesPath);
+                "meshesPath", "meshes/", &Series_nompi::setMeshesPath);
             if (meshes.dirtyRecursive())
             {
                 meshes.flush(meshesPath, flushParams);
@@ -420,7 +420,7 @@ void Iteration::flush(internal::FlushParams const &flushParams)
         if (!particles.empty() || s.containsAttribute("particlesPath"))
         {
             auto particlesPath = set_and_get_mp_path(
-                "particlesPath", "particles/", &Series::setParticlesPath);
+                "particlesPath", "particles/", &Series_nompi::setParticlesPath);
             if (particles.dirtyRecursive())
             {
                 particles.flush(particlesPath, flushParams);
@@ -529,7 +529,7 @@ void Iteration::read_impl(std::string const &groupPath)
 
     /* Find the root point [Series] of this file,
      * meshesPath and particlesPath are stored there */
-    Series s = retrieveSeries();
+    Series_nompi s = retrieveSeries();
 
     Parameter<Operation::LIST_PATHS> pList;
     auto version = IOHandler()->m_standard;
@@ -737,7 +737,7 @@ auto Iteration::beginStep(bool reread) -> BeginStepStatus
 }
 
 auto Iteration::beginStep(
-    std::optional<Iteration> thisObject, Series &series, bool reread)
+    std::optional<Iteration> thisObject, Series_nompi &series, bool reread)
     -> BeginStepStatus
 {
     BeginStepStatus res;
@@ -873,7 +873,7 @@ void Iteration::endStep()
 
 StepStatus Iteration::getStepStatus()
 {
-    Series s = retrieveSeries();
+    Series_nompi s = retrieveSeries();
     switch (s.iterationEncoding())
     {
         using IE = IterationEncoding;
@@ -889,7 +889,7 @@ StepStatus Iteration::getStepStatus()
 
 void Iteration::setStepStatus(StepStatus status)
 {
-    Series s = retrieveSeries();
+    Series_nompi s = retrieveSeries();
     switch (s.iterationEncoding())
     {
         using IE = IterationEncoding;

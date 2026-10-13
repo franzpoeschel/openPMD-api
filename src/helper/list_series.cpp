@@ -32,7 +32,7 @@
 
 namespace openPMD::helper
 {
-std::ostream &listSeries(Series &series, bool const longer, std::ostream &out)
+std::ostream &listSeries(Series_nompi &series, bool const longer, std::ostream &out)
 {
     out << "openPMD series: " << series.name() << "\n";
     out << "openPMD standard: " << series.openPMD() << "\n";

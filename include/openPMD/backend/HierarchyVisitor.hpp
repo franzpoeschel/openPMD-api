@@ -14,7 +14,7 @@ class PatchRecord;
 class PatchRecordComponent;
 class Record;
 class RecordComponent;
-class Series;
+class Series_nompi;
 
 class HierarchyVisitor
 {
@@ -31,6 +31,6 @@ public:
     virtual void operator()(PatchRecordComponent &) = 0;
     virtual void operator()(Record &) = 0;
     virtual void operator()(RecordComponent &) = 0;
-    virtual void operator()(Series &) = 0;
+    virtual void operator()(Series_nompi &) = 0;
 };
 } // namespace openPMD

@@ -52,7 +52,7 @@ auto LegacyIteratorAdaptor::operator!=(LegacyIteratorAdaptor const &other) const
 }
 
 ReadIterations::ReadIterations(
-    Series series,
+    Series_nompi series,
     Access access,
     std::optional<internal::ParsePreference> parsePreference)
     : m_series(std::move(series)), m_parsePreference(parsePreference)

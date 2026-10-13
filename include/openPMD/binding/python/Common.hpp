@@ -48,7 +48,7 @@ namespace py = pybind11;
 using namespace openPMD;
 
 // opaque types
-using PyIterationContainer = Series::IterationsContainer_t;
+using PyIterationContainer = Series_nompi::IterationsContainer_t;
 using PyMeshContainer = Container<Mesh>;
 using PyPartContainer = Container<ParticleSpecies>;
 using PyPatchContainer = Container<ParticlePatches>;

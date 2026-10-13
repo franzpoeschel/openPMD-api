@@ -38,7 +38,7 @@ namespace helper
      * `operator<<`
      */
     std::ostream &listSeries(
-        Series &series,
+        Series_nompi &series,
         bool const longer = false,
         std::ostream &out = std::cout);
 } // namespace helper

@@ -112,7 +112,7 @@ class Container : virtual public Attributable
     friend class ParticleSpecies;
     friend class ParticlePatches;
     friend class internal::SeriesData;
-    friend class Series;
+    friend class Series_nompi;
     template <typename>
     friend class internal::EraseStaleEntries;
     friend class StatefulIterator;

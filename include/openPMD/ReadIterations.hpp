@@ -73,17 +73,17 @@ public:
  */
 class ReadIterations
 {
-    friend class Series;
+    friend class Series_nompi;
 
 private:
     using iterations_t = decltype(internal::SeriesData::iterations);
     using iterator_t = LegacyIteratorAdaptor;
 
-    Series m_series;
+    Series_nompi m_series;
     std::optional<internal::ParsePreference> m_parsePreference;
 
     ReadIterations(
-        Series,
+        Series_nompi,
         Access,
         std::optional<internal::ParsePreference> parsePreference);
 

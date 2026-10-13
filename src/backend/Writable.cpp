@@ -74,9 +74,9 @@ void Writable::seriesFlush(
     {
         (*iteration_internal)->asInternalCopyOf<Iteration>().touch();
     }
-    auto series = series_internal->asInternalCopyOf<Series>();
+    auto series = series_internal->asInternalCopyOf<Series_nompi>();
     auto [begin, end] = [&, &iteration_internal_lambda = iteration_internal]()
-        -> std::pair<Series::iterations_iterator, Series::iterations_iterator> {
+        -> std::pair<Series_nompi::iterations_iterator, Series_nompi::iterations_iterator> {
         if (!flush_entire_series)
         {
             if (!iteration_internal_lambda.has_value())

@@ -64,11 +64,11 @@ struct unpickled_series
     // The cached Series objects are stored as weak_ptr, since they are memory
     // managed by the Python side. The C++ side just needs to check if the
     // weak_ptr is still valid when handing out a new reference. If not, reopen.
-    std::map<uintptr_t, std::weak_ptr<Series>> m_series_by_former_id;
+    std::map<uintptr_t, std::weak_ptr<Series_nompi>> m_series_by_former_id;
     std::shared_mutex m_mutex;
 
     auto get(uintptr_t id, std::string const &filename)
-        -> std::shared_ptr<Series>;
+        -> std::shared_ptr<Series_nompi>;
 };
 
 /*

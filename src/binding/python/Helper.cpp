@@ -32,7 +32,7 @@ void init_Helper(py::module &m)
 {
     m.def(
          "list_series",
-         [](Series &series, bool const longer) {
+         [](Series_nompi &series, bool const longer) {
              std::stringstream s;
              helper::listSeries(series, longer, s);
              py::print(s.str());

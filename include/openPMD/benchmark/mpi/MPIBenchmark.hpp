@@ -105,7 +105,7 @@ public:
         std::string jsonConfig,
         std::string backend,
         Datatype dt,
-        Series::IterationIndex_t iterations,
+        Series_nompi::IterationIndex_t iterations,
         int threadSize);
 
     /**
@@ -123,7 +123,7 @@ public:
         std::string jsonConfig,
         std::string backend,
         Datatype dt,
-        Series::IterationIndex_t iterations);
+        Series_nompi::IterationIndex_t iterations);
 
     void resetConfigurations();
 
@@ -146,7 +146,7 @@ private:
         std::string,
         int,
         Datatype,
-        Series::IterationIndex_t>>
+        Series_nompi::IterationIndex_t>>
         m_configurations;
 
     enum Config
@@ -194,7 +194,7 @@ private:
             Extent &extent,
             std::string const &extension,
             std::shared_ptr<DatasetFiller<T>> datasetFiller,
-            Series::IterationIndex_t iterations);
+            Series_nompi::IterationIndex_t iterations);
 
         /**
          * Execute a single read benchmark.
@@ -210,7 +210,7 @@ private:
             Offset &offset,
             Extent &extent,
             std::string extension,
-            Series::IterationIndex_t iterations);
+            Series_nompi::IterationIndex_t iterations);
 
         template <typename T>
         static void call(
@@ -278,7 +278,7 @@ void MPIBenchmark<DatasetFillerProvider>::addConfiguration(
     std::string jsonConfig,
     std::string backend,
     Datatype dt,
-    Series::IterationIndex_t iterations,
+    Series_nompi::IterationIndex_t iterations,
     int threadSize)
 {
     this->m_configurations.emplace_back(
@@ -290,7 +290,7 @@ void MPIBenchmark<DatasetFillerProvider>::addConfiguration(
     std::string jsonConfig,
     std::string backend,
     Datatype dt,
-    Series::IterationIndex_t iterations)
+    Series_nompi::IterationIndex_t iterations)
 {
     int size;
     MPI_Comm_size(communicator, &size);
@@ -313,13 +313,13 @@ MPIBenchmark<DatasetFillerProvider>::BenchmarkExecution<Clock>::writeBenchmark(
     Extent &extent,
     std::string const &extension,
     std::shared_ptr<DatasetFiller<T>> datasetFiller,
-    Series::IterationIndex_t iterations)
+    Series_nompi::IterationIndex_t iterations)
 {
     MPI_Barrier(m_benchmark->communicator);
     auto start = Clock::now();
 
     // open file for writing
-    Series series = Series(
+    Series_nompi series = Series_nompi(
         m_benchmark->m_basePath + "." + extension,
         Access::CREATE,
         m_benchmark->communicator,
@@ -327,7 +327,7 @@ MPIBenchmark<DatasetFillerProvider>::BenchmarkExecution<Clock>::writeBenchmark(
 
     typename Clock::duration ignore{};
 
-    for (Series::IterationIndex_t i = 0; i < iterations; i++)
+    for (Series_nompi::IterationIndex_t i = 0; i < iterations; i++)
     {
         auto ignore_start = Clock::now();
         auto writeData = datasetFiller->produceData();
@@ -362,18 +362,18 @@ MPIBenchmark<DatasetFillerProvider>::BenchmarkExecution<Clock>::readBenchmark(
     Offset &offset,
     Extent &extent,
     std::string extension,
-    Series::IterationIndex_t iterations)
+    Series_nompi::IterationIndex_t iterations)
 {
     MPI_Barrier(m_benchmark->communicator);
     // let every thread measure time
     auto start = Clock::now();
 
-    Series series = Series(
+    Series_nompi series = Series_nompi(
         m_benchmark->m_basePath + "." + extension,
         Access::READ_ONLY,
         m_benchmark->communicator);
 
-    for (Series::IterationIndex_t i = 0; i < iterations; i++)
+    for (Series_nompi::IterationIndex_t i = 0; i < iterations; i++)
     {
         MeshRecordComponent id =
             series.snapshots()[i].meshes["id"][MeshRecordComponent::SCALAR];
@@ -404,7 +404,7 @@ void MPIBenchmark<DatasetFillerProvider>::BenchmarkExecution<Clock>::call(
         std::string backend;
         int size;
         Datatype dt2;
-        Series::IterationIndex_t iterations;
+        Series_nompi::IterationIndex_t iterations;
         std::tie(jsonConfig, backend, size, dt2, iterations) = config;
 
         if (dt != dt2)

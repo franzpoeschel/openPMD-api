@@ -108,7 +108,7 @@ namespace cli
 
             try
             {
-                auto s = Series(
+                auto s = Series_nompi(
                     argv[1],
                     Access::READ_ONLY,
                     R"({"defer_iteration_parsing": true})");

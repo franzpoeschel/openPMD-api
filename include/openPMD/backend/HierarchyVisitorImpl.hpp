@@ -71,7 +71,7 @@ public:
     {
         lambda(obj);
     }
-    void operator()(Series &obj) override
+    void operator()(Series_nompi &obj) override
     {
         lambda(obj);
     }

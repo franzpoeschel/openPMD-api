@@ -175,7 +175,7 @@ class Iteration
 {
     template <typename T, typename T_key, typename T_container>
     friend class Container;
-    friend class Series;
+    friend class Series_nompi;
     friend class internal::AttributableData;
     template <typename T, typename Series_type>
     friend T &internal::makeOwning(T &self, Series_type);
@@ -432,7 +432,7 @@ private:
      * be known after opening the step.
      */
     static BeginStepStatus
-    beginStep(std::optional<Iteration> thisObject, Series &series, bool reread);
+    beginStep(std::optional<Iteration> thisObject, Series_nompi &series, bool reread);
 
     /**
      * @brief End an IO step on the IO file (or file-like object)

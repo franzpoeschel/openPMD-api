@@ -97,14 +97,14 @@ namespace
         bool isContained{}; //! pattern match successful
         int padding{}; //! number of zeros used for padding of iteration, zero
                        //! if no padding
-        Series::IterationIndex_t iteration =
+        Series_nompi::IterationIndex_t iteration =
             0; //! iteration found in regex pattern (default: 0)
         std::optional<std::string> extension;
 
         // support for std::tie
-        operator std::tuple<bool &, int &, Series::IterationIndex_t &>()
+        operator std::tuple<bool &, int &, Series_nompi::IterationIndex_t &>()
         {
-            return std::tuple<bool &, int &, Series::IterationIndex_t &>{
+            return std::tuple<bool &, int &, Series_nompi::IterationIndex_t &>{
                 isContained, padding, iteration};
         }
     };
@@ -204,7 +204,7 @@ Or by the JSON/TOML option {"hint_lazy_parsing_timeout": 0}.
     };
 } // namespace
 
-struct Series::ParsedInput
+struct Series_nompi::ParsedInput
 {
     std::string path;
     std::string name;
@@ -218,12 +218,12 @@ struct Series::ParsedInput
     bool verify_homogeneous_extents = true;
 }; // ParsedInput
 
-std::string Series::openPMD() const
+std::string Series_nompi::openPMD() const
 {
     return getAttribute("openPMD").get<std::string>();
 }
 
-Series &Series::setOpenPMD(std::string const &o)
+Series_nompi &Series_nompi::setOpenPMD(std::string const &o)
 {
     setAttribute("openPMD", o);
     auto standard = auxiliary::parseStandard(o);
@@ -235,23 +235,23 @@ Series &Series::setOpenPMD(std::string const &o)
     return *this;
 }
 
-uint32_t Series::openPMDextension() const
+uint32_t Series_nompi::openPMDextension() const
 {
     return getAttribute("openPMDextension").get<uint32_t>();
 }
 
-Series &Series::setOpenPMDextension(uint32_t oe)
+Series_nompi &Series_nompi::setOpenPMDextension(uint32_t oe)
 {
     setAttribute("openPMDextension", oe);
     return *this;
 }
 
-std::string Series::basePath() const
+std::string Series_nompi::basePath() const
 {
     return getAttribute("basePath").get<std::string>();
 }
 
-Series &Series::setBasePath(std::string const &bp)
+Series_nompi &Series_nompi::setBasePath(std::string const &bp)
 {
     switch (IOHandler()->m_standard)
     {
@@ -267,12 +267,12 @@ Series &Series::setBasePath(std::string const &bp)
     return *this;
 }
 
-std::string Series::meshesPath() const
+std::string Series_nompi::meshesPath() const
 {
     return getAttribute("meshesPath").get<std::string>();
 }
 
-Series &Series::setMeshesPath(std::string const &mp)
+Series_nompi &Series_nompi::setMeshesPath(std::string const &mp)
 {
     auto &series = get();
     if (std::any_of(
@@ -293,7 +293,7 @@ Series &Series::setMeshesPath(std::string const &mp)
     return *this;
 }
 
-std::vector<std::string> Series::availableDatasets()
+std::vector<std::string> Series_nompi::availableDatasets()
 {
     if (iterationEncoding() == IterationEncoding::variableBased &&
         IOHandler()->m_backendAccess == Access::READ_RANDOM_ACCESS)
@@ -309,7 +309,7 @@ std::vector<std::string> Series::availableDatasets()
     return std::move(*listDatasets.datasets);
 }
 
-bool Series::hasRankTableRead()
+bool Series_nompi::hasRankTableRead()
 {
     if (access::writeOnly(IOHandler()->m_frontendAccess))
     {
@@ -326,9 +326,9 @@ bool Series::hasRankTableRead()
 }
 
 #if openPMD_HAVE_MPI
-chunk_assignment::RankMeta Series::rankTable(bool collective)
+chunk_assignment::RankMeta Series_nompi::rankTable(bool collective)
 #else
-chunk_assignment::RankMeta Series::rankTable([[maybe_unused]] bool collective)
+chunk_assignment::RankMeta Series_nompi::rankTable([[maybe_unused]] bool collective)
 #endif
 {
     auto &series = get();
@@ -470,14 +470,14 @@ chunk_assignment::RankMeta Series::rankTable([[maybe_unused]] bool collective)
     return res;
 }
 
-Series &Series::setRankTable(const std::string &myRankInfo)
+Series_nompi &Series_nompi::setRankTable(const std::string &myRankInfo)
 {
     get().m_rankTable.m_rankTableSource =
         internal::SeriesData::SourceSpecifiedManually{myRankInfo};
     return *this;
 }
 
-void Series::flushRankTable(FlushLevel l, Attributable &attributable)
+void Series_nompi::flushRankTable(FlushLevel l, Attributable &attributable)
 {
     if (!flush_level::global_flushpoint(l))
     {
@@ -605,12 +605,12 @@ void Series::flushRankTable(FlushLevel l, Attributable &attributable)
     writeDataset(std::move(put));
 }
 
-std::string Series::particlesPath() const
+std::string Series_nompi::particlesPath() const
 {
     return getAttribute("particlesPath").get<std::string>();
 }
 
-Series &Series::setParticlesPath(std::string const &pp)
+Series_nompi &Series_nompi::setParticlesPath(std::string const &pp)
 {
     auto &series = get();
     if (std::any_of(
@@ -631,92 +631,92 @@ Series &Series::setParticlesPath(std::string const &pp)
     return *this;
 }
 
-std::string Series::author() const
+std::string Series_nompi::author() const
 {
     return getAttribute("author").get<std::string>();
 }
 
-Series &Series::setAuthor(std::string const &a)
+Series_nompi &Series_nompi::setAuthor(std::string const &a)
 {
     setAttribute("author", a);
     return *this;
 }
 
-std::string Series::software() const
+std::string Series_nompi::software() const
 {
     return getAttribute("software").get<std::string>();
 }
 
-Series &
-Series::setSoftware(std::string const &newName, std::string const &newVersion)
+Series_nompi &
+Series_nompi::setSoftware(std::string const &newName, std::string const &newVersion)
 {
     setAttribute("software", newName);
     setAttribute("softwareVersion", newVersion);
     return *this;
 }
 
-std::string Series::softwareVersion() const
+std::string Series_nompi::softwareVersion() const
 {
     return getAttribute("softwareVersion").get<std::string>();
 }
 
-Series &Series::setSoftwareVersion(std::string const &sv)
+Series_nompi &Series_nompi::setSoftwareVersion(std::string const &sv)
 {
     setAttribute("softwareVersion", sv);
     return *this;
 }
 
-std::string Series::date() const
+std::string Series_nompi::date() const
 {
     return getAttribute("date").get<std::string>();
 }
 
-Series &Series::setDate(std::string const &d)
+Series_nompi &Series_nompi::setDate(std::string const &d)
 {
     setAttribute("date", d);
     return *this;
 }
 
-std::string Series::softwareDependencies() const
+std::string Series_nompi::softwareDependencies() const
 {
     return getAttribute("softwareDependencies").get<std::string>();
 }
 
-Series &
-Series::setSoftwareDependencies(std::string const &newSoftwareDependencies)
+Series_nompi &
+Series_nompi::setSoftwareDependencies(std::string const &newSoftwareDependencies)
 {
     setAttribute("softwareDependencies", newSoftwareDependencies);
     return *this;
 }
 
-std::string Series::machine() const
+std::string Series_nompi::machine() const
 {
     return getAttribute("machine").get<std::string>();
 }
 
-Series &Series::setMachine(std::string const &newMachine)
+Series_nompi &Series_nompi::setMachine(std::string const &newMachine)
 {
     setAttribute("machine", newMachine);
     return *this;
 }
 
-IterationEncoding Series::iterationEncoding() const
+IterationEncoding Series_nompi::iterationEncoding() const
 {
     return get().m_iterationEncoding;
 }
 
-Series &Series::setIterationEncoding(IterationEncoding ie)
+Series_nompi &Series_nompi::setIterationEncoding(IterationEncoding ie)
 {
     setIterationEncoding_internal(ie, internal::default_or_explicit::explicit_);
     return *this;
 }
 
-std::string Series::iterationFormat() const
+std::string Series_nompi::iterationFormat() const
 {
     return getAttribute("iterationFormat").get<std::string>();
 }
 
-Series &Series::setIterationFormat(std::string const &i)
+Series_nompi &Series_nompi::setIterationFormat(std::string const &i)
 {
     if (written())
         throw std::runtime_error(
@@ -742,12 +742,12 @@ Series &Series::setIterationFormat(std::string const &i)
     return *this;
 }
 
-std::string Series::name() const
+std::string Series_nompi::name() const
 {
     return get().m_name;
 }
 
-Series &Series::setName(std::string const &n)
+Series_nompi &Series_nompi::setName(std::string const &n)
 {
     auto &series = get();
     if (series.m_deferred_initialization)
@@ -785,18 +785,18 @@ Series &Series::setName(std::string const &n)
     return *this;
 }
 
-std::string Series::backend() const
+std::string Series_nompi::backend() const
 {
     return IOHandler()->backendName();
 }
 
-std::string Series::backend()
+std::string Series_nompi::backend()
 {
     /* this activates the non-const call to IOHandler() */
     return IOHandler()->backendName();
 }
 
-void Series::flush(std::string backendConfig)
+void Series_nompi::flush(std::string backendConfig)
 {
     auto &series = get();
     flush_impl(
@@ -805,9 +805,9 @@ void Series::flush(std::string backendConfig)
         {FlushLevel::UserFlush, std::move(backendConfig)});
 }
 
-std::unique_ptr<Series::ParsedInput> Series::parseInput(std::string filepath)
+std::unique_ptr<Series_nompi::ParsedInput> Series_nompi::parseInput(std::string filepath)
 {
-    std::unique_ptr<Series::ParsedInput> input{new Series::ParsedInput};
+    std::unique_ptr<Series_nompi::ParsedInput> input{new Series_nompi::ParsedInput};
 
 #ifdef _WIN32
     if (auxiliary::contains(filepath, '/'))
@@ -885,13 +885,13 @@ std::unique_ptr<Series::ParsedInput> Series::parseInput(std::string filepath)
     return input;
 }
 
-bool Series::hasExpansionPattern(std::string filenameWithExtension)
+bool Series_nompi::hasExpansionPattern(std::string filenameWithExtension)
 {
     auto input = parseInput(std::move(filenameWithExtension));
     return input->iterationEncoding == IterationEncoding::fileBased;
 }
 
-bool Series::reparseExpansionPattern(std::string filenameWithExtension)
+bool Series_nompi::reparseExpansionPattern(std::string filenameWithExtension)
 {
     auto input = parseInput(std::move(filenameWithExtension));
     if (input->iterationEncoding != IterationEncoding::fileBased)
@@ -948,7 +948,7 @@ namespace
 } // namespace
 
 template <typename... MPI_Communicator>
-void Series::init(
+void Series_nompi::init(
     std::string const &filepath,
     Access at,
     std::string const &options,
@@ -1003,7 +1003,7 @@ void Series::init(
              options,
              at,
              emplace_parse_config_options_into_iohandler,
-             comm...](Series &s) mutable {
+             comm...](Series_nompi &s) mutable {
                 if (called_this_already)
                 {
                     throw std::runtime_error("Must be called one time only");
@@ -1088,7 +1088,7 @@ void Series::init(
 }
 
 template <typename TracingJSON, typename... MPI_Communicator>
-auto Series::initIOHandler(
+auto Series_nompi::initIOHandler(
     std::string const &filepath,
     std::string const &options,
     Access at,
@@ -1192,9 +1192,9 @@ auto Series::initIOHandler(
     return std::make_tuple(std::move(input), std::move(optionsJson));
 }
 
-void Series::initSeries(
+void Series_nompi::initSeries(
     std::unique_ptr<AbstractIOHandler> ioHandler,
-    std::unique_ptr<Series::ParsedInput> input)
+    std::unique_ptr<Series_nompi::ParsedInput> input)
 {
     auto &series = get();
     auto &writable = series->m_writable;
@@ -1352,7 +1352,7 @@ Given file pattern: ')END"
     IOHandler()->m_lastFlushSuccessful = true;
 }
 
-void Series::initDefaults(IterationEncoding ie, bool initAll)
+void Series_nompi::initDefaults(IterationEncoding ie, bool initAll)
 {
     if (!containsAttribute("basePath"))
     {
@@ -1387,7 +1387,7 @@ void Series::initDefaults(IterationEncoding ie, bool initAll)
         setSoftware("openPMD-api", getVersion());
 }
 
-std::future<void> Series::flush_impl(
+std::future<void> Series_nompi::flush_impl(
     iterations_iterator begin,
     iterations_iterator end,
     internal::FlushParams const &flushParams,
@@ -1441,7 +1441,7 @@ std::future<void> Series::flush_impl(
     }
 }
 
-void Series::flushFileBased(
+void Series_nompi::flushFileBased(
     iterations_iterator begin,
     iterations_iterator end,
     internal::FlushParams const &flushParams,
@@ -1596,7 +1596,7 @@ void Series::flushFileBased(
     }
 }
 
-void Series::flushGorVBased(
+void Series_nompi::flushGorVBased(
     iterations_iterator begin,
     iterations_iterator end,
     internal::FlushParams const &flushParams,
@@ -1731,7 +1731,7 @@ void Series::flushGorVBased(
     }
 }
 
-void Series::readFileBased(
+void Series_nompi::readFileBased(
     std::optional<IterationIndex_t> read_only_this_single_iteration)
 {
     auto &series = get();
@@ -1818,7 +1818,7 @@ void Series::readFileBased(
         }
         return {};
     };
-    std::vector<decltype(Series::iterations)::key_type> unparseableIterations;
+    std::vector<decltype(Series_nompi::iterations)::key_type> unparseableIterations;
     if (series.m_parseLazily)
     {
         for (auto &iteration : series.iterations)
@@ -1958,7 +1958,7 @@ void Series::readFileBased(
             "Please specify '%0<N>T' or open as read-only.");
 }
 
-void Series::readOneIterationFileBased(std::string const &filePath)
+void Series_nompi::readOneIterationFileBased(std::string const &filePath)
 {
     auto &series = get();
 
@@ -2098,7 +2098,7 @@ namespace
     }
 } // namespace
 
-auto Series::readGorVBased(
+auto Series_nompi::readGorVBased(
     bool do_always_throw_errors,
     bool do_init,
     std::optional<IterationIndex_t> read_only_this_single_iteration)
@@ -2437,7 +2437,7 @@ creating new iterations.
     throw std::runtime_error("Unreachable!");
 }
 
-void Series::readBase()
+void Series_nompi::readBase()
 {
     auto &series = get();
     Parameter<Operation::READ_ATT> aRead;
@@ -2597,7 +2597,7 @@ void Series::readBase()
     }
 }
 
-std::string Series::iterationFilename(IterationIndex_t i)
+std::string Series_nompi::iterationFilename(IterationIndex_t i)
 {
     /*
      * The filename might have been overridden at the Series level or at the
@@ -2629,7 +2629,7 @@ std::string Series::iterationFilename(IterationIndex_t i)
     }
 }
 
-Series::iterations_iterator Series::indexOf(Iteration const &iteration)
+Series_nompi::iterations_iterator Series_nompi::indexOf(Iteration const &iteration)
 {
     auto &series = get();
     // first try the cached index; if it points to the correct entry return it
@@ -2653,7 +2653,7 @@ Series::iterations_iterator Series::indexOf(Iteration const &iteration)
     }
 }
 
-AdvanceStatus Series::advance(
+AdvanceStatus Series_nompi::advance(
     AdvanceMode mode,
     internal::AttributableData &file,
     iterations_iterator begin)
@@ -2786,7 +2786,7 @@ AdvanceStatus Series::advance(
     return *param.status;
 }
 
-AdvanceStatus Series::advance(AdvanceMode mode)
+AdvanceStatus Series_nompi::advance(AdvanceMode mode)
 {
     auto &series = get();
     if (series.m_iterationEncoding == IterationEncoding::fileBased)
@@ -2852,7 +2852,7 @@ AdvanceStatus Series::advance(AdvanceMode mode)
     return *param.status;
 }
 
-void Series::flushStep(bool doFlush, FlushLevel l)
+void Series_nompi::flushStep(bool doFlush, FlushLevel l)
 {
     if (!flush_level::write_datasets(l))
     {
@@ -2887,7 +2887,7 @@ void Series::flushStep(bool doFlush, FlushLevel l)
     series.m_wroteAtLeastOneIOStep = true;
 }
 
-Series &Series::setIterationEncoding_internal(
+Series_nompi &Series_nompi::setIterationEncoding_internal(
     IterationEncoding ie, internal::default_or_explicit doe)
 {
     auto &series = get();
@@ -2940,7 +2940,7 @@ Series &Series::setIterationEncoding_internal(
     return *this;
 }
 
-auto Series::openIterationIfDirty(IterationIndex_t index, Iteration &iteration)
+auto Series_nompi::openIterationIfDirty(IterationIndex_t index, Iteration &iteration)
     -> IterationOpened
 {
     auto &data = iteration.get();
@@ -3034,7 +3034,7 @@ auto Series::openIterationIfDirty(IterationIndex_t index, Iteration &iteration)
     return IterationOpened::RemainsClosed;
 }
 
-void Series::openIteration(IterationIndex_t index, Iteration &iteration)
+void Series_nompi::openIteration(IterationIndex_t index, Iteration &iteration)
 {
     auto oldStatus = iteration.get().m_closed;
     using CL = internal::CloseStatus;
@@ -3193,7 +3193,7 @@ namespace
 } // namespace
 
 template <typename TracingJSON>
-void Series::parseJsonOptions(TracingJSON &options, ParsedInput &input)
+void Series_nompi::parseJsonOptions(TracingJSON &options, ParsedInput &input)
 {
     auto &series = get();
     getJsonOption<bool>(
@@ -3323,7 +3323,7 @@ namespace internal
             this->m_sharedStatefulIterator->close();
             this->m_sharedStatefulIterator.reset();
         }
-        Series impl;
+        Series_nompi impl;
         impl.setData({this, [](auto const *) {}});
         auto IOHandler = impl.IOHandler();
         if (IOHandler &&
@@ -3375,11 +3375,11 @@ namespace internal
     }
 } // namespace internal
 
-Series::Series() : Attributable(NoInit()), iterations{}
+Series_nompi::Series_nompi() : Attributable(NoInit()), iterations{}
 {}
 
 #if openPMD_HAVE_MPI
-Series::Series(
+Series_nompi::Series_nompi(
     std::string const &filepath,
     Access at,
     MPI_Comm comm,
@@ -3393,7 +3393,7 @@ Series::Series(
 }
 #endif
 
-Series::Series(
+Series_nompi::Series_nompi(
     std::string const &filepath, Access at, std::string const &options)
     : Attributable(NoInit())
 {
@@ -3401,16 +3401,16 @@ Series::Series(
     init(filepath, at, options);
 }
 
-Series::operator bool() const
+Series_nompi::operator bool() const
 {
     return m_attri.operator bool();
 }
 
-ReadIterations Series::readIterations()
+ReadIterations Series_nompi::readIterations()
 {
     // Use private constructor instead of copy constructor to avoid
     // object slicing
-    auto series = m_attri->asInternalCopyOf<Series>();
+    auto series = m_attri->asInternalCopyOf<Series_nompi>();
     return ReadIterations{
         std::move(series),
         IOHandler()->m_frontendAccess,
@@ -3420,7 +3420,7 @@ ReadIterations Series::readIterations()
 namespace
 {
     auto make_writing_stateful_iterator(
-        Series const &copied_series, internal::SeriesData &series)
+        Series_nompi const &copied_series, internal::SeriesData &series)
         -> StatefulIterator *
     {
         if (!series.m_sharedStatefulIterator)
@@ -3432,7 +3432,7 @@ namespace
         return series.m_sharedStatefulIterator.get();
     }
     auto make_reading_stateful_iterator(
-        Series copied_series, internal::SeriesData &series)
+        Series_nompi copied_series, internal::SeriesData &series)
         -> std::variant<std::function<StatefulIterator *()>, StatefulIterator *>
     {
         if (series.m_sharedStatefulIterator)
@@ -3454,7 +3454,7 @@ namespace
     }
 } // namespace
 
-Snapshots Series::snapshots()
+Snapshots Series_nompi::snapshots()
 {
     auto &series = get();
     if (series.m_deferred_initialization.has_value())
@@ -3503,7 +3503,7 @@ Snapshots Series::snapshots()
     throw std::runtime_error("unreachable!");
 }
 
-Snapshots Series::makeRandomAccessSnapshots()
+Snapshots Series_nompi::makeRandomAccessSnapshots()
 {
     auto &series = get();
     return Snapshots(
@@ -3511,7 +3511,7 @@ Snapshots Series::makeRandomAccessSnapshots()
             new RandomAccessIteratorContainer(series.iterations)},
         series.iterations);
 }
-Snapshots Series::makeSynchronousSnapshots()
+Snapshots Series_nompi::makeSynchronousSnapshots()
 {
     auto &series = get();
     /*
@@ -3564,12 +3564,12 @@ Snapshots Series::makeSynchronousSnapshots()
         series.iterations);
 }
 
-void Series::parseBase()
+void Series_nompi::parseBase()
 {
     readIterations();
 }
 
-WriteIterations Series::writeIterations()
+WriteIterations Series_nompi::writeIterations()
 {
     auto const access = IOHandler()->m_frontendAccess;
     if (access != Access::CREATE_RANDOM_ACCESS &&
@@ -3585,13 +3585,13 @@ WriteIterations Series::writeIterations()
     return makeSynchronousSnapshots();
 }
 
-void Series::close()
+void Series_nompi::close()
 {
     get().close();
     m_attri.reset();
 }
 
-bool Series::closed() const
+bool Series_nompi::closed() const
 {
     if (!operator bool())
     {
@@ -3605,7 +3605,7 @@ bool Series::closed() const
     return !w.IOHandler->has_value();
 }
 
-void Series::visitHierarchy(HierarchyVisitor &v, bool recursive)
+void Series_nompi::visitHierarchy(HierarchyVisitor &v, bool recursive)
 {
     if (recursive)
     {
@@ -3614,7 +3614,7 @@ void Series::visitHierarchy(HierarchyVisitor &v, bool recursive)
     v(*this);
 }
 
-auto Series::currentSnapshot() -> std::optional<std::vector<IterationIndex_t>>
+auto Series_nompi::currentSnapshot() -> std::optional<std::vector<IterationIndex_t>>
 {
     using vec_t = std::vector<IterationIndex_t>;
     auto &series = get();
@@ -3674,7 +3674,7 @@ auto Series::currentSnapshot() -> std::optional<std::vector<IterationIndex_t>>
     }
 }
 
-AbstractIOHandler *Series::runDeferredInitialization()
+AbstractIOHandler *Series_nompi::runDeferredInitialization()
 {
     auto &series = get();
     if (series.m_deferred_initialization.has_value())
@@ -3690,7 +3690,7 @@ AbstractIOHandler *Series::runDeferredInitialization()
     }
 }
 
-AbstractIOHandler *Series::IOHandler()
+AbstractIOHandler *Series_nompi::IOHandler()
 {
     auto res = Attributable::IOHandler();
     if (res && //  res->backendName() == "Dummy" &&
@@ -3700,13 +3700,13 @@ AbstractIOHandler *Series::IOHandler()
     }
     return res;
 }
-AbstractIOHandler const *Series::IOHandler() const
+AbstractIOHandler const *Series_nompi::IOHandler() const
 {
     auto res = Attributable::IOHandler();
     return res;
 }
 
-auto Series::preparseSnapshots()
+auto Series_nompi::preparseSnapshots()
     -> std::optional<std::vector<std::vector<IterationIndex_t>>>
 {
     using vec_t = std::vector<IterationIndex_t>;
@@ -3766,7 +3766,7 @@ auto Series::preparseSnapshots()
         readAttr.resource<vector_of_attributes_type>());
 }
 
-bool Series::randomAccessSteps() const
+bool Series_nompi::randomAccessSteps() const
 {
     return get().m_parsePreference.value_or(
                internal::ParsePreference::UpFront) ==
@@ -3875,7 +3875,7 @@ namespace
 
 namespace debug
 {
-    void printDirty(Series const &series)
+    void printDirty(Series_nompi const &series)
     {
         auto print = [](Attributable const &attr) {
             size_t indent = 0;

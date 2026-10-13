@@ -44,7 +44,7 @@ template <typename FilePositionType>
 class AbstractIOHandlerImplCommon;
 template <typename>
 class Span;
-class Series;
+class Series_nompi;
 
 namespace internal
 {
@@ -60,7 +60,7 @@ namespace detail
 
 namespace debug
 {
-    void printDirty(Series const &);
+    void printDirty(Series_nompi const &);
 }
 
 /** @brief Layer to mirror structure of logical data and persistent data in
@@ -88,7 +88,7 @@ class Writable final
     friend class Iteration;
     friend class Mesh;
     friend class ParticleSpecies;
-    friend class Series;
+    friend class Series_nompi;
     friend class Record;
     friend class RecordComponent;
     friend class AbstractIOHandlerImpl;
@@ -104,7 +104,7 @@ class Writable final
     friend std::string concrete_bp1_file_position(Writable *);
     template <typename>
     friend class Span;
-    friend void debug::printDirty(Series const &);
+    friend void debug::printDirty(Series_nompi const &);
     friend struct Parameter<Operation::CREATE_DATASET>;
     friend struct Parameter<Operation::OPEN_DATASET>;
     friend class internal::ScientificDefaults;

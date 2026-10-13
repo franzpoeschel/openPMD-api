@@ -42,7 +42,7 @@ class OpaqueSeriesIterator
           value_type_in>
 {
 private:
-    friend class Series;
+    friend class Series_nompi;
     friend class StatefulSnapshotsContainer;
     friend class RandomAccessIteratorContainer;
     using parent_t =

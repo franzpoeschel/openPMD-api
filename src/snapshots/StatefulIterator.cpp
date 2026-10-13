@@ -416,7 +416,7 @@ auto StatefulIterator::reparse_possibly_deleted_iteration(iteration_index_t idx)
     }
 }
 
-StatefulIterator::StatefulIterator(tag_write_t, Series const &series_in)
+StatefulIterator::StatefulIterator(tag_write_t, Series_nompi const &series_in)
     : m_data{std::make_shared<std::optional<SharedData>>(std::in_place)}
 {
     auto &data = get();
@@ -428,12 +428,12 @@ StatefulIterator::StatefulIterator(tag_write_t, Series const &series_in)
      * This is ok due to the usual C++ iterator invalidation workflows
      * (deleting the original container invalidates the iterator).
      */
-    data.series = series_in.m_attri->asInternalCopyOf<Series>();
+    data.series = series_in.m_attri->asInternalCopyOf<Series_nompi>();
 }
 
 StatefulIterator::StatefulIterator(
     tag_read_t,
-    Series const &series_in,
+    Series_nompi const &series_in,
     std::optional<internal::ParsePreference> const &parsePreference)
     : m_data{std::make_shared<std::optional<SharedData>>(std::in_place)}
 {
@@ -447,7 +447,7 @@ StatefulIterator::StatefulIterator(
      * This is ok due to the usual C++ iterator invalidation workflows
      * (deleting the original container invalidates the iterator).
      */
-    data.series = series_in.m_attri->asInternalCopyOf<Series>();
+    data.series = series_in.m_attri->asInternalCopyOf<Series_nompi>();
 
     auto &series = data.series;
     if (series.IOHandler()->m_frontendAccess == Access::READ_LINEAR &&
@@ -624,7 +624,7 @@ StatefulIterator::nextStep(size_t recursion_depth)
 std::optional<StatefulIterator *> StatefulIterator::loopBody(Seek const &seek)
 {
     auto &data = get();
-    Series &series = data.series;
+    Series_nompi &series = data.series;
     auto &iterations = series.iterations;
 
     { /*
@@ -891,7 +891,7 @@ auto StatefulIterator::operator*() const -> value_type const &
     if (auto cur = data.currentIteration(); cur.has_value())
     {
 
-        auto iterator = static_cast<Series::IterationsContainer_t const &>(
+        auto iterator = static_cast<Series_nompi::IterationsContainer_t const &>(
                             data.series.iterations)
                             .find(*cur);
         return iterator.operator*();

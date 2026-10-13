@@ -51,7 +51,7 @@ namespace traits
 class AbstractFilePosition;
 class Attributable;
 class Iteration;
-class Series;
+class Series_nompi;
 
 namespace internal
 {
@@ -133,7 +133,7 @@ namespace internal
             auto *self = dynamic_cast<typename T::Data_t *>(this);
             if (!self)
             {
-                if constexpr (std::is_same_v<Series, T>)
+                if constexpr (std::is_same_v<Series_nompi, T>)
                 {
                     throw std::runtime_error(
                         "[Attributable::retrieveSeries] Error when trying to "
@@ -213,7 +213,7 @@ namespace internal
 
 namespace debug
 {
-    void printDirty(Series const &);
+    void printDirty(Series_nompi const &);
 }
 
 /** @brief Layer to manage storage of attributes associated with file objects.
@@ -237,10 +237,10 @@ class Attributable
     template <typename T>
     friend struct traits::GenerationPolicy;
     friend class Iteration;
-    friend class Series;
+    friend class Series_nompi;
     friend class Writable;
     friend class internal::RecordComponentData;
-    friend void debug::printDirty(Series const &);
+    friend void debug::printDirty(Series_nompi const &);
     template <typename T, typename Series_type>
     friend T &internal::makeOwning(T &self, Series_type);
     friend class StatefulSnapshotsContainer;
@@ -468,7 +468,7 @@ public:
 OPENPMD_protected
     // clang-format on
 
-    Series retrieveSeries() const;
+    Series_nompi retrieveSeries() const;
 
     /** Returns the corresponding Iteration
      *

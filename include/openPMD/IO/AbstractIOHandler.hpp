@@ -263,7 +263,7 @@ namespace detail
  */
 class AbstractIOHandler
 {
-    friend class Series;
+    friend class Series_nompi;
     friend class ADIOS2IOHandlerImpl;
     friend class JSONIOHandlerImpl;
     friend class HDF5IOHandlerImpl;

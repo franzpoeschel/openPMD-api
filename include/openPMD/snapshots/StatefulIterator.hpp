@@ -203,7 +203,7 @@ class StatefulIterator
           Container<Iteration, Iteration::IterationIndex_t>::value_type>
 {
     friend class StatefulSnapshotsContainer;
-    friend class Series;
+    friend class Series_nompi;
     friend class internal::SeriesData;
 
     using iteration_index_t = IndexedIteration::index_t;
@@ -227,7 +227,7 @@ class StatefulIterator
          * A non-owning handle is fine due to the usual semantics for iterator
          * invalidation.
          */
-        Series series;
+        Series_nompi series;
         /*
          * No step opened yet, so initialize this with CurrentStep::Before. Look
          * to the documentation of Before_t, During_t, After_t and CurrentStep
@@ -302,10 +302,10 @@ public:
 
     StatefulIterator(
         tag_read_t,
-        Series const &,
+        Series_nompi const &,
         std::optional<internal::ParsePreference> const &parsePreference);
 
-    StatefulIterator(tag_write_t, Series const &);
+    StatefulIterator(tag_write_t, Series_nompi const &);
 
     // dereference
     auto operator*() -> value_type &;

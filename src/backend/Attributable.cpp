@@ -179,14 +179,14 @@ void Attributable::iterationFlush(std::string backendConfig)
         std::move(backendConfig));
 }
 
-Series Attributable::retrieveSeries() const
+Series_nompi Attributable::retrieveSeries() const
 {
     Writable const *findSeries = &writable();
     while (findSeries->parent)
     {
         findSeries = findSeries->parent;
     }
-    return findSeries->attributable->asInternalCopyOf<Series>();
+    return findSeries->attributable->asInternalCopyOf<Series_nompi>();
 }
 
 auto Attributable::containingIteration() const -> std::pair<
@@ -281,7 +281,7 @@ auto Attributable::myPath() const -> MyPath
     std::reverse(res.group.begin(), res.group.end());
     auto &seriesData = auxiliary::deref_dynamic_cast<internal::SeriesData>(
         findSeries->attributable);
-    Series series;
+    Series_nompi series;
     series.setData(
         std::shared_ptr<internal::SeriesData>{
             &seriesData, [](auto const *) {}});
@@ -662,15 +662,15 @@ namespace internal
         return self;
     }
 
-    template Series &makeOwning(Series &, std::shared_ptr<Series>);
+    template Series_nompi &makeOwning(Series_nompi &, std::shared_ptr<Series_nompi>);
     template RecordComponent &
-    makeOwning(RecordComponent &, std::shared_ptr<Series>);
+    makeOwning(RecordComponent &, std::shared_ptr<Series_nompi>);
     template MeshRecordComponent &
-    makeOwning(MeshRecordComponent &, std::shared_ptr<Series>);
-    template Mesh &makeOwning(Mesh &, std::shared_ptr<Series>);
-    template Record &makeOwning(Record &, std::shared_ptr<Series>);
+    makeOwning(MeshRecordComponent &, std::shared_ptr<Series_nompi>);
+    template Mesh &makeOwning(Mesh &, std::shared_ptr<Series_nompi>);
+    template Record &makeOwning(Record &, std::shared_ptr<Series_nompi>);
     template ParticleSpecies &
-    makeOwning(ParticleSpecies &, std::shared_ptr<Series>);
-    template Iteration &makeOwning(Iteration &, std::shared_ptr<Series>);
+    makeOwning(ParticleSpecies &, std::shared_ptr<Series_nompi>);
+    template Iteration &makeOwning(Iteration &, std::shared_ptr<Series_nompi>);
 } // namespace internal
 } // namespace openPMD
