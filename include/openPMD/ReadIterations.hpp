@@ -25,7 +25,7 @@
  */
 
 #include "openPMD/Iteration.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/snapshots/Snapshots.hpp"
 
 namespace openPMD

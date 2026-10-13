@@ -18,7 +18,7 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include "openPMD/ChunkInfo_nompi.hpp"
+#include "openPMD/ChunkInfo_mpi.hpp"
 #include "openPMD/auxiliary/OneDimensionalBlockSlicer.hpp"
 #include "openPMD/binding/python/Mpi.hpp"
 

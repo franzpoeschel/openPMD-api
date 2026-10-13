@@ -25,7 +25,7 @@
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/IOTask.hpp"
 #include "openPMD/IterationEncoding.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/Filesystem_nompi.hpp"

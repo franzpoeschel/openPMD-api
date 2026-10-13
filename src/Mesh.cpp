@@ -22,7 +22,7 @@
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/RecordComponent.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/ThrowError.hpp"
 #include "openPMD/UnitDimension.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"

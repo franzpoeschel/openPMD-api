@@ -4,7 +4,7 @@
 
 #include "openPMD/Iteration.hpp"
 #include "openPMD/ParticleSpecies.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include <type_traits>
 
 namespace openPMD

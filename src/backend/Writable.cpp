@@ -21,7 +21,7 @@
 #include "openPMD/backend/Writable.hpp"
 
 #include "openPMD/IO/AbstractIOHandler.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/backend/Attributable.hpp"
 
 #include <stdexcept>

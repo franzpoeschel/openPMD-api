@@ -25,7 +25,7 @@
 #if openPMD_HAVE_MPI
 
 #include "openPMD/Datatype.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 
 #include "string.h"
 #include <map>

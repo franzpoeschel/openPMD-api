@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/helper/list_series.hpp"
 
 #include <exception>

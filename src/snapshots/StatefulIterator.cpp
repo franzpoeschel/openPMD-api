@@ -24,7 +24,7 @@
 #include "openPMD/Error.hpp"
 
 #include "openPMD/Iteration.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/auxiliary/Variant.hpp"
 #include "openPMD/backend/ParsePreference.hpp"
 

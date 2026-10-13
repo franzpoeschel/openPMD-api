@@ -24,7 +24,7 @@
 #include "openPMD/Iteration.hpp"
 #include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/RecordComponent.hpp"
-#include "openPMD/Series.hpp"
+#include "openPMD/Series_nompi.hpp"
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attribute.hpp"
