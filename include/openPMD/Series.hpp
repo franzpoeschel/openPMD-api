@@ -22,5 +22,10 @@
 
 // Compatibility header. Once the MPI/non-MPI split of the Series class is
 // complete, this header will select the appropriate variant and expose the
-// `openPMD::Series` alias. For now it simply forwards to the non-MPI variant.
+// `openPMD::Series` alias.
 #include "openPMD/Series_nompi.hpp"
+
+namespace openPMD
+{
+using Series = Series_nompi;
+} // namespace openPMD
