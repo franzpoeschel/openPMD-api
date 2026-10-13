@@ -19,7 +19,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "openPMD/auxiliary/JSON.hpp"
+#include "openPMD/auxiliary/JSON_mpi.hpp"
 #include "openPMD/auxiliary/JSON_internal.hpp"
 
 #include "openPMD/Error.hpp"
