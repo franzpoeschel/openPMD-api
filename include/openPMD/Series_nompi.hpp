@@ -38,10 +38,6 @@
 #include "openPMD/snapshots/Snapshots.hpp"
 #include "openPMD/version.hpp"
 
-#if openPMD_HAVE_MPI
-#include <mpi.h>
-#endif
-
 #include <any>
 #include <cstdint> // uint64_t
 #include <deque>
@@ -305,26 +301,6 @@ class Series_nompi : public Attributable
 public:
     explicit Series_nompi();
 
-#if openPMD_HAVE_MPI
-    /**
-     * @brief Construct a new Series
-     *
-     * For further details, refer to the documentation of the non-MPI overload.
-     *
-     * @param filepath The file path.
-     * @param at Access mode.
-     * @param comm The MPI communicator.
-     * @param options Advanced backend configuration via JSON.
-     *      May be specified as a JSON-formatted string directly, or as a path
-     *      to a JSON textfile, prepended by an at sign '@'.
-     */
-    Series_nompi(
-        std::string const &filepath,
-        Access at,
-        MPI_Comm comm,
-        std::string const &options = "{}");
-#endif
-
     /**
      * @brief Construct a new Series.
      *
@@ -488,11 +464,7 @@ public:
      * @return  Vector with a String per (writing) MPI rank, indicating user-
      *          defined meta information per rank. Example: host name.
      */
-#if openPMD_HAVE_MPI
-    chunk_assignment::RankMeta rankTable(bool collective);
-#else
     chunk_assignment::RankMeta rankTable(bool collective = false);
-#endif
 
     /**
      * @brief Set the Mpi Ranks Meta Info attribute, i.e. a Vector with
@@ -800,6 +772,24 @@ public:
             "Cannot call this on an instance of Series.");
     }
 
+protected:
+    /**
+     * @brief Construct a new Series with a type-erased MPI communicator.
+     *
+     * Used by the MPI-enabled `Series_mpi` subclass. The communicator is passed
+     * as `std::any` so that this header does not need MPI types.
+     *
+     * @param filepath The file path.
+     * @param at Access mode.
+     * @param options Advanced backend configuration via JSON.
+     * @param communicator The MPI communicator, or an empty `std::any`.
+     */
+    Series_nompi(
+        std::string const &filepath,
+        Access at,
+        std::string const &options,
+        std::any communicator);
+
     // clang-format off
 OPENPMD_private
     // clang-format on
@@ -865,19 +855,18 @@ OPENPMD_private
     void parseJsonOptions(TracingJSON &options, ParsedInput &);
     bool hasExpansionPattern(std::string filenameWithExtension);
     bool reparseExpansionPattern(std::string filenameWithExtension);
-    template <typename... MPI_Communicator>
     void init(
         std::string const &filepath,
         Access at,
         std::string const &options,
-        MPI_Communicator &&...);
-    template <typename TracingJSON, typename... MPI_Communicator>
+        std::any communicator = {});
+    template <typename TracingJSON>
     std::tuple<std::unique_ptr<ParsedInput>, TracingJSON> initIOHandler(
         std::string const &filepath,
         std::string const &options,
         Access at,
         bool resolve_generic_extension,
-        MPI_Communicator &&...);
+        std::any communicator = {});
     void initSeries(
         std::unique_ptr<AbstractIOHandler>, std::unique_ptr<ParsedInput>);
     void initDefaults(IterationEncoding, bool initAll = false);

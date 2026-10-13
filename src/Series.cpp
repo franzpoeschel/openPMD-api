@@ -20,6 +20,7 @@
  * If not, see <http://www.gnu.org/licenses/>.
  */
 #include "openPMD/Series.hpp"
+#include "openPMD/Series_mpi.hpp"
 #include "openPMD/ChunkInfo.hpp"
 #include "openPMD/ChunkInfo_internal.hpp"
 #include "openPMD/Error.hpp"
@@ -947,13 +948,69 @@ namespace
     }
 } // namespace
 
-template <typename... MPI_Communicator>
+namespace
+{
+    /*
+     * The MPI communicator is type-erased as `std::any` in the public headers.
+     * These helpers cast it back to `MPI_Comm` (when present) and dispatch to
+     * the MPI-aware overloads of the respective functions.
+     */
+    template <typename TracingJSON>
+    std::unique_ptr<AbstractIOHandler> createIOHandlerWithCommunicator(
+        std::optional<std::unique_ptr<AbstractIOHandler>> initialize_from,
+        std::string path,
+        Access at,
+        Format format,
+        std::string originalExtension,
+        std::any const &communicator,
+        TracingJSON &&options,
+        std::string const &pathAsItWasSpecifiedInTheConstructor)
+    {
+#if openPMD_HAVE_MPI
+        if (communicator.has_value())
+        {
+            return createIOHandler(
+                std::move(initialize_from),
+                std::move(path),
+                at,
+                format,
+                std::move(originalExtension),
+                std::any_cast<MPI_Comm>(communicator),
+                std::forward<TracingJSON>(options),
+                pathAsItWasSpecifiedInTheConstructor);
+        }
+#endif
+        return createIOHandler(
+            std::move(initialize_from),
+            std::move(path),
+            at,
+            format,
+            std::move(originalExtension),
+            std::forward<TracingJSON>(options),
+            pathAsItWasSpecifiedInTheConstructor);
+    }
+
+    json::ParsedConfig parseOptionsWithCommunicator(
+        std::string const &options,
+        std::any const &communicator,
+        bool considerFiles)
+    {
+#if openPMD_HAVE_MPI
+        if (communicator.has_value())
+        {
+            return json::parseOptions(
+                options, std::any_cast<MPI_Comm>(communicator), considerFiles);
+        }
+#endif
+        return json::parseOptions(options, considerFiles);
+    }
+} // namespace
+
 void Series_nompi::init(
     std::string const &filepath,
     Access at,
     std::string const &options,
-    // Either an MPI_Comm or none, the template works for both options
-    MPI_Communicator &&...comm)
+    std::any communicator)
 {
     auto emplace_parse_config_options_into_iohandler =
         [](AbstractIOHandler &ioHandler, ParsedInput &input) {
@@ -962,19 +1019,19 @@ void Series_nompi::init(
         };
 
     auto init_directly = [this,
-                          &comm...,
+                          &communicator,
                           at,
                           &filepath,
                           &emplace_parse_config_options_into_iohandler](
                              std::unique_ptr<ParsedInput> parsed_input,
                              json::TracingJSON tracing_json) {
-        auto io_handler = createIOHandler(
+        auto io_handler = createIOHandlerWithCommunicator(
             std::nullopt,
             parsed_input->path,
             at,
             parsed_input->format,
             parsed_input->filenameExtension.value_or(std::string()),
-            comm...,
+            communicator,
             tracing_json,
             filepath);
         emplace_parse_config_options_into_iohandler(*io_handler, *parsed_input);
@@ -987,7 +1044,7 @@ void Series_nompi::init(
                           &filepath,
                           &options,
                           &emplace_parse_config_options_into_iohandler,
-                          &comm...](std::string const &parsed_directory) {
+                          &communicator](std::string const &parsed_directory) {
         // Set a temporary IOHandler so that API calls which require a present
         // IOHandler don't fail
         writable().IOHandler =
@@ -1003,7 +1060,7 @@ void Series_nompi::init(
              options,
              at,
              emplace_parse_config_options_into_iohandler,
-             comm...](Series_nompi &s) mutable {
+             communicator](Series_nompi &s) mutable {
                 if (called_this_already)
                 {
                     throw std::runtime_error("Must be called one time only");
@@ -1015,22 +1072,18 @@ void Series_nompi::init(
 
                 auto [parsed_input, tracing_json] =
                     s.initIOHandler<json::TracingJSON>(
-                        filepath,
-                        options,
-                        at,
-                        true,
-                        std::forward<MPI_Communicator>(comm)...);
+                        filepath, options, at, true, communicator);
 
                 auto &writable = s.get()->m_writable;
 
-                auto io_handler = createIOHandler(
+                auto io_handler = createIOHandlerWithCommunicator(
                     writable.IOHandler ? std::move(*writable.IOHandler)
                                        : std::nullopt,
                     parsed_input->path,
                     at,
                     parsed_input->format,
                     parsed_input->filenameExtension.value_or(std::string()),
-                    comm...,
+                    communicator,
                     tracing_json,
                     filepath);
                 emplace_parse_config_options_into_iohandler(
@@ -1048,11 +1101,7 @@ void Series_nompi::init(
     case Access::READ_WRITE:
     case Access::READ_ONLY: {
         auto [parsed_input, tracing_json] = initIOHandler<json::TracingJSON>(
-            filepath,
-            options,
-            at,
-            true,
-            std::forward<MPI_Communicator>(comm)...);
+            filepath, options, at, true, communicator);
         init_directly(std::move(parsed_input), std::move(tracing_json));
     }
     break;
@@ -1062,11 +1111,7 @@ void Series_nompi::init(
     case Access::APPEND_LINEAR: {
         auto [first_parsed_input, first_tracing_json] =
             initIOHandler<json::TracingJSON>(
-                filepath,
-                options,
-                at,
-                false,
-                std::forward<MPI_Communicator>(comm)...);
+                filepath, options, at, false, communicator);
         if (first_parsed_input->filenameExtension.has_value())
         {
             init_directly(
@@ -1087,21 +1132,19 @@ void Series_nompi::init(
     }
 }
 
-template <typename TracingJSON, typename... MPI_Communicator>
+template <typename TracingJSON>
 auto Series_nompi::initIOHandler(
     std::string const &filepath,
     std::string const &options,
     Access at,
     bool resolve_generic_extension,
-    MPI_Communicator &&...comm)
+    std::any communicator)
     -> std::tuple<std::unique_ptr<ParsedInput>, TracingJSON>
 {
     auto &series = get();
 
-    json::TracingJSON optionsJson = json::parseOptions(
-        options,
-        std::forward<MPI_Communicator>(comm)...,
-        /* considerFiles = */ true);
+    json::TracingJSON optionsJson = parseOptionsWithCommunicator(
+        options, communicator, /* considerFiles = */ true);
     auto input = parseInput(filepath);
     if (resolve_generic_extension && input->format == Format::GENERIC &&
         !access::create(at))
@@ -3378,28 +3421,33 @@ namespace internal
 Series_nompi::Series_nompi() : Attributable(NoInit()), iterations{}
 {}
 
-#if openPMD_HAVE_MPI
 Series_nompi::Series_nompi(
+    std::string const &filepath,
+    Access at,
+    std::string const &options,
+    std::any communicator)
+    : Attributable(NoInit())
+{
+    auto data = std::make_shared<internal::SeriesData>();
+    data->m_communicator = communicator;
+    setData(std::move(data));
+    init(filepath, at, options, std::move(communicator));
+}
+
+Series_nompi::Series_nompi(
+    std::string const &filepath, Access at, std::string const &options)
+    : Series_nompi(filepath, at, options, std::any{})
+{}
+
+#if openPMD_HAVE_MPI
+Series_mpi::Series_mpi(
     std::string const &filepath,
     Access at,
     MPI_Comm comm,
     std::string const &options)
-    : Attributable(NoInit())
-{
-    auto data = std::make_shared<internal::SeriesData>();
-    data->m_communicator = comm;
-    setData(std::move(data));
-    init(filepath, at, options, comm);
-}
+    : Series_nompi(filepath, at, options, std::any(comm))
+{}
 #endif
-
-Series_nompi::Series_nompi(
-    std::string const &filepath, Access at, std::string const &options)
-    : Attributable(NoInit())
-{
-    setData(std::make_shared<internal::SeriesData>());
-    init(filepath, at, options);
-}
 
 Series_nompi::operator bool() const
 {
