@@ -197,7 +197,7 @@ Ref.: https://github.com/openPMD/openPMD-standard/pull/193)"[1])
             py::overload_cast<double>(&Mesh::setGridUnitSI));
     add_pickle(
         cl,
-        [](std::shared_ptr<openPMD::Series_nompi> series,
+        [](std::shared_ptr<openPMD::Series> series,
            std::vector<std::string> const &group) {
             uint64_t const n_it = std::stoull(group.at(1));
             auto res = series->iterations[n_it].open().meshes[group.at(3)];

@@ -57,7 +57,7 @@ void init_ParticleSpecies(py::module &m)
                 py::keep_alive<0, 1>()));
     add_pickle(
         cl,
-        [](std::shared_ptr<openPMD::Series_nompi> series,
+        [](std::shared_ptr<openPMD::Series> series,
            std::vector<std::string> const &group) {
             uint64_t const n_it = std::stoull(group.at(1));
             ParticleSpecies res =

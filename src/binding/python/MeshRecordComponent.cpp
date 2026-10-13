@@ -83,7 +83,7 @@ void init_MeshRecordComponent(py::module &m)
             "(node/cell/voxel) of the mesh");
     add_pickle(
         cl,
-        [](std::shared_ptr<openPMD::Series_nompi> series,
+        [](std::shared_ptr<openPMD::Series> series,
            std::vector<std::string> const &group) {
             uint64_t const n_it = std::stoull(group.at(1));
             auto res =

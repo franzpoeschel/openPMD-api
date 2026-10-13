@@ -86,7 +86,7 @@ void init_Record(py::module &m)
         .def("set_time_offset", &Record::setTimeOffset<long double>);
     add_pickle(
         cl,
-        [](std::shared_ptr<openPMD::Series_nompi> series,
+        [](std::shared_ptr<openPMD::Series> series,
            std::vector<std::string> const &group) {
             uint64_t const n_it = std::stoull(group.at(1));
             auto res = series->iterations[n_it].open().particles[group.at(3)]

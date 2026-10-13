@@ -114,7 +114,7 @@ struct DefineSeriesConstructorPerPathType
 #endif
 
     template <typename PathType, typename JsonCfgType>
-    static void call(py::class_<Series_nompi, Attributable> &py_class)
+    static void call(py::class_<Series, Attributable> &py_class)
     {
         py_class
             .def(
@@ -124,7 +124,7 @@ struct DefineSeriesConstructorPerPathType
                     decltype(auto) filepath_ = filepath_as_string(filepath);
                     decltype(auto) options_ = json_cfg_as_string(options);
                     py::gil_scoped_release release;
-                    return new Series_nompi(filepath_, at, options_);
+                    return new Series(filepath_, at, options_);
                 }),
                 py::arg("filepath"),
                 py::arg("access"),
@@ -215,7 +215,7 @@ It will be replaced with an automatically determined file name extension:
                     else
                     {
                         py::gil_scoped_release release;
-                        return new Series_nompi(
+                        return new Series(
                             filepath_,
                             at,
                             std::get<MPI_Comm>(variant),
@@ -280,7 +280,7 @@ not possible once it has been closed.
     )END")
             .def(
                 "__getitem__",
-                [](Snapshots &s, Series_nompi::IterationIndex_t key) {
+                [](Snapshots &s, Series::IterationIndex_t key) {
                     py::gil_scoped_release release;
                     return s[key];
                 },
@@ -382,7 +382,7 @@ not possible once it has been closed.
         iterations(m, "Iterations");
     (void)iterations;
 
-    py::class_<Series_nompi, Attributable> cl(m, "Series");
+    py::class_<Series, Attributable> cl(m, "Series");
 
     ::auxiliary::ForEachTypeNested<
         ::internal::DefineSeriesConstructorPerPathType,
@@ -397,16 +397,16 @@ not possible once it has been closed.
         // config argument types
         std::tuple<std::string, py::object>
 #endif
-        >::template call<py::class_<Series_nompi, Attributable> &>(cl);
+        >::template call<py::class_<Series, Attributable> &>(cl);
     //                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     // need to explicitly state template parameters, otherwise Clang on
     // Windows does not understand that it really is a template
 
-    cl.def("__bool__", &Series_nompi::operator bool)
-        .def("__len__", [](Series_nompi const &s) { return s.iterations.size(); })
+    cl.def("__bool__", &Series::operator bool)
+        .def("__len__", [](Series const &s) { return s.iterations.size(); })
         .def(
             "__repr__",
-            [](Series_nompi const &s) {
+            [](Series const &s) {
                 std::stringstream stream;
                 auto myPath = s.myPath();
                 stream << "<openPMD.Series at '" << myPath.filePath()
@@ -418,7 +418,7 @@ not possible once it has been closed.
                 stream << " and " << s.numAttributes() << " attributes>";
                 return stream.str();
             })
-        .def("close", &Series_nompi::close, R"(
+        .def("close", &Series::close, R"(
 Closes the Series and release the data storage/transport backends.
 
 All backends are closed after calling this method.
@@ -427,35 +427,35 @@ The Series will be evaluated as false in boolean contexts after calling
 this method.
         )")
 
-        .def_property("openPMD", &Series_nompi::openPMD, &Series_nompi::setOpenPMD)
+        .def_property("openPMD", &Series::openPMD, &Series::setOpenPMD)
         .def_property(
             "openPMD_extension",
-            &Series_nompi::openPMDextension,
-            &Series_nompi::setOpenPMDextension)
-        .def_property("base_path", &Series_nompi::basePath, &Series_nompi::setBasePath)
+            &Series::openPMDextension,
+            &Series::setOpenPMDextension)
+        .def_property("base_path", &Series::basePath, &Series::setBasePath)
         .def_property(
-            "meshes_path", &Series_nompi::meshesPath, &Series_nompi::setMeshesPath)
-        .def_property_readonly("has_rank_table_read", &Series_nompi::hasRankTableRead)
-        .def("get_rank_table", &Series_nompi::rankTable, py::arg("collective"))
-        .def("set_rank_table", &Series_nompi::setRankTable, py::arg("my_rank_info"))
+            "meshes_path", &Series::meshesPath, &Series::setMeshesPath)
+        .def_property_readonly("has_rank_table_read", &Series::hasRankTableRead)
+        .def("get_rank_table", &Series::rankTable, py::arg("collective"))
+        .def("set_rank_table", &Series::setRankTable, py::arg("my_rank_info"))
         .def_property(
-            "particles_path", &Series_nompi::particlesPath, &Series_nompi::setParticlesPath)
-        .def_property("author", &Series_nompi::author, &Series_nompi::setAuthor)
+            "particles_path", &Series::particlesPath, &Series::setParticlesPath)
+        .def_property("author", &Series::author, &Series::setAuthor)
         .def_property(
             "machine",
-            &Series_nompi::machine,
-            &Series_nompi::setMachine,
+            &Series::machine,
+            &Series::setMachine,
             "Indicate the machine or relevant hardware that created the file.")
-        .def_property_readonly("software", &Series_nompi::software)
+        .def_property_readonly("software", &Series::software)
         .def(
             "set_software",
-            &Series_nompi::setSoftware,
+            &Series::setSoftware,
             py::arg("name"),
             py::arg("version") = std::string("unspecified"))
-        .def_property_readonly("software_version", &Series_nompi::softwareVersion)
+        .def_property_readonly("software_version", &Series::softwareVersion)
         .def(
             "set_software_version",
-            [](Series_nompi &s, std::string const &softwareVersion) {
+            [](Series &s, std::string const &softwareVersion) {
                 py::print(
                     "Series.set_software_version is deprecated. Set the "
                     "version with the second argument of Series.set_software");
@@ -463,49 +463,49 @@ this method.
             })
         // softwareDependencies
         // machine
-        .def_property("date", &Series_nompi::date, &Series_nompi::setDate)
+        .def_property("date", &Series::date, &Series::setDate)
         .def_property(
             "iteration_encoding",
-            &Series_nompi::iterationEncoding,
-            &Series_nompi::setIterationEncoding)
+            &Series::iterationEncoding,
+            &Series::setIterationEncoding)
         .def_property(
             "iteration_format",
-            &Series_nompi::iterationFormat,
-            &Series_nompi::setIterationFormat)
-        .def_property("name", &Series_nompi::name, &Series_nompi::setName)
+            &Series::iterationFormat,
+            &Series::setIterationFormat)
+        .def_property("name", &Series::name, &Series::setName)
         .def(
             "flush",
-            [](Series_nompi &s, std::string const &backend_config) {
+            [](Series &s, std::string const &backend_config) {
                 py::gil_scoped_release release_gil;
                 s.flush(backend_config);
             },
             py::arg("backend_config") = "{}")
 
         .def_property_readonly(
-            "backend", static_cast<std::string (Series_nompi::*)()>(&Series_nompi::backend))
+            "backend", static_cast<std::string (Series::*)()>(&Series::backend))
 
         // TODO remove in future versions (deprecated)
-        .def("set_openPMD", &Series_nompi::setOpenPMD)
-        .def("set_openPMD_extension", &Series_nompi::setOpenPMDextension)
-        .def("set_base_path", &Series_nompi::setBasePath)
-        .def("set_meshes_path", &Series_nompi::setMeshesPath)
-        .def("set_particles_path", &Series_nompi::setParticlesPath)
-        .def("set_author", &Series_nompi::setAuthor)
-        .def("set_date", &Series_nompi::setDate)
-        .def("set_iteration_encoding", &Series_nompi::setIterationEncoding)
-        .def("set_iteration_format", &Series_nompi::setIterationFormat)
-        .def("set_name", &Series_nompi::setName)
+        .def("set_openPMD", &Series::setOpenPMD)
+        .def("set_openPMD_extension", &Series::setOpenPMDextension)
+        .def("set_base_path", &Series::setBasePath)
+        .def("set_meshes_path", &Series::setMeshesPath)
+        .def("set_particles_path", &Series::setParticlesPath)
+        .def("set_author", &Series::setAuthor)
+        .def("set_date", &Series::setDate)
+        .def("set_iteration_encoding", &Series::setIterationEncoding)
+        .def("set_iteration_format", &Series::setIterationFormat)
+        .def("set_name", &Series::setName)
 
         .def_property_readonly(
             "iterations",
             py::cpp_function(
-                [](Series_nompi &s) { return s.iterations; },
+                [](Series &s) { return s.iterations; },
                 py::return_value_policy::copy,
                 // garbage collection: return value must be freed before Series
                 py::keep_alive<0, 1>()))
         .def(
             "read_iterations",
-            [](Series_nompi &s) {
+            [](Series &s) {
                 py::gil_scoped_release release;
                 return s.readIterations();
             },
@@ -525,7 +525,7 @@ Look for the ReadIterations class for further documentation.
             )END")
         .def(
             "parse_base",
-            [](Series_nompi &s) {
+            [](Series &s) {
                 py::gil_scoped_release release;
                 s.parseBase();
             },
@@ -544,7 +544,7 @@ for that use case: When using IO steps, this call only ensures that the
 first step is parsed.)END"[1])
         .def(
             "write_iterations",
-            &Series_nompi::writeIterations,
+            &Series::writeIterations,
             py::keep_alive<0, 1>(),
             R"END(
 Entry point to the writing end of the streaming API.
@@ -563,19 +563,19 @@ Look for the WriteIterations class for further documentation.
             )END")
         .def(
             "snapshots",
-            &Series_nompi::snapshots,
+            &Series::snapshots,
             py::keep_alive<0, 1>(),
             "TODO FILL IN DOCUMENTATION");
 
     add_pickle(
         cl,
-        [](std::shared_ptr<openPMD::Series_nompi> series,
+        [](std::shared_ptr<openPMD::Series> series,
            std::vector<std::string> const &) {
             // Need to work on a copy since makeOwning will change the internal
             // change pointer to capture also the cached Series. For this, the
             // Series must be a different object than the cached Series,
             // otherwise the cat will bite its own tail here.
-            Series_nompi copy = *series;
+            Series copy = *series;
             return openPMD::internal::makeOwning(copy, std::move(series));
         });
 
@@ -651,7 +651,7 @@ Parameters:
             py::arg("comm"),
             docs_merge_json)
 #endif
-        .def("__del__", [](Series_nompi &s) {
+        .def("__del__", [](Series &s) {
             try
             {
                 s.close();
