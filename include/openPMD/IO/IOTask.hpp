@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include "openPMD/Dataset.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IterationEncoding.hpp"

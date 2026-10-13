@@ -20,7 +20,7 @@
  */
 #pragma once
 
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include <string>
 
 namespace openPMD::host_info

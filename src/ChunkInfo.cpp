@@ -18,7 +18,7 @@
  * and the GNU Lesser General Public License along with openPMD-api.
  * If not, see <http://www.gnu.org/licenses/>.
  */
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_mpi.hpp"
 
 #include "openPMD/ChunkInfo_internal.hpp"
 #include "openPMD/Error.hpp"

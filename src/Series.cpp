@@ -21,7 +21,7 @@
  */
 #include "openPMD/Series.hpp"
 #include "openPMD/Series_mpi.hpp"
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include "openPMD/ChunkInfo_internal.hpp"
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"

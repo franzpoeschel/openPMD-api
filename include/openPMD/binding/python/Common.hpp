@@ -8,7 +8,7 @@
  */
 #pragma once
 
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include "openPMD/Iteration.hpp"
 #include "openPMD/Mesh.hpp"
 #include "openPMD/ParticlePatches.hpp"

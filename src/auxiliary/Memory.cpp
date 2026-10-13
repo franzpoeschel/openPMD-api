@@ -20,7 +20,7 @@
  */
 
 #include "openPMD/auxiliary/Memory.hpp"
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include "openPMD/auxiliary/Memory_internal.hpp"
 #include "openPMD/auxiliary/UniquePtr.hpp"
 

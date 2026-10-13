@@ -1,6 +1,6 @@
 #pragma once
 
-#include "openPMD/ChunkInfo.hpp"
+#include "openPMD/ChunkInfo_nompi.hpp"
 #include "openPMD/Streaming.hpp"
 #include "openPMD/backend/Attributable.hpp"
 
