@@ -42,6 +42,7 @@
 #include <mpi.h>
 #endif
 
+#include <any>
 #include <cstdint> // uint64_t
 #include <deque>
 #include <functional>
@@ -246,12 +247,12 @@ namespace internal
 
         void close();
 
-#if openPMD_HAVE_MPI
         /*
-         * @todo Once we have separate MPI headers, move this there.
+         * The MPI communicator, type-erased as `std::any` so that this
+         * header does not need to include <mpi.h>. Empty if no communicator
+         * was passed.
          */
-        std::optional<MPI_Comm> m_communicator;
-#endif
+        std::any m_communicator;
 
         struct NoSourceSpecified
         {};

@@ -424,7 +424,7 @@ chunk_assignment::RankMeta Series::rankTable([[maybe_unused]] bool collective)
 #if openPMD_HAVE_MPI
     if (collective && series.m_communicator.has_value())
     {
-        auto comm = series.m_communicator.value();
+        auto comm = std::any_cast<MPI_Comm>(series.m_communicator);
         int rank{0}, size{1};
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &size);
@@ -551,7 +551,7 @@ void Series::flushRankTable(FlushLevel l, Attributable &attributable)
 #if openPMD_HAVE_MPI
     if (series.m_communicator.has_value())
     {
-        auto comm = *series.m_communicator;
+        auto comm = std::any_cast<MPI_Comm>(series.m_communicator);
         MPI_Comm_rank(comm, &rank);
         MPI_Comm_size(comm, &size);
         // todo char portability
