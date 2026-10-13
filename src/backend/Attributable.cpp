@@ -25,6 +25,10 @@
 #include "openPMD/ParticleSpecies.hpp"
 #include "openPMD/RecordComponent.hpp"
 #include "openPMD/Series_nompi.hpp"
+#include "openPMD/config.hpp"
+#if openPMD_HAVE_MPI
+#include "openPMD/Series_mpi.hpp"
+#endif
 #include "openPMD/auxiliary/DerefDynamicCast.hpp"
 #include "openPMD/auxiliary/StringManip.hpp"
 #include "openPMD/backend/Attribute.hpp"
@@ -672,5 +676,23 @@ namespace internal
     template ParticleSpecies &
     makeOwning(ParticleSpecies &, std::shared_ptr<Series_nompi>);
     template Iteration &makeOwning(Iteration &, std::shared_ptr<Series_nompi>);
+
+#if openPMD_HAVE_MPI
+    /*
+     * Consumer-facing code (e.g. the Python bindings) uses the MPI-enabled
+     * `Series_mpi` type, so the corresponding instantiations are needed as
+     * well.
+     */
+    template Series_mpi &makeOwning(Series_mpi &, std::shared_ptr<Series_mpi>);
+    template RecordComponent &
+    makeOwning(RecordComponent &, std::shared_ptr<Series_mpi>);
+    template MeshRecordComponent &
+    makeOwning(MeshRecordComponent &, std::shared_ptr<Series_mpi>);
+    template Mesh &makeOwning(Mesh &, std::shared_ptr<Series_mpi>);
+    template Record &makeOwning(Record &, std::shared_ptr<Series_mpi>);
+    template ParticleSpecies &
+    makeOwning(ParticleSpecies &, std::shared_ptr<Series_mpi>);
+    template Iteration &makeOwning(Iteration &, std::shared_ptr<Series_mpi>);
+#endif
 } // namespace internal
 } // namespace openPMD
