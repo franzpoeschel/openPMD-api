@@ -20,6 +20,12 @@
  */
 #pragma once
 
-// Compatibility header. For now forwards to the non-MPI variant; selection of
-// the MPI variant is added in a follow-up commit.
+// Compatibility header. Selects the MPI or non-MPI variant of the filesystem
+// helpers.
+#include "openPMD/config.hpp"
+
+#if openPMD_HAVE_MPI
+#include "openPMD/auxiliary/Filesystem_mpi.hpp"
+#else
 #include "openPMD/auxiliary/Filesystem_nompi.hpp"
+#endif
