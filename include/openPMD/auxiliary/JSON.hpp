@@ -20,6 +20,11 @@
  */
 #pragma once
 
-// Compatibility header. For now forwards to the non-MPI variant; selection of
-// the MPI variant is added in a follow-up commit.
+// Compatibility header. Selects the MPI or non-MPI variant of json::merge.
+#include "openPMD/config.hpp"
+
+#if openPMD_HAVE_MPI
+#include "openPMD/auxiliary/JSON_mpi.hpp"
+#else
 #include "openPMD/auxiliary/JSON_nompi.hpp"
+#endif
