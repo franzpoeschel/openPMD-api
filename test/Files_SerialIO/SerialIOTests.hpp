@@ -36,3 +36,7 @@ namespace components_without_extent
 {
 auto components_without_extent() -> void;
 }
+namespace read_linear_try_next
+{
+auto read_linear_try_next() -> void;
+}
