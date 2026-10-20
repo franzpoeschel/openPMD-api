@@ -1952,7 +1952,9 @@ void ADIOS2IOHandlerImpl::advance(
     auto &ba = getFileData(file, IfFileNotOpen::ThrowError);
     std::visit(
         auxiliary::overloaded{
-            [&](AdvanceMode mode) { *parameters.status = ba.advance(mode); },
+            [&](AdvanceMode mode) {
+                *parameters.status = ba.advance(mode, parameters.stepTimeout);
+            },
             [&](Parameter<Operation::ADVANCE>::StepSelection step) {
                 ba.setStepSelection(step.step);
                 *parameters.status = AdvanceStatus::RANDOMACCESS;
