@@ -234,24 +234,12 @@ auto Container<T, T_key, T_container>::insert(
 template <typename T, typename T_key, typename T_container>
 auto Container<T, T_key, T_container>::swap(Container &other) noexcept -> void
 {
-    auto const this_is_group = (**m_attri).m_writable.objectType.isGroup();
-    auto const other_is_group =
-        (**other.m_attri).m_writable.objectType.isGroup();
-
-    if (this_is_group && other_is_group)
-    {
-        auto &this_group = group_data();
-        auto &other_group = other.group_data();
-        this_group.m_children.swap(other_group.m_children);
-        this_group.m_children_cache.swap(other_group.m_children_cache);
-        this_group.m_children_managed_as_custom_hierarchy.swap(
-            other_group.m_children_managed_as_custom_hierarchy);
-    }
-    else
-    {
-        assert(!this_is_group && !other_is_group);
-        m_containerData->m_container.swap(other.m_containerData->m_container);
-    }
+    auto &this_group = group_data();
+    auto &other_group = other.group_data();
+    this_group.m_children.swap(other_group.m_children);
+    this_group.m_children_cache.swap(other_group.m_children_cache);
+    this_group.m_children_managed_as_custom_hierarchy.swap(
+        other_group.m_children_managed_as_custom_hierarchy);
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -302,14 +290,7 @@ template <typename T, typename T_key, typename T_container>
 auto Container<T, T_key, T_container>::erase_unchecked(
     typename InternalContainer::key_type const &key) -> void
 {
-    if ((**m_attri).m_writable.objectType.isGroup())
-    {
-        group_data().erase_child(key_as_string(key));
-    }
-    else
-    {
-        m_containerData->m_container.erase(key);
-    }
+    group_data().erase_child(key_as_string(key));
 }
 
 template <typename T, typename T_key, typename T_container>

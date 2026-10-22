@@ -352,7 +352,7 @@ public:
 
     void setDatasetDefined(BaseRecordComponent::Data_t &data) override
     {
-        if (!T_Container::empty())
+        if (this->writable().objectType.isGroup() && !T_Container::empty())
         {
             throw error::WrongAPIUsage(
                 "A scalar component can not be contained at the same time as "

@@ -766,7 +766,8 @@ inline void BaseRecord<T_elem>::flush(
      * Defensive programming. Normally, this error should yield as soon as
      * possible.
      */
-    if (scalar() && !T_Container::empty())
+    if (scalar() && this->writable().objectType.isGroup() &&
+        !T_Container::empty())
     {
         throw error::WrongAPIUsage(
             "A scalar component can not be contained at the same time as "

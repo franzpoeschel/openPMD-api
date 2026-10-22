@@ -380,6 +380,10 @@ void CustomHierarchy::printRecursively()
 
 void CustomHierarchy::printRecursively(std::string indent)
 {
+    if (!writable().objectType.isGroup())
+    {
+        return;
+    }
     auto print_indent = [&indent]() { std::cout << indent; };
     auto it = begin();
     auto end_ = end();

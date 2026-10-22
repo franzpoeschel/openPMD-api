@@ -110,14 +110,6 @@ namespace internal
     public:
         using InternalContainer = T_container;
 
-        /**
-         * Fallback storage for objects that are not groups (e.g. a scalar
-         * RecordComponent that inherits Container). Such objects cannot have
-         * children, so this map stays empty. Group objects use the shared
-         * ChildrenCache in GroupMetaData instead.
-         */
-        InternalContainer m_container;
-
         ContainerData() = default;
 
         ContainerData(ContainerData const &) = delete;
@@ -344,14 +336,8 @@ protected:
     /** Mutable access to the typed child map, also from const methods. */
     inline auto container_front_mutable() const -> InternalContainer &
     {
-        if ((**m_attri).m_writable.objectType.isGroup())
-        {
-            return children_cache().template get_or_create<T, T_key>().map();
-        }
-        // Non-group objects inherit Container in a few places (e.g. scalar
-        // RecordComponent). They cannot have children; keep a per-handle
-        // empty map for their Container API.
-        return m_containerData->m_container;
+        assert((**m_attri).m_writable.objectType.isGroup());
+        return children_cache().template get_or_create<T, T_key>().map();
     }
 
     inline auto container_front() const ->
@@ -395,14 +381,7 @@ protected:
     /** Clear all children and every typed cache without IO checks. */
     void clear_children_unchecked()
     {
-        if ((**m_attri).m_writable.objectType.isGroup())
-        {
-            group_data().clear_children();
-        }
-        else
-        {
-            m_containerData->m_container.clear();
-        }
+        group_data().clear_children();
     }
 
 public:
@@ -574,7 +553,7 @@ public:
     template <typename ChildClass>
     void visitHierarchyContainer(HierarchyVisitor &v, bool recursive)
     {
-        if (recursive)
+        if (recursive && this->writable().objectType.isGroup())
         {
             for (auto &p : *this)
             {
