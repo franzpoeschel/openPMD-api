@@ -290,10 +290,9 @@ auto Container<T, T_key, T_container>::erase(key_type const &key) -> size_type
         IOHandler()->enqueue(IOTask(&res->second, pDelete));
         IOHandler()->flush(internal::defaultFlushParams);
     }
-    auto const existed = res != container_front().end() ||
-        container_back().count(key_as_string(key)) != 0;
+    auto count = container_back().count(key_as_string(key));
     erase_unchecked(key);
-    return existed ? 1 : 0;
+    return count;
 }
 
 template <typename T, typename T_key, typename T_container>
