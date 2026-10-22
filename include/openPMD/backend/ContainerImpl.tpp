@@ -232,24 +232,6 @@ auto Container<T, T_key, T_container>::insert(
 }
 
 template <typename T, typename T_key, typename T_container>
-auto Container<T, T_key, T_container>::swap(Container &other) noexcept -> void
-{
-    auto &this_group = group_data();
-    auto &other_group = other.group_data();
-    this_group.m_children.swap(other_group.m_children);
-    this_group.m_children_cache.swap(other_group.m_children_cache);
-    this_group.m_children_managed_as_custom_hierarchy.swap(
-        other_group.m_children_managed_as_custom_hierarchy);
-}
-
-template <typename T, typename T_key, typename T_container>
-auto Container<T, T_key, T_container>::refresh() -> void
-{
-    writable().objectType.ifGroup(
-        [&](auto &group_data) { syncContainers(group_data); });
-}
-
-template <typename T, typename T_key, typename T_container>
 auto Container<T, T_key, T_container>::find(key_type const &key) -> iterator
 {
     return container_front().find(key);
@@ -366,7 +348,7 @@ auto Container<T, T_key, T_container>::flush(
 template <typename T, typename T_key, typename T_container>
 Container<T, T_key, T_container>::Container() : Attributable(NoInit())
 {
-    setData(std::make_shared<ContainerData>());
+    setData(std::make_shared<internal::AttributableData>());
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -378,7 +360,6 @@ Container<T, T_key, T_container>::Container(Container const &other)
     : Attributable(NoInit())
 {
     m_attri = other.m_attri;
-    m_containerData = other.m_containerData;
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -389,7 +370,6 @@ Container<T, T_key, T_container>::Container(Container &&other) noexcept
     {
         m_attri = std::move(other.m_attri);
     }
-    m_containerData = std::move(other.m_containerData);
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -397,7 +377,6 @@ auto Container<T, T_key, T_container>::operator=(Container const &other)
     -> Container &
 {
     m_attri = other.m_attri;
-    m_containerData = other.m_containerData;
     return *this;
 }
 
@@ -409,7 +388,6 @@ auto Container<T, T_key, T_container>::operator=(Container &&other) noexcept
     {
         m_attri = std::move(other.m_attri);
     }
-    m_containerData = std::move(other.m_containerData);
     return *this;
 }
 

@@ -82,6 +82,7 @@ namespace traits
 } // namespace traits
 
 class CustomHierarchy;
+class CustomDataset;
 
 namespace internal
 {
@@ -100,24 +101,6 @@ namespace internal
      */
     template <>
     constexpr inline bool isDerivedFromAttributable<CustomHierarchy> = true;
-
-    template <
-        typename T,
-        typename T_key = std::string,
-        typename T_container = std::map<T_key, T>>
-    class ContainerData : virtual public AttributableData
-    {
-    public:
-        using InternalContainer = T_container;
-
-        ContainerData() = default;
-
-        ContainerData(ContainerData const &) = delete;
-        ContainerData(ContainerData &&) = delete;
-
-        ContainerData &operator=(ContainerData const &) = delete;
-        ContainerData &operator=(ContainerData &&) = delete;
-    };
 
     template <typename base_iterator>
     struct access_policy_iterator : base_iterator
@@ -221,7 +204,6 @@ class Container : virtual public Attributable
     using Self_t = Container<T, T_key, T_container>;
 
 protected:
-    using ContainerData = internal::ContainerData<T, T_key, T_container>;
     using InternalContainer = T_container;
 
     using stringify_t = std::conditional_t<
@@ -257,30 +239,11 @@ protected:
             f(*this->front);
             return f(*this->back);
         }
-
-        template <typename Functor>
-        inline auto for_both_to_string(Functor &&f)
-        {
-            f(*this->front, [](auto key) { return key; });
-            if constexpr (std::is_same_v<T_key, std::string>)
-            {
-                return f(*this->back, [](auto key) { return key; });
-            }
-            else
-            {
-                return f(
-                    *this->back,
-                    static_cast<std::string (*)(T_key)>(&std::to_string));
-            }
-        }
     };
 
-    std::shared_ptr<ContainerData> m_containerData;
-
-    inline void setData(std::shared_ptr<ContainerData> containerData)
+    inline void setData(std::shared_ptr<internal::AttributableData> data)
     {
-        m_containerData = std::move(containerData);
-        Attributable::setData(m_containerData);
+        Attributable::setData(std::move(data));
     }
 
     inline SynchronizedContainers<true> container() const
@@ -333,23 +296,40 @@ protected:
             group_data().m_children_cache);
     }
 
-    /** Mutable access to the typed child map, also from const methods. */
-    inline auto container_front_mutable() const -> InternalContainer &
+    /** Raw access to the typed child map, without materializing children. */
+    inline auto container_front_unchecked() const -> InternalContainer &
     {
         assert((**m_attri).m_writable.objectType.isGroup());
         return children_cache().template get_or_create<T, T_key>().map();
     }
 
+    /** Access the typed child map, materializing custom-hierarchy views.
+     *
+     * Other view types are not materialized implicitly; they throw from
+     * syncContainers via materialize_child() if a missing child exists.
+     */
     inline auto container_front() const ->
         typename SynchronizedContainers<true>::front_t &
     {
-        return container_front_mutable();
+        if constexpr (
+            std::is_same_v<T, CustomHierarchy> ||
+            std::is_same_v<T, CustomDataset>)
+        {
+            syncContainers(group_data());
+        }
+        return container_front_unchecked();
     }
 
     inline auto container_front() ->
         typename SynchronizedContainers<false>::front_t &
     {
-        return container_front_mutable();
+        if constexpr (
+            std::is_same_v<T, CustomHierarchy> ||
+            std::is_same_v<T, CustomDataset>)
+        {
+            syncContainers(group_data());
+        }
+        return container_front_unchecked();
     }
 
     inline auto container_back() const ->
@@ -364,6 +344,7 @@ protected:
         return this->writable().objectType.requireGroup()->m_children;
     }
 
+    OPENPMD_protected
     void syncContainers(
         internal::object_type::GroupMetaData const &group_data) const;
 
@@ -470,18 +451,6 @@ public:
         cont.insert(internal_insert_list.begin(), internal_insert_list.end());
     }
     void insert(std::initializer_list<value_type> ilist);
-
-    void swap(Container &other) noexcept;
-
-    /** Synchronize this view with the backend child hierarchy.
-     *
-     * Missing children are materialized where a backend-to-frontend
-     * materialization is defined. Other view types throw. Already
-     * materialized children and their iterators stay valid when an error is
-     * thrown, so iteration can continue over the remaining materialized
-     * children after catching it.
-     */
-    void refresh();
 
     mapped_type &at(key_type const &key);
     mapped_type const &at(key_type const &key) const;

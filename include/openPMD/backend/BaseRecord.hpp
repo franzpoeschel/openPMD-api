@@ -49,7 +49,7 @@ namespace internal
          */
         typename T_RecordComponentData = typename T_elem::Data_t>
     class BaseRecordData final
-        : public ContainerData<T_elem>
+        : virtual public AttributableData
         , public T_RecordComponentData
     {
         using T_RecordComponent = T_elem;
@@ -322,7 +322,6 @@ public:
     template <class InputIt>
     void insert(InputIt first, InputIt last);
     void insert(std::initializer_list<value_type> ilist);
-    void swap(BaseRecord &other) noexcept;
     bool contains(key_type const &key) const;
     template <class... Args>
     auto emplace(Args &&...args) -> std::pair<iterator, bool>;
@@ -382,7 +381,7 @@ protected:
 namespace detail
 {
     constexpr char const *const NO_SCALAR_INSERT =
-        "[BaseRecord] emplace()/insert()/swap() API invalid for scalar "
+        "[BaseRecord] emplace()/insert() API invalid for scalar "
         "records. Use the Record directly as a RecordComponent.";
 
     template <typename BaseRecord>

@@ -73,7 +73,7 @@ void Container<T, T_key, T_container>::syncContainers(
     // method might be called as const. The cache implements interior
     // mutability, so use that here.
 
-    auto &container_front = container_front_mutable();
+    auto &container_front = container_front_unchecked();
     auto &container_back = group_data.m_children;
 
     auto size_front = container_front.size();

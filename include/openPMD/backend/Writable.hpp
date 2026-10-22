@@ -50,7 +50,6 @@ class AbstractIOHandlerImplCommon;
 template <typename>
 class Span;
 class Series;
-class CustomHierarchy;
 
 namespace traits
 {
@@ -125,18 +124,6 @@ namespace internal::object_type
             std::map<std::string, std::shared_ptr<SharedAttributableData>>;
         children_map_t m_children;
 
-        // Attributable::customHierarchies() creates objects of type
-        // CustomHierarchy ephemerally on the spot. If that object is the first
-        // object for its associated SharedAttributableData instance, it must be
-        // stored somewhere still, because the first instance is back-referenced
-        // by Writable class (TODO: turn that back-reference into a weak_ptr?).
-        // Store these objects in the parent to avoid reference cycles.
-        // Need shared_ptr because size is not yet known and unique_ptr cannot
-        // be managed by std::map.
-        using children_object_storage_t =
-            std::map<std::string, std::shared_ptr<CustomHierarchy>>;
-        children_object_storage_t m_children_managed_as_custom_hierarchy;
-
         /**
          * Lazily materialized typed views of m_children. This is the only
          * persistent storage for the typed child handles; all views of this
@@ -149,7 +136,6 @@ namespace internal::object_type
         {
             m_children.erase(key);
             m_children_cache.erase(key);
-            m_children_managed_as_custom_hierarchy.erase(key);
         }
 
         /** Clear the authoritative map and every cache. */
@@ -157,7 +143,6 @@ namespace internal::object_type
         {
             m_children.clear();
             m_children_cache.clear();
-            m_children_managed_as_custom_hierarchy.clear();
         }
 
         bool phantom = false;

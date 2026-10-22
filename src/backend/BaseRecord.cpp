@@ -709,14 +709,6 @@ auto BaseRecord<T_elem>::insert(std::initializer_list<value_type> ilist) -> void
 }
 
 template <typename T_elem>
-auto BaseRecord<T_elem>::swap(BaseRecord &other) noexcept -> void
-{
-    detail::verifyNonscalar(this);
-    detail::verifyNonscalar(&other);
-    this->T_Container::swap(other);
-}
-
-template <typename T_elem>
 auto BaseRecord<T_elem>::contains(key_type const &key) const -> bool
 {
     if (scalar())

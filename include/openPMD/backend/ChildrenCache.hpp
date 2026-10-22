@@ -355,8 +355,6 @@ public:
     [[nodiscard]] bool empty() const noexcept;
     [[nodiscard]] std::size_t num_maps() const noexcept;
 
-    void swap(ChildrenCache &other) noexcept;
-
     /** Validate internal cache invariants. */
     void assert_consistent() const;
 

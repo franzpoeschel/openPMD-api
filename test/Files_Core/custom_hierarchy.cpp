@@ -80,8 +80,6 @@ void write(
     auto custom_groups = iteration.customHierarchies()["fully"]["custom"];
     auto custom_datasets = custom_groups.datasets();
     auto fully_custom_dataset_2 = custom_datasets["dataset2"];
-    REQUIRE(!custom_groups.contains("dataset2"));
-    custom_groups.refresh();
     REQUIRE(custom_groups.contains("dataset2"));
     fully_custom_dataset_2.resetDataset({Datatype::INT, {3}});
     fully_custom_dataset.setComment(
@@ -225,7 +223,9 @@ void materialization_error()
     iteration.customHierarchies()["meshes"]["custom_group"].setAttribute(
         "a", "b");
 
-    REQUIRE_THROWS_AS(iteration.meshes.refresh(), error::WrongAPIUsage);
+    auto const &group = *iteration.meshes.writable().objectType.requireGroup();
+    REQUIRE_THROWS_AS(
+        iteration.meshes.syncContainers(group), error::WrongAPIUsage);
 
     // Already materialized children and their iterators remain valid.
     REQUIRE(iteration.meshes.contains("E"));

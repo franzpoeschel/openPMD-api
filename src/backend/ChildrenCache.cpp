@@ -75,11 +75,6 @@ std::size_t ChildrenCache::num_maps() const noexcept
     return m_entries.size();
 }
 
-void ChildrenCache::swap(ChildrenCache &other) noexcept
-{
-    m_entries.swap(other.m_entries);
-}
-
 void ChildrenCache::assert_consistent() const
 {
 #ifndef NDEBUG

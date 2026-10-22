@@ -96,6 +96,13 @@ namespace internal
          * The attributes defined by this Attributable.
          */
         A_MAP m_attributes;
+
+        /**
+         * True if the frontend instance owning Writable::attributable was
+         * created through a custom-hierarchy view and has not yet been
+         * replaced by a regular typed view.
+         */
+        bool managed_as_custom_hierarchy = false;
     };
 
     /*
@@ -501,23 +508,13 @@ public:
      */
     [[nodiscard]] uintptr_t memoryID() const;
 
-    // TODO: Add parse? parameter, dont parse, parse this object, parse
-    // recursively
-    // Alternatively, parse upon deferred initialization?
-    // CustomHierarchy is ephemeral, and i dont even know what that word
-    // means. but i want to say that things are created on the spot. if we go to
-    // the same place in the openPMD file using different paths, the objects
-    // will be different, except for the backend data stored in
-    // sharedattributabledata and writable classes. even when later turning a
-    // customhierarchy object into a recordcomponent, this will not be same
-    // recordcomponent object as in the usual openpmd hierarchy.
-    // All data that needs to be shared within instances, is inside
-    // SharedAttributableData (including Writable).
-    // If objects are *created* by customhierarchies, the pointer
-    // writable.attributable will point to that object as the first instance. so
-    // i guess we will still need to store the objects somewhere and cannot keep
-    // them fully ephemeral. This job is done by
-    // GroupMetaData::m_children_managed_as_custom_hierarchy.
+    /** Return a generic, lazily materialized view of this object's hierarchy.
+     *
+     * Views are materialized on access. Objects created through the returned
+     * view are owned by the parent group's child cache and marked via
+     * SharedAttributableData::managed_as_custom_hierarchy until a regular
+     * typed view takes over the backend object.
+     */
     auto customHierarchies() -> CustomHierarchy;
 
     // clang-format off
