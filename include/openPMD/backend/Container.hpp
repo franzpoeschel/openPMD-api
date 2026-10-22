@@ -30,6 +30,7 @@
 #include <cassert>
 #include <initializer_list>
 #include <map>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -380,6 +381,11 @@ protected:
     void syncContainers(
         internal::object_type::GroupMetaData const &group_data) const;
 
+    template <typename U>
+    static auto materialize_child(
+        std::shared_ptr<internal::SharedAttributableData> const &child)
+        -> std::optional<U>;
+
     /** Remove a key from the authoritative children and every typed cache.
      *
      * Performs no IO checks or DELETE_PATH enqueuing.
@@ -487,6 +493,16 @@ public:
     void insert(std::initializer_list<value_type> ilist);
 
     void swap(Container &other) noexcept;
+
+    /** Synchronize this view with the backend child hierarchy.
+     *
+     * Missing children are materialized where a backend-to-frontend
+     * materialization is defined. Other view types throw. Already
+     * materialized children and their iterators stay valid when an error is
+     * thrown, so iteration can continue over the remaining materialized
+     * children after catching it.
+     */
+    void refresh();
 
     mapped_type &at(key_type const &key);
     mapped_type const &at(key_type const &key) const;

@@ -255,6 +255,13 @@ auto Container<T, T_key, T_container>::swap(Container &other) noexcept -> void
 }
 
 template <typename T, typename T_key, typename T_container>
+auto Container<T, T_key, T_container>::refresh() -> void
+{
+    writable().objectType.ifGroup(
+        [&](auto &group_data) { syncContainers(group_data); });
+}
+
+template <typename T, typename T_key, typename T_container>
 auto Container<T, T_key, T_container>::find(key_type const &key) -> iterator
 {
     return container_front().find(key);

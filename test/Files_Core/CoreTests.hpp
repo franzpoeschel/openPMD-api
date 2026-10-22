@@ -33,4 +33,5 @@ auto read_nonexistent_attribute() -> void;
 namespace custom_hierarchy
 {
 auto custom_hierarchy() -> void;
-}
+auto materialization_error() -> void;
+} // namespace custom_hierarchy

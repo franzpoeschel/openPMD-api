@@ -171,13 +171,6 @@ auto ConvertibleContainer<MappedType>::subhierarchies()
     return res;
 }
 
-template <typename MappedType>
-void ConvertibleContainer<MappedType>::refresh()
-{
-    this->writable().objectType.ifGroup(
-        [&](auto &group_data) { this->syncContainers(group_data); });
-}
-
 template class ConvertibleContainer<CustomHierarchy>;
 template class ConvertibleContainer<CustomDataset>;
 

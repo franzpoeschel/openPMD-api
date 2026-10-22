@@ -91,9 +91,6 @@ public:
 
     auto datasets() -> ConvertibleContainer<CustomDataset>;
     auto subhierarchies() -> ConvertibleContainer<CustomHierarchy>;
-
-    // TODO when to refresh? refresh implicitly?
-    void refresh();
 };
 
 namespace traits

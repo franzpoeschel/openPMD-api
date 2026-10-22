@@ -215,6 +215,26 @@ struct test_config
     IterationEncoding encoding;
 };
 
+void materialization_error()
+{
+    Series series(
+        "../samples/custom_hierarchy/materialization_error.json",
+        Access::CREATE);
+    auto iteration = series.iterations[0];
+    iteration.meshes["E"]["x"].resetDataset({Datatype::INT, {3}});
+    iteration.customHierarchies()["meshes"]["custom_group"].setAttribute(
+        "a", "b");
+
+    REQUIRE_THROWS_AS(iteration.meshes.refresh(), error::WrongAPIUsage);
+
+    // Already materialized children and their iterators remain valid.
+    REQUIRE(iteration.meshes.contains("E"));
+    auto it = iteration.meshes.begin();
+    REQUIRE(it != iteration.meshes.end());
+    REQUIRE(it->first == "E");
+    REQUIRE(&it->second == &iteration.meshes.at("E"));
+}
+
 void custom_hierarchy()
 {
     test_config configs[] = {

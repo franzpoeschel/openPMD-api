@@ -1890,6 +1890,11 @@ TEST_CASE("custom_hierarchy", "[core]")
     custom_hierarchy::custom_hierarchy();
 }
 
+TEST_CASE("custom_hierarchy_materialization_error", "[core]")
+{
+    custom_hierarchy::materialization_error();
+}
+
 TEST_CASE("unique_ptr", "[core]")
 {
     auto stdptr = std::make_unique<int>(5);

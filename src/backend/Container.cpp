@@ -30,8 +30,40 @@
 #include "openPMD/backend/HierarchyVisitorImpl.hpp"
 #include "openPMD/backend/PatchRecordComponent.hpp"
 
+#include <exception>
+#include <optional>
+#include <typeinfo>
+
 namespace openPMD
 {
+template <typename T, typename T_key, typename T_container>
+template <typename U>
+auto Container<T, T_key, T_container>::materialize_child(
+    std::shared_ptr<internal::SharedAttributableData> const &child)
+    -> std::optional<U>
+{
+    if constexpr (std::is_same_v<U, CustomHierarchy>)
+    {
+        return CustomHierarchy(child);
+    }
+    else if constexpr (std::is_same_v<U, CustomDataset>)
+    {
+        if (!child->m_writable.objectType.isDataset())
+        {
+            return std::nullopt;
+        }
+        return CustomHierarchy(child).asDataset();
+    }
+    else
+    {
+        throw error::WrongAPIUsage(
+            "Cannot materialize a child of type '" +
+            std::string(typeid(U).name()) +
+            "' from the backend hierarchy. This view type has no defined "
+            "backend-to-frontend materialization.");
+    }
+}
+
 template <typename T, typename T_key, typename T_container>
 void Container<T, T_key, T_container>::syncContainers(
     internal::object_type::GroupMetaData const &group_data) const
@@ -47,11 +79,7 @@ void Container<T, T_key, T_container>::syncContainers(
     auto size_front = container_front.size();
     auto size_back = container_back.size();
 
-    if (size_front == size_back)
-    {
-        return;
-    }
-    else if (size_front > size_back)
+    if (size_front > size_back)
     {
         std::stringstream error;
         auto print = [&error](auto const &map) -> std::stringstream & {
@@ -83,39 +111,66 @@ void Container<T, T_key, T_container>::syncContainers(
     // Not necessary to run GenerationPolicy here again. We could run it for
     // safety purposes, but at a performance impact.
 
-    // GenerationPolicy<CustomHierarchy> gen;
+    std::exception_ptr first_materialization_error;
 
-    auto it = container_front.begin();
-    auto end = container_front.end();
-    for (auto const &[key, attributable] : container_back)
+    for (auto const &[key, child] : container_back)
     {
-        if constexpr (
-            std::is_same_v<mapped_type, CustomHierarchy> ||
-            std::is_same_v<mapped_type, CustomDataset>)
+        auto const typed_key =
+            internal::children_cache_detail::key_from_string<T_key>(key);
+
+        if (typed_key &&
+            container_front.find(*typed_key) != container_front.end())
         {
-            if (it == end || it->first != key)
+            continue;
+        }
+
+        try
+        {
+            auto materialized = materialize_child<mapped_type>(child);
+            if (materialized)
             {
-                if constexpr (std::is_same_v<mapped_type, CustomHierarchy>)
+                assert(typed_key.has_value());
+                if (typed_key)
                 {
-                    // under the invariant that the front container contains no
-                    // elements that are not present in the back container, it
-                    // now points to an entry past the to-be-inserted key
-                    it = container_front.emplace_hint(
-                        it, key, CustomHierarchy(attributable));
-                    // gen(container, it);
-                }
-                else if constexpr (std::is_same_v<mapped_type, CustomDataset>)
-                {
-                    if (attributable->m_writable.objectType.isDataset())
-                    {
-                        it = container_front.emplace_hint(
-                            it, key, CustomHierarchy(attributable).asDataset());
-                        // gen(container, it);
-                    }
+                    auto const inserted = container_front.emplace(
+                        *typed_key, std::move(*materialized));
+                    assert(inserted.second);
+                    (void)inserted;
                 }
             }
         }
-        ++it;
+        catch (...)
+        {
+            /*
+             * Do not clear or rebuild the front map here: already
+             * materialized children and their iterators must stay valid. Keep
+             * materializing the remaining children and rethrow the first
+             * error at the end.
+             */
+            if (!first_materialization_error)
+            {
+                first_materialization_error = std::current_exception();
+            }
+        }
+    }
+
+    if (first_materialization_error)
+    {
+        std::rethrow_exception(first_materialization_error);
+    }
+
+    for (auto const &[front_key, child] : container_front)
+    {
+        (void)child;
+        if (container_back.find(key_as_string(front_key)) ==
+            container_back.end())
+        {
+            throw error::Internal(
+                "CustomHierarchy went into illegal state at '" +
+                myPath().openPMDPath() +
+                "': the typed view contains entries that are not present in "
+                "the backend hierarchy.");
+        }
     }
 }
 
