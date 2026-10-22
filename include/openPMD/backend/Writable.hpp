@@ -23,6 +23,7 @@
 #include "openPMD/Error.hpp"
 #include "openPMD/IO/AbstractIOHandler.hpp"
 #include "openPMD/IO/InvalidatableFile.hpp"
+#include "openPMD/backend/ChildrenCache.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -136,6 +137,29 @@ namespace internal::object_type
             std::map<std::string, std::shared_ptr<CustomHierarchy>>;
         children_object_storage_t m_children_managed_as_custom_hierarchy;
 
+        /**
+         * Lazily materialized typed views of m_children. This is the only
+         * persistent storage for the typed child handles; all views of this
+         * group share it.
+         */
+        mutable ChildrenCache m_children_cache;
+
+        /** Remove a child from the authoritative map and every cache. */
+        void erase_child(std::string const &key)
+        {
+            m_children.erase(key);
+            m_children_cache.erase(key);
+            m_children_managed_as_custom_hierarchy.erase(key);
+        }
+
+        /** Clear the authoritative map and every cache. */
+        void clear_children()
+        {
+            m_children.clear();
+            m_children_cache.clear();
+            m_children_managed_as_custom_hierarchy.clear();
+        }
+
         bool phantom = false;
     };
 } // namespace internal::object_type
@@ -188,6 +212,17 @@ namespace internal
         }
 
         auto requireGroup() -> object_type::GroupMetaData *
+        {
+            if (auto res = std::get_if<object_type::GroupMetaData>(&as_base());
+                res)
+            {
+                return res;
+            }
+            throw error::Internal(
+                "Internal object status: Group type required.");
+        }
+
+        auto requireGroup() const -> object_type::GroupMetaData const *
         {
             if (auto res = std::get_if<object_type::GroupMetaData>(&as_base());
                 res)

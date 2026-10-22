@@ -630,8 +630,7 @@ auto BaseRecord<T_elem>::insert(value_type const &value)
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;
-        this->container_back().erase(key);
-        this->container_front().erase(res.first);
+        this->erase_unchecked(key);
         throw error::WrongAPIUsage(detail::NO_SCALAR_INSERT);
     }
     return {makeIterator(std::move(res.first)), res.second};
@@ -646,8 +645,7 @@ auto BaseRecord<T_elem>::insert(value_type &&value) -> std::pair<iterator, bool>
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;
-        this->container_back().erase(key);
-        this->container_front().erase(res.first);
+        this->erase_unchecked(key);
         throw error::WrongAPIUsage(detail::NO_SCALAR_INSERT);
     }
     return {makeIterator(std::move(res.first)), res.second};
@@ -672,8 +670,7 @@ auto BaseRecord<T_elem>::insert(const_iterator hint, value_type const &value)
     if (res->first == RecordComponent::SCALAR)
     {
         auto const key = res->first;
-        this->container_back().erase(key);
-        this->container_front().erase(res);
+        this->erase_unchecked(key);
         throw error::WrongAPIUsage(detail::NO_SCALAR_INSERT);
     }
     return makeIterator(res);
@@ -698,8 +695,7 @@ auto BaseRecord<T_elem>::insert(const_iterator hint, value_type &&value)
     if (res->first == RecordComponent::SCALAR)
     {
         auto const key = res->first;
-        this->container_back().erase(key);
-        this->container_front().erase(res);
+        this->erase_unchecked(key);
         throw error::WrongAPIUsage(detail::NO_SCALAR_INSERT);
     }
     return makeIterator(res);
@@ -717,8 +713,7 @@ auto BaseRecord<T_elem>::swap(BaseRecord &other) noexcept -> void
 {
     detail::verifyNonscalar(this);
     detail::verifyNonscalar(&other);
-    this->container_front().swap(other.container_front());
-    this->container_back().swap(other.container_back());
+    this->T_Container::swap(other);
 }
 
 template <typename T_elem>

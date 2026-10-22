@@ -27,6 +27,7 @@
 #include "openPMD/backend/HierarchyVisitor.hpp"
 #include "openPMD/backend/Writable.hpp"
 
+#include <cassert>
 #include <initializer_list>
 #include <map>
 #include <set>
@@ -109,7 +110,10 @@ namespace internal
         using InternalContainer = T_container;
 
         /**
-         * The wrapped container holding all the actual data, e.g. std::map.
+         * Fallback storage for objects that are not groups (e.g. a scalar
+         * RecordComponent that inherits Container). Such objects cannot have
+         * children, so this map stays empty. Group objects use the shared
+         * ChildrenCache in GroupMetaData instead.
          */
         InternalContainer m_container;
 
@@ -316,16 +320,49 @@ protected:
         return {&container_front(), &container_back()};
     }
 
+    inline auto group_data() const
+        -> internal::object_type::GroupMetaData const &
+    {
+        auto const *res = (**m_attri).m_writable.objectType.requireGroup();
+        assert(res != nullptr);
+        return *res;
+    }
+
+    inline auto group_data() -> internal::object_type::GroupMetaData &
+    {
+        return *this->writable().objectType.requireGroup();
+    }
+
+    inline auto children_cache() const -> internal::ChildrenCache &
+    {
+        // The cache is mutable state; materializing a view is logically const.
+        return const_cast<internal::ChildrenCache &>(
+            group_data().m_children_cache);
+    }
+
+    /** Mutable access to the typed child map, also from const methods. */
+    inline auto container_front_mutable() const -> InternalContainer &
+    {
+        if ((**m_attri).m_writable.objectType.isGroup())
+        {
+            return children_cache().template get_or_create<T, T_key>().map();
+        }
+        // Non-group objects inherit Container in a few places (e.g. scalar
+        // RecordComponent). They cannot have children; keep a per-handle
+        // empty map for their Container API.
+        return m_containerData->m_container;
+    }
+
     inline auto container_front() const ->
         typename SynchronizedContainers<true>::front_t &
     {
-        return m_containerData->m_container;
+        return container_front_mutable();
     }
 
     inline auto container_front() ->
         typename SynchronizedContainers<false>::front_t &
     {
-        return m_containerData->m_container;
+        return container_front_mutable();
     }
 
     inline auto container_back() const ->
@@ -342,6 +379,25 @@ protected:
 
     void syncContainers(
         internal::object_type::GroupMetaData const &group_data) const;
+
+    /** Remove a key from the authoritative children and every typed cache.
+     *
+     * Performs no IO checks or DELETE_PATH enqueuing.
+     */
+    void erase_unchecked(typename InternalContainer::key_type const &key);
+
+    /** Clear all children and every typed cache without IO checks. */
+    void clear_children_unchecked()
+    {
+        if ((**m_attri).m_writable.objectType.isGroup())
+        {
+            group_data().clear_children();
+        }
+        else
+        {
+            m_containerData->m_container.clear();
+        }
+    }
 
 public:
     using key_type = typename InternalContainer::key_type;
@@ -430,7 +486,7 @@ public:
     }
     void insert(std::initializer_list<value_type> ilist);
 
-    void swap(Container &other);
+    void swap(Container &other) noexcept;
 
     mapped_type &at(key_type const &key);
     mapped_type const &at(key_type const &key) const;

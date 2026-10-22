@@ -32,6 +32,12 @@
 #include <typeindex>
 #include <utility>
 
+namespace openPMD
+{
+template <typename T, typename T_key, typename T_container>
+class Container;
+} // namespace openPMD
+
 namespace openPMD::internal
 {
 namespace children_cache_detail
@@ -205,8 +211,20 @@ public:
     }
 
 private:
+    template <typename, typename, typename>
+    friend class openPMD::Container;
+
     explicit ChildrenCacheMap(map_type &map) noexcept : m_map(&map)
     {}
+
+    auto map() noexcept -> map_type &
+    {
+        return *m_map;
+    }
+    auto map() const noexcept -> map_type const &
+    {
+        return *m_map;
+    }
 
     map_type *m_map;
 };
@@ -246,9 +264,9 @@ class ChildrenCache
 public:
     ChildrenCache() = default;
     ChildrenCache(ChildrenCache const &) = delete;
-    ChildrenCache(ChildrenCache &&) = default;
+    ChildrenCache(ChildrenCache &&) noexcept = default;
     ChildrenCache &operator=(ChildrenCache const &) = delete;
-    ChildrenCache &operator=(ChildrenCache &&) = default;
+    ChildrenCache &operator=(ChildrenCache &&) noexcept = default;
 
     /** Get or create the map for (T, Key).
      *
@@ -336,6 +354,8 @@ public:
 
     [[nodiscard]] bool empty() const noexcept;
     [[nodiscard]] std::size_t num_maps() const noexcept;
+
+    void swap(ChildrenCache &other) noexcept;
 
     /** Validate internal cache invariants. */
     void assert_consistent() const;

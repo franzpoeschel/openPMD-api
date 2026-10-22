@@ -36,8 +36,6 @@ void ChildrenCache::erase(std::string const &canonicalKey)
         (void)type;
         assert(!entry.contains(canonicalKey));
     }
-
-    assert_consistent();
 }
 
 void ChildrenCache::clear()
@@ -75,6 +73,11 @@ bool ChildrenCache::empty() const noexcept
 std::size_t ChildrenCache::num_maps() const noexcept
 {
     return m_entries.size();
+}
+
+void ChildrenCache::swap(ChildrenCache &other) noexcept
+{
+    m_entries.swap(other.m_entries);
 }
 
 void ChildrenCache::assert_consistent() const

@@ -37,12 +37,11 @@ void Container<T, T_key, T_container>::syncContainers(
     internal::object_type::GroupMetaData const &group_data) const
 {
     // Need to sync backend objects into the CustomHierarchy instance
-    // Need to be a bit sneaky, we must modify my_container&, but this
-    // method might be called as const. shared_ptr<>s implement interior
+    // Need to be a bit sneaky, we must modify the typed map, but this
+    // method might be called as const. The cache implements interior
     // mutability, so use that here.
 
-    // auto &container_front = container.container_front();
-    auto &container_front = m_containerData->m_container;
+    auto &container_front = container_front_mutable();
     auto &container_back = group_data.m_children;
 
     auto size_front = container_front.size();

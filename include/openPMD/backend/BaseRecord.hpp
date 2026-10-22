@@ -426,8 +426,7 @@ auto BaseRecord<T_elem>::emplace(Args &&...args) -> std::pair<iterator, bool>
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;
-        this->container_back().erase(key);
-        this->container_front().erase(res.first);
+        this->erase_unchecked(key);
         throw error::WrongAPIUsage(detail::NO_SCALAR_INSERT);
     }
     return {makeIterator(std::move(res.first)), res.second};

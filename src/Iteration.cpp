@@ -574,7 +574,7 @@ void Iteration::read_impl(std::string const &groupPath)
             std::cerr << "Cannot read meshes in iteration " << groupPath
                       << " and will skip them due to read error:\n"
                       << err.what() << std::endl;
-            meshes.container().for_both([](auto &map) { map.clear(); });
+            meshes.clear_children_unchecked();
         }
     }
     meshes.setDirty(false);
@@ -591,7 +591,7 @@ void Iteration::read_impl(std::string const &groupPath)
             std::cerr << "Cannot read particles in iteration " << groupPath
                       << " and will skip them due to read error:\n"
                       << err.what() << std::endl;
-            particles.container().for_both([](auto &map) { map.clear(); });
+            particles.clear_children_unchecked();
         }
     }
     particles.setDirty(false);

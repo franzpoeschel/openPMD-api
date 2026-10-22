@@ -232,10 +232,26 @@ auto Container<T, T_key, T_container>::insert(
 }
 
 template <typename T, typename T_key, typename T_container>
-auto Container<T, T_key, T_container>::swap(Container &other) -> void
+auto Container<T, T_key, T_container>::swap(Container &other) noexcept -> void
 {
-    container_front().swap(other.container_front());
-    container_back().swap(other.container_back());
+    auto const this_is_group = (**m_attri).m_writable.objectType.isGroup();
+    auto const other_is_group =
+        (**other.m_attri).m_writable.objectType.isGroup();
+
+    if (this_is_group && other_is_group)
+    {
+        auto &this_group = group_data();
+        auto &other_group = other.group_data();
+        this_group.m_children.swap(other_group.m_children);
+        this_group.m_children_cache.swap(other_group.m_children_cache);
+        this_group.m_children_managed_as_custom_hierarchy.swap(
+            other_group.m_children_managed_as_custom_hierarchy);
+    }
+    else
+    {
+        assert(!this_is_group && !other_is_group);
+        m_containerData->m_container.swap(other.m_containerData->m_container);
+    }
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -276,6 +292,20 @@ auto Container<T, T_key, T_container>::contains(key_type const &key) const
 }
 
 template <typename T, typename T_key, typename T_container>
+auto Container<T, T_key, T_container>::erase_unchecked(
+    typename InternalContainer::key_type const &key) -> void
+{
+    if ((**m_attri).m_writable.objectType.isGroup())
+    {
+        group_data().erase_child(key_as_string(key));
+    }
+    else
+    {
+        m_containerData->m_container.erase(key);
+    }
+}
+
+template <typename T, typename T_key, typename T_container>
 auto Container<T, T_key, T_container>::erase(key_type const &key) -> size_type
 {
     if (Access::READ_ONLY == IOHandler()->m_frontendAccess)
@@ -290,17 +320,10 @@ auto Container<T, T_key, T_container>::erase(key_type const &key) -> size_type
         IOHandler()->enqueue(IOTask(&res->second, pDelete));
         IOHandler()->flush(internal::defaultFlushParams);
     }
-    /*
-     * Also drop the entry from the storage of objects that are managed as
-     * custom hierarchy. Otherwise, the object would be re-created upon the
-     * next flush.
-     */
-    writable()
-        .objectType.requireGroup()
-        ->m_children_managed_as_custom_hierarchy.erase(key_as_string(key));
-    return container().for_both_to_string([&key](auto &map, auto &&to_string) {
-        return map.erase(to_string(key));
-    });
+    auto const existed = res != container_front().end() ||
+        container_back().count(key_as_string(key)) != 0;
+    erase_unchecked(key);
+    return existed ? 1 : 0;
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -310,24 +333,18 @@ auto Container<T, T_key, T_container>::erase(iterator res) -> iterator
         throw std::runtime_error(
             "Can not erase from a container in a read-only Series.");
 
-    if (res != container_front().end() && res->second.written())
+    auto const key = res->first;
+    auto next = res;
+    ++next;
+    if (res->second.written())
     {
         Parameter<Operation::DELETE_PATH> pDelete;
         pDelete.path = ".";
         IOHandler()->enqueue(IOTask(&res->second, pDelete));
         IOHandler()->flush(internal::defaultFlushParams);
     }
-    container_back().erase(key_as_string(res->first));
-    /*
-     * Also drop the entry from the storage of objects that are managed as
-     * custom hierarchy. Otherwise, the object would be re-created upon the
-     * next flush.
-     */
-    writable()
-        .objectType.requireGroup()
-        ->m_children_managed_as_custom_hierarchy.erase(
-            key_as_string(res->first));
-    return container_front().erase(res);
+    erase_unchecked(key);
+    return next;
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -337,10 +354,7 @@ auto Container<T, T_key, T_container>::clear_unchecked() -> void
         throw std::runtime_error(
             "Clearing a written container not (yet) implemented.");
 
-    container().for_both([](auto &map) { map.clear(); });
-    writable()
-        .objectType.requireGroup()
-        ->m_children_managed_as_custom_hierarchy.clear();
+    clear_children_unchecked();
 }
 
 template <typename T, typename T_key, typename T_container>
@@ -451,22 +465,19 @@ namespace internal
     EraseStaleEntries<Container_t>::~EraseStaleEntries()
     {
         auto map = m_originalContainer.container();
-        using iterator_t =
-            typename Container_t::InternalContainer::const_iterator;
-        std::vector<iterator_t> deleteMe;
+        std::vector<typename Container_t::key_type> deleteMe;
         deleteMe.reserve(map.front->size() - m_accessedKeys.size());
-        for (iterator_t it = map.front->begin(); it != map.front->end(); ++it)
+        for (auto it = map.front->begin(); it != map.front->end(); ++it)
         {
             auto lookup = m_accessedKeys.find(it->first);
             if (lookup == m_accessedKeys.end())
             {
-                deleteMe.push_back(it);
+                deleteMe.push_back(it->first);
             }
         }
-        for (auto &it : deleteMe)
+        for (auto const &key : deleteMe)
         {
-            map.back->erase(it->first);
-            map.front->erase(it);
+            m_originalContainer.erase_unchecked(key);
         }
     }
 } // namespace internal

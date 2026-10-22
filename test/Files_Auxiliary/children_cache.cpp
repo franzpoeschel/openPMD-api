@@ -21,6 +21,7 @@
 #include "AuxiliaryTests.hpp"
 
 #include "openPMD/backend/ChildrenCache.hpp"
+#include "openPMD/backend/Writable.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -133,6 +134,26 @@ auto children_cache() -> void
         auto found = cache.find<int, std::string>();
         REQUIRE(found.has_value());
         REQUIRE(found->at("a") == 1);
+    }
+
+    SECTION("group_metadata_erase_clears_every_cache")
+    {
+        internal::object_type::GroupMetaData group;
+        auto ints = group.m_children_cache.get_or_create<int, std::string>();
+        auto doubles =
+            group.m_children_cache.get_or_create<double, std::string>();
+        ints.try_emplace("x", 1);
+        doubles.try_emplace("x", 2.0);
+
+        group.erase_child("x");
+        REQUIRE(!ints.contains("x"));
+        REQUIRE(!doubles.contains("x"));
+
+        ints.try_emplace("y", 3);
+        doubles.try_emplace("y", 4.0);
+        group.clear_children();
+        REQUIRE(ints.empty());
+        REQUIRE(doubles.empty());
     }
 }
 } // namespace children_cache
