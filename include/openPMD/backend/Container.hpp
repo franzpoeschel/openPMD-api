@@ -140,8 +140,7 @@ protected:
     using InternalContainer = T_container;
     using View = internal::ChildView<T, T_key>;
 
-    internal::ChildFilter m_child_filter =
-        internal::ChildViewPolicy<T, T_key>::filter();
+    internal::ChildFilter m_child_filter = internal::default_child_filter();
 
     inline void setData(std::shared_ptr<internal::AttributableData> data)
     {
@@ -161,10 +160,12 @@ protected:
         return *this->writable().objectType.requireGroup();
     }
 
-    static auto create_child(T_key const &key, Writable &parent) -> T
+    // Static, so it receives the container's own Writable explicitly. This is
+    // the same object as this->writable() for non-static callers.
+    static auto create_child(T_key const &key, Writable &self) -> T
     {
         T child;
-        child.linkHierarchy(parent);
+        child.linkHierarchy(self);
         child.writable().ownKeyWithinParent =
             internal::children_cache_detail::key_to_string(key);
         return child;

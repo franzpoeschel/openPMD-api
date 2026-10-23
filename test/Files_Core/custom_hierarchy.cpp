@@ -155,7 +155,7 @@ void read(
 
     auto custom_data_2 = iteration.customHierarchies()["fully"]
                              .datasets()
-                             .subhierarchies()["custom"]["dataset2"]
+                             .subgroups()["custom"]["dataset2"]
                              .asDataset()
                              .loadChunk<int>();
     iteration.seriesFlush();
@@ -166,9 +166,9 @@ void read(
 
     {
         auto custom = iteration.customHierarchies()["fully"]["custom"];
-        auto subhierarchies = custom.subhierarchies();
-        REQUIRE(!subhierarchies.contains("dataset"));
-        REQUIRE(subhierarchies.contains("constant_dataset"));
+        auto subgroups = custom.subgroups();
+        REQUIRE(!subgroups.contains("dataset"));
+        REQUIRE(subgroups.contains("constant_dataset"));
 
         auto datasets = custom.datasets();
         REQUIRE(datasets.contains("dataset"));

@@ -87,7 +87,7 @@ public:
     auto asDataset() -> CustomDataset;
 
     auto datasets() -> ConvertibleContainer<CustomDataset>;
-    auto subhierarchies() -> ConvertibleContainer<CustomHierarchy>;
+    auto subgroups() -> ConvertibleContainer<CustomHierarchy>;
 };
 
 namespace traits

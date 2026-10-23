@@ -142,7 +142,7 @@ auto ConvertibleContainer<CustomDataset>::datasets()
 }
 
 template <typename MappedType>
-auto ConvertibleContainer<MappedType>::subhierarchies()
+auto ConvertibleContainer<MappedType>::subgroups()
     -> ConvertibleContainer<CustomHierarchy>
 {
     ConvertibleContainer<CustomHierarchy> res;

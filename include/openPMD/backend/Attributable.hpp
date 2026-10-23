@@ -103,6 +103,11 @@ namespace internal
          * True if the frontend instance owning Writable::attributable was
          * created through a custom-hierarchy view and has not yet been
          * replaced by a regular typed view.
+         *
+         * This cannot be inferred from the typed caches: a cache can contain
+         * either a custom-created handle or an alias materialized from the
+         * regular hierarchy. The flag distinguishes those cases for
+         * custom-hierarchy flush/visit and for preferCurrentBackpointer().
          */
         bool managed_as_custom_hierarchy = false;
     };
@@ -512,12 +517,15 @@ public:
      */
     [[nodiscard]] uintptr_t memoryID() const;
 
-    /** Return a generic, lazily materialized view of this object's hierarchy.
+    /** Return a generic view of this object's hierarchy.
      *
-     * Views are materialized on access. Objects created through the returned
-     * view are owned by the parent group's child cache and marked via
-     * SharedAttributableData::managed_as_custom_hierarchy until a regular
-     * typed view takes over the backend object.
+     * The returned view is lazy: children are read from the backend and
+     * represented by frontend handles only when they are accessed.
+     *
+     * Children created or erased through the returned view affect the regular
+     * openPMD hierarchy. Handles created through this view are kept alive by
+     * the containing backend group, independently of the lifetime of the
+     * returned handle.
      */
     auto customHierarchies() -> CustomHierarchy;
 

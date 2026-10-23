@@ -49,11 +49,11 @@ auto children_cache() -> void
     SECTION("get_or_create_returns_same_map")
     {
         internal::ChildrenCache cache;
-        auto first = cache.get_or_create<int, std::string>();
+        auto first = cache.get_or_create_cache<int, std::string>();
         add_child(cache, "a");
         first.unsafe_try_emplace("a", 1);
 
-        auto second = cache.get_or_create<int, std::string>();
+        auto second = cache.get_or_create_cache<int, std::string>();
         REQUIRE(second.contains("a"));
         REQUIRE(second.at("a") == 1);
         REQUIRE(cache.num_maps() == 1);
@@ -64,8 +64,8 @@ auto children_cache() -> void
     SECTION("different_types_are_independent")
     {
         internal::ChildrenCache cache;
-        auto ints = cache.get_or_create<int, std::string>();
-        auto doubles = cache.get_or_create<double, std::string>();
+        auto ints = cache.get_or_create_cache<int, std::string>();
+        auto doubles = cache.get_or_create_cache<double, std::string>();
         add_child(cache, "a");
         ints.unsafe_try_emplace("a", 1);
         doubles.unsafe_try_emplace("a", 2.5);
@@ -80,8 +80,8 @@ auto children_cache() -> void
     SECTION("erase_removes_from_every_map")
     {
         internal::ChildrenCache cache;
-        auto strings = cache.get_or_create<int, std::string>();
-        auto numbers = cache.get_or_create<int, std::uint64_t>();
+        auto strings = cache.get_or_create_cache<int, std::string>();
+        auto numbers = cache.get_or_create_cache<int, std::uint64_t>();
         add_child(cache, "a");
         add_child(cache, "b");
         add_child(cache, "42");
@@ -103,8 +103,8 @@ auto children_cache() -> void
     SECTION("clear_empties_every_map")
     {
         internal::ChildrenCache cache;
-        auto strings = cache.get_or_create<int, std::string>();
-        auto numbers = cache.get_or_create<int, std::uint64_t>();
+        auto strings = cache.get_or_create_cache<int, std::string>();
+        auto numbers = cache.get_or_create_cache<int, std::uint64_t>();
         add_child(cache, "a");
         add_child(cache, "42");
         strings.unsafe_try_emplace("a", 1);
@@ -122,8 +122,8 @@ auto children_cache() -> void
     SECTION("erased_keys_do_not_resurrect")
     {
         internal::ChildrenCache cache;
-        auto strings = cache.get_or_create<int, std::string>();
-        auto numbers = cache.get_or_create<int, std::uint64_t>();
+        auto strings = cache.get_or_create_cache<int, std::string>();
+        auto numbers = cache.get_or_create_cache<int, std::uint64_t>();
         add_child(cache, "a");
         add_child(cache, "42");
         strings.unsafe_try_emplace("a", 1);
@@ -147,15 +147,15 @@ auto children_cache() -> void
     SECTION("find_and_contains")
     {
         internal::ChildrenCache cache;
-        REQUIRE(!cache.contains<int, std::string>());
-        REQUIRE(!cache.find<int, std::string>().has_value());
+        REQUIRE(!cache.contains_cache<int, std::string>());
+        REQUIRE(!cache.find_cache<int, std::string>().has_value());
 
-        auto strings = cache.get_or_create<int, std::string>();
+        auto strings = cache.get_or_create_cache<int, std::string>();
         add_child(cache, "a");
         strings.unsafe_try_emplace("a", 1);
 
-        REQUIRE(cache.contains<int, std::string>());
-        auto found = cache.find<int, std::string>();
+        REQUIRE(cache.contains_cache<int, std::string>());
+        auto found = cache.find_cache<int, std::string>();
         REQUIRE(found.has_value());
         REQUIRE(found->at("a") == 1);
     }
@@ -163,9 +163,9 @@ auto children_cache() -> void
     SECTION("group_metadata_erase_clears_every_cache")
     {
         internal::object_type::GroupMetaData group;
-        auto ints = group.m_children_cache.get_or_create<int, std::string>();
+        auto ints = group.m_children_cache.get_or_create_cache<int, std::string>();
         auto doubles =
-            group.m_children_cache.get_or_create<double, std::string>();
+            group.m_children_cache.get_or_create_cache<double, std::string>();
         add_child(group.m_children_cache, "x");
         ints.unsafe_try_emplace("x", 1);
         doubles.unsafe_try_emplace("x", 2.0);

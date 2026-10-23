@@ -20,6 +20,9 @@
  */
 #pragma once
 
+#include "openPMD/auxiliary/TypeTraits.hpp"
+#include "openPMD/backend/ChildrenCacheMap.hpp"
+
 #include <cassert>
 #include <cstddef>
 #include <functional>
@@ -27,7 +30,9 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <typeindex>
 #include <utility>
@@ -38,9 +43,6 @@ class SharedAttributableData;
 
 namespace children_cache_detail
 {
-    template <typename>
-    constexpr bool dependent_false = false;
-
     template <typename Key>
     auto key_from_string(std::string const &key) -> std::optional<Key>
     {
@@ -96,153 +98,100 @@ namespace children_cache_detail
         else
         {
             static_assert(
-                dependent_false<Key>,
+                auxiliary::dependent_false_v<Key>,
                 "ChildrenCache does not know how to convert this key type "
                 "from its canonical string representation.");
         }
     }
 
-    template <typename Key>
-    auto key_to_string(Key const &key) -> std::string
+    template <typename Key, typename Enable = void>
+    struct KeyFromStringOrThrow
     {
-        if constexpr (std::is_same_v<Key, std::string>)
+        static auto parse(std::string const &) -> Key
+        {
+            static_assert(
+                auxiliary::dependent_false_v<Key>,
+                "ChildrenCache does not know how to convert this key type "
+                "from its canonical string representation.");
+            return Key{};
+        }
+    };
+
+    template <typename Key>
+    struct KeyFromStringOrThrow<Key, std::enable_if_t<std::is_integral_v<Key>>>
+    {
+        static auto parse(std::string const &key) -> Key
+        {
+            auto const parsed = key_from_string<Key>(key);
+            if (!parsed)
+            {
+                throw std::invalid_argument(
+                    "Cannot convert '" + key + "' to the typed key.");
+            }
+            return *parsed;
+        }
+    };
+
+    template <>
+    struct KeyFromStringOrThrow<std::string>
+    {
+        static auto parse(std::string const &key) -> std::string const &
         {
             return key;
         }
-        else if constexpr (std::is_integral_v<Key>)
+    };
+
+    /** Parse a canonical key, throwing if it cannot be represented. */
+    template <typename Key>
+    decltype(auto) key_from_string_or_throw(std::string const &key)
+    {
+        return KeyFromStringOrThrow<Key>::parse(key);
+    }
+
+    template <typename Key, typename Enable = void>
+    struct KeyToStringTraits
+    {
+        static auto convert(Key const &) -> std::string
+        {
+            static_assert(
+                auxiliary::dependent_false_v<Key>,
+                "ChildrenCache does not know how to convert this key type "
+                "to its canonical string representation.");
+            return {};
+        }
+    };
+
+    template <typename Key>
+    struct KeyToStringTraits<Key, std::enable_if_t<std::is_integral_v<Key>>>
+    {
+        static auto convert(Key const &key) -> std::string
         {
             return std::to_string(key);
         }
-        else
+    };
+
+    template <>
+    struct KeyToStringTraits<std::string>
+    {
+        static auto convert(std::string const &key) -> std::string const &
         {
-            static_assert(
-                dependent_false<Key>,
-                "ChildrenCache does not know how to convert this key type "
-                "to its canonical string representation.");
+            return key;
         }
+    };
+
+    /** Convert a typed key to the canonical string representation. */
+    template <typename Key>
+    decltype(auto) key_to_string(Key const &key)
+    {
+        return KeyToStringTraits<Key>::convert(key);
     }
 } // namespace children_cache_detail
 
-/** Non-owning, restricted view of one typed map inside a ChildrenCache.
- *
- * The only purpose of this class is to ban access to modifying calls and
- * thereby enforce code discipline: structural removal must go through
- * ChildrenCache::erase() / clear(), which keep the authoritative child map and
- * every materialized typed map in sync. Apart from that restriction, all
- * accessors forward to the underlying std::map.
- *
- * unsafe_try_emplace() is the single intentional mutation hook, used only for
- * lazy materialization. Its name highlights that callers must ensure the
- * canonical key exists in the authoritative child map and that the emplaced
- * handle refers to that child.
- */
-template <typename T, typename Key>
-class ChildrenCacheMap
-{
-    friend class ChildrenCache;
-
-public:
-    using map_type = std::map<Key, T>;
-    using key_type = typename map_type::key_type;
-    using mapped_type = typename map_type::mapped_type;
-    using value_type = typename map_type::value_type;
-    using size_type = typename map_type::size_type;
-    using iterator = typename map_type::iterator;
-    using const_iterator = typename map_type::const_iterator;
-    using reverse_iterator = typename map_type::reverse_iterator;
-    using const_reverse_iterator = typename map_type::const_reverse_iterator;
-
-    auto begin() noexcept -> iterator
-    {
-        return m_map->begin();
-    }
-    auto begin() const noexcept -> const_iterator
-    {
-        return m_map->begin();
-    }
-    auto end() noexcept -> iterator
-    {
-        return m_map->end();
-    }
-    auto end() const noexcept -> const_iterator
-    {
-        return m_map->end();
-    }
-    auto rbegin() noexcept -> reverse_iterator
-    {
-        return m_map->rbegin();
-    }
-    auto rbegin() const noexcept -> const_reverse_iterator
-    {
-        return m_map->rbegin();
-    }
-    auto rend() noexcept -> reverse_iterator
-    {
-        return m_map->rend();
-    }
-    auto rend() const noexcept -> const_reverse_iterator
-    {
-        return m_map->rend();
-    }
-
-    [[nodiscard]] auto empty() const noexcept -> bool
-    {
-        return m_map->empty();
-    }
-    [[nodiscard]] auto size() const noexcept -> size_type
-    {
-        return m_map->size();
-    }
-
-    auto find(Key const &key) noexcept -> iterator
-    {
-        return m_map->find(key);
-    }
-    auto find(Key const &key) const noexcept -> const_iterator
-    {
-        return m_map->find(key);
-    }
-    [[nodiscard]] auto contains(Key const &key) const noexcept -> bool
-    {
-        return m_map->find(key) != m_map->end();
-    }
-
-    auto at(Key const &key) -> T &
-    {
-        return m_map->at(key);
-    }
-    auto at(Key const &key) const -> T const &
-    {
-        return m_map->at(key);
-    }
-
-    /** Materialize a child handle (unsafe mutation hook).
-     *
-     * The caller is responsible for the authoritative side of the contract:
-     * the canonical key must exist in the parent's child collection and the
-     * emplaced handle must refer to the corresponding backend node.
-     * Duplicate keys are not replaced silently; use the returned `second`
-     * flag to detect them.
-     */
-    template <typename... Args>
-    auto unsafe_try_emplace(Key const &key, Args &&...args)
-        -> std::pair<iterator, bool>
-    {
-        return m_map->try_emplace(key, std::forward<Args>(args)...);
-    }
-
-private:
-    explicit ChildrenCacheMap(map_type &map) noexcept : m_map(&map)
-    {}
-
-    map_type *m_map;
-};
-
 /** Collection of lazily materialized, type-erased child maps.
  *
- * The maps are projections of a single authoritative child collection, not
- * independent containers. This class only owns the materialized maps and
- * guarantees that structural removal is applied to every one of them.
+ * This class owns the authoritative child map and the lazily materialized
+ * typed maps derived from it. The typed maps are projections, not independent
+ * containers, and structural removal is applied to all of them together.
  *
  * Invariants:
  *  - at most one map exists per (T, Key) pair;
@@ -251,6 +200,11 @@ private:
  *  - erase(key) removes key from every materialized map and leaves no stale
  *    entry behind;
  *  - clear() empties every materialized map.
+ *
+ * ChildrenCache enforces these invariants on erase()/clear() and validates
+ * them in assert_consistent(). Callers of ChildrenCacheMap's
+ * unsafe_try_emplace() (currently ChildView) are responsible for only
+ * materializing keys that exist in the authoritative child map.
  *
  * Assertions validate these invariants. In particular, assert_consistent()
  * verifies that every materialized key can be reconstructed from its canonical
@@ -280,12 +234,17 @@ public:
     ChildrenCache &operator=(ChildrenCache const &) = delete;
     ChildrenCache &operator=(ChildrenCache &&) noexcept = default;
 
-    /** Get or create the map for (T, Key).
+    /** Get or create the cache for (T, Key).
      *
      * Materialization is a cache operation and therefore logically const.
+     *
+     * The Entry callbacks below are the only implementations; they are
+     * generic over Key and rely solely on the key conversion helpers. There
+     * are no per-type specializations. Type-specific materialization is
+     * handled by ChildMaterializer instead.
      */
     template <typename T, typename Key>
-    auto get_or_create() const -> ChildrenCacheMap<T, Key>
+    auto get_or_create_cache() const -> ChildrenCacheMap<T, Key>
     {
         using map_type = std::map<Key, T>;
         auto const type = std::type_index(typeid(map_type));
@@ -334,7 +293,8 @@ public:
     }
 
     template <typename T, typename Key>
-    [[nodiscard]] auto find() const -> std::optional<ChildrenCacheMap<T, Key>>
+    [[nodiscard]] auto find_cache() const
+        -> std::optional<ChildrenCacheMap<T, Key>>
     {
         using map_type = std::map<Key, T>;
         auto const it = m_entries.find(std::type_index(typeid(map_type)));
@@ -348,7 +308,7 @@ public:
     }
 
     template <typename T, typename Key>
-    [[nodiscard]] auto contains() const noexcept -> bool
+    [[nodiscard]] auto contains_cache() const noexcept -> bool
     {
         return m_entries.find(std::type_index(typeid(std::map<Key, T>))) !=
             m_entries.end();
@@ -370,7 +330,15 @@ public:
     void assert_consistent() const;
 
 private:
+    /** Authoritative children of this group. */
     children_map_t m_children;
+
+    /**
+     * Type-erased typed caches, stored once per ChildrenCache instance (i.e.
+     * once per group node) and shared by all views of that node. The
+     * ChildrenCacheMap instances handed out by get_or_create_cache() are
+     * non-owning views and store no state.
+     */
     mutable std::map<std::type_index, Entry> m_entries;
 };
 } // namespace openPMD::internal
