@@ -79,7 +79,7 @@ template <typename T, typename Key>
 struct ChildViewPolicy
 {
     // Numeric keys are the materialized special case (Series::iterations).
-    static constexpr bool materialized = !std::is_same_v<Key, std::string>;
+    static constexpr bool non_string = !std::is_same_v<Key, std::string>;
 
     static auto filter() -> ChildFilter
     {
@@ -113,7 +113,7 @@ auto materialize_child_at(
     std::shared_ptr<SharedAttributableData> const &child,
     bool access_policy = true) -> typename std::map<Key, T>::iterator
 {
-    auto typed = cache.template get_or_create<T, Key>();
+    auto typed_cache = cache.template get_or_create<T, Key>();
     auto const key = children_cache_detail::key_from_string<Key>(canonicalKey);
     assert(key.has_value());
     if (!key)
@@ -123,8 +123,8 @@ auto materialize_child_at(
             "' to the typed container key.");
     }
 
-    auto it = typed.find(*key);
-    if (it == typed.end())
+    auto it = typed_cache.find(*key);
+    if (it == typed_cache.end())
     {
         auto materialized =
             ChildMaterializer<T>::materialize(canonicalKey, child);
@@ -136,7 +136,7 @@ auto materialize_child_at(
                 canonicalKey + "'.");
         }
         auto inserted =
-            typed.unsafe_try_emplace(*key, std::move(*materialized));
+            typed_cache.unsafe_try_emplace(*key, std::move(*materialized));
         it = inserted.first;
     }
 
@@ -295,8 +295,7 @@ class ChildView
 public:
     using materialized_t = std::true_type;
     using projected_t = std::false_type;
-    using mode_t =
-        std::integral_constant<bool, ChildViewPolicy<T, Key>::materialized>;
+    static constexpr bool non_string = ChildViewPolicy<T, Key>::non_string;
 
     using children_map_t = ChildrenCache::children_map_t;
     using InternalContainer = std::map<Key, T>;
@@ -312,19 +311,19 @@ public:
     using const_pointer = typename InternalContainer::const_pointer;
 
     using iterator = std::conditional_t<
-        ChildViewPolicy<T, Key>::materialized,
+        ChildViewPolicy<T, Key>::non_string,
         typename InternalContainer::iterator,
         ProjectedChildIterator<T, Key, false>>;
     using const_iterator = std::conditional_t<
-        ChildViewPolicy<T, Key>::materialized,
+        ChildViewPolicy<T, Key>::non_string,
         typename InternalContainer::const_iterator,
         ProjectedChildIterator<T, Key, true>>;
     using reverse_iterator = std::conditional_t<
-        ChildViewPolicy<T, Key>::materialized,
+        ChildViewPolicy<T, Key>::non_string,
         typename InternalContainer::reverse_iterator,
         std::reverse_iterator<iterator>>;
     using const_reverse_iterator = std::conditional_t<
-        ChildViewPolicy<T, Key>::materialized,
+        ChildViewPolicy<T, Key>::non_string,
         typename InternalContainer::const_reverse_iterator,
         std::reverse_iterator<const_iterator>>;
 
@@ -367,7 +366,7 @@ public:
     }
     auto rbegin() -> reverse_iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             sync();
             return typed().rbegin();
@@ -379,7 +378,7 @@ public:
     }
     auto rbegin() const -> const_reverse_iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             sync();
             return typed().rbegin();
@@ -395,7 +394,7 @@ public:
     }
     auto rend() -> reverse_iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             return typed().rend();
         }
@@ -406,7 +405,7 @@ public:
     }
     auto rend() const -> const_reverse_iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             return typed().rend();
         }
@@ -457,7 +456,7 @@ public:
             return end();
         }
 
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             auto typed_view = typed();
             auto typed_it = typed_view.find(key);
@@ -488,7 +487,7 @@ public:
             return end();
         }
 
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             auto typed_view = typed();
             auto typed_it = typed_view.find(key);
@@ -631,7 +630,7 @@ public:
     {
         auto next = it;
         ++next;
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             m_cache->erase(children_cache_detail::key_to_string(it->first));
         }
@@ -664,7 +663,7 @@ private:
     template <typename Iterator>
     auto make_begin() const -> Iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             sync();
             return typed().begin();
@@ -684,7 +683,7 @@ private:
     template <typename Iterator>
     auto make_end() const -> Iterator
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             return typed().end();
         }
@@ -706,7 +705,7 @@ private:
 
     void sync() const
     {
-        if constexpr (mode_t::value)
+        if constexpr (non_string)
         {
             auto typed_view = typed();
             for (auto const &[canonical, child] : m_cache->children())
