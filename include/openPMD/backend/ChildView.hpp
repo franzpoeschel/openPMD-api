@@ -135,7 +135,8 @@ auto materialize_child_at(
                 "No frontend handle was produced while materializing child '" +
                 canonicalKey + "'.");
         }
-        auto inserted = typed.try_emplace(*key, std::move(*materialized));
+        auto inserted =
+            typed.unsafe_try_emplace(*key, std::move(*materialized));
         it = inserted.first;
     }
 
@@ -573,7 +574,7 @@ public:
         children.emplace(canonical, child.m_attri->asSharedPtrOfAttributable());
 
         auto typed_view = typed();
-        auto inserted = typed_view.try_emplace(key, std::move(child));
+        auto inserted = typed_view.unsafe_try_emplace(key, std::move(child));
         assert(inserted.second);
         traits::GenerationPolicy<T> generation;
         generation(*this, inserted.first);
@@ -724,7 +725,8 @@ private:
                     ChildMaterializer<T>::materialize(canonical, child);
                 if (materialized)
                 {
-                    typed_view.try_emplace(*key, std::move(*materialized));
+                    typed_view.unsafe_try_emplace(
+                        *key, std::move(*materialized));
                 }
             }
         }
@@ -775,7 +777,7 @@ private:
         }
 
         auto typed_view = typed();
-        auto inserted = typed_view.try_emplace(
+        auto inserted = typed_view.unsafe_try_emplace(
             value.first, std::forward<Value>(value).second);
         if (!inserted.second)
         {

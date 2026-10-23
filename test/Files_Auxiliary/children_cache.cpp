@@ -51,7 +51,7 @@ auto children_cache() -> void
         internal::ChildrenCache cache;
         auto first = cache.get_or_create<int, std::string>();
         add_child(cache, "a");
-        first.try_emplace("a", 1);
+        first.unsafe_try_emplace("a", 1);
 
         auto second = cache.get_or_create<int, std::string>();
         REQUIRE(second.contains("a"));
@@ -67,8 +67,8 @@ auto children_cache() -> void
         auto ints = cache.get_or_create<int, std::string>();
         auto doubles = cache.get_or_create<double, std::string>();
         add_child(cache, "a");
-        ints.try_emplace("a", 1);
-        doubles.try_emplace("a", 2.5);
+        ints.unsafe_try_emplace("a", 1);
+        doubles.unsafe_try_emplace("a", 2.5);
 
         REQUIRE(cache.num_maps() == 2);
         REQUIRE(ints.at("a") == 1);
@@ -85,9 +85,9 @@ auto children_cache() -> void
         add_child(cache, "a");
         add_child(cache, "b");
         add_child(cache, "42");
-        strings.try_emplace("a", 1);
-        strings.try_emplace("b", 2);
-        numbers.try_emplace(42, 3);
+        strings.unsafe_try_emplace("a", 1);
+        strings.unsafe_try_emplace("b", 2);
+        numbers.unsafe_try_emplace(42, 3);
 
         cache.erase("a");
         REQUIRE(!strings.contains("a"));
@@ -107,8 +107,8 @@ auto children_cache() -> void
         auto numbers = cache.get_or_create<int, std::uint64_t>();
         add_child(cache, "a");
         add_child(cache, "42");
-        strings.try_emplace("a", 1);
-        numbers.try_emplace(42, 3);
+        strings.unsafe_try_emplace("a", 1);
+        numbers.unsafe_try_emplace(42, 3);
         REQUIRE(!cache.empty());
 
         cache.clear();
@@ -126,8 +126,8 @@ auto children_cache() -> void
         auto numbers = cache.get_or_create<int, std::uint64_t>();
         add_child(cache, "a");
         add_child(cache, "42");
-        strings.try_emplace("a", 1);
-        numbers.try_emplace(42, 1);
+        strings.unsafe_try_emplace("a", 1);
+        numbers.unsafe_try_emplace(42, 1);
 
         cache.erase("a");
         cache.erase("42");
@@ -136,8 +136,8 @@ auto children_cache() -> void
         // stale handles from the caches.
         add_child(cache, "a");
         add_child(cache, "42");
-        strings.try_emplace("a", 2);
-        numbers.try_emplace(42, 2);
+        strings.unsafe_try_emplace("a", 2);
+        numbers.unsafe_try_emplace(42, 2);
 
         REQUIRE(strings.at("a") == 2);
         REQUIRE(numbers.at(42) == 2);
@@ -152,7 +152,7 @@ auto children_cache() -> void
 
         auto strings = cache.get_or_create<int, std::string>();
         add_child(cache, "a");
-        strings.try_emplace("a", 1);
+        strings.unsafe_try_emplace("a", 1);
 
         REQUIRE(cache.contains<int, std::string>());
         auto found = cache.find<int, std::string>();
@@ -167,16 +167,16 @@ auto children_cache() -> void
         auto doubles =
             group.m_children_cache.get_or_create<double, std::string>();
         add_child(group.m_children_cache, "x");
-        ints.try_emplace("x", 1);
-        doubles.try_emplace("x", 2.0);
+        ints.unsafe_try_emplace("x", 1);
+        doubles.unsafe_try_emplace("x", 2.0);
 
         group.erase_child("x");
         REQUIRE(!ints.contains("x"));
         REQUIRE(!doubles.contains("x"));
 
         add_child(group.m_children_cache, "y");
-        ints.try_emplace("y", 3);
-        doubles.try_emplace("y", 4.0);
+        ints.unsafe_try_emplace("y", 3);
+        doubles.unsafe_try_emplace("y", 4.0);
         group.clear_children();
         REQUIRE(ints.empty());
         REQUIRE(doubles.empty());

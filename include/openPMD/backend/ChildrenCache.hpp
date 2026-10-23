@@ -32,12 +32,6 @@
 #include <typeindex>
 #include <utility>
 
-namespace openPMD
-{
-template <typename T, typename T_key, typename T_container>
-class Container;
-} // namespace openPMD
-
 namespace openPMD::internal
 {
 class SharedAttributableData;
@@ -131,9 +125,16 @@ namespace children_cache_detail
 
 /** Non-owning, restricted view of one typed map inside a ChildrenCache.
  *
- * The view deliberately does not expose erase(), clear(), or operator[].
- * Structural removal is only possible through ChildrenCache::erase() and
- * ChildrenCache::clear(), which update every materialized map.
+ * The only purpose of this class is to ban access to modifying calls and
+ * thereby enforce code discipline: structural removal must go through
+ * ChildrenCache::erase() / clear(), which keep the authoritative child map and
+ * every materialized typed map in sync. Apart from that restriction, all
+ * accessors forward to the underlying std::map.
+ *
+ * unsafe_try_emplace() is the single intentional mutation hook, used only for
+ * lazy materialization. Its name highlights that callers must ensure the
+ * canonical key exists in the authoritative child map and that the emplaced
+ * handle refers to that child.
  */
 template <typename T, typename Key>
 class ChildrenCacheMap
@@ -215,7 +216,7 @@ public:
         return m_map->at(key);
     }
 
-    /** Materialize a child handle.
+    /** Materialize a child handle (unsafe mutation hook).
      *
      * The caller is responsible for the authoritative side of the contract:
      * the canonical key must exist in the parent's child collection and the
@@ -224,27 +225,15 @@ public:
      * flag to detect them.
      */
     template <typename... Args>
-    auto try_emplace(Key const &key, Args &&...args)
+    auto unsafe_try_emplace(Key const &key, Args &&...args)
         -> std::pair<iterator, bool>
     {
         return m_map->try_emplace(key, std::forward<Args>(args)...);
     }
 
 private:
-    template <typename, typename, typename>
-    friend class openPMD::Container;
-
     explicit ChildrenCacheMap(map_type &map) noexcept : m_map(&map)
     {}
-
-    auto map() noexcept -> map_type &
-    {
-        return *m_map;
-    }
-    auto map() const noexcept -> map_type const &
-    {
-        return *m_map;
-    }
 
     map_type *m_map;
 };
