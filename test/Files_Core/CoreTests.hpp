@@ -34,4 +34,5 @@ namespace custom_hierarchy
 {
 auto custom_hierarchy() -> void;
 auto materialization_error() -> void;
+auto iteration_filtering() -> void;
 } // namespace custom_hierarchy

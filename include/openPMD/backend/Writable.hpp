@@ -72,6 +72,9 @@ namespace internal
     class ScientificDefaults;
     class BaseRecordComponentData;
     class RecordComponentData;
+    template <typename, typename>
+    class ChildView;
+    struct ChildFilter;
 } // namespace internal
 
 namespace internal::object_type
@@ -120,28 +123,33 @@ namespace internal::object_type
         // movability for map handling
         // Disallowing move in AttributableData is only a measure for code
         // discipline anyway.
-        using children_map_t =
-            std::map<std::string, std::shared_ptr<SharedAttributableData>>;
-        children_map_t m_children;
+        using children_map_t = ChildrenCache::children_map_t;
 
         /**
-         * Lazily materialized typed views of m_children. This is the only
-         * persistent storage for the typed child handles; all views of this
+         * Authoritative child hierarchy plus lazily materialized typed views.
+         * This is the only persistent storage for children; all views of this
          * group share it.
          */
         mutable ChildrenCache m_children_cache;
 
+        inline auto children() -> children_map_t &
+        {
+            return m_children_cache.children();
+        }
+        inline auto children() const -> children_map_t const &
+        {
+            return m_children_cache.children();
+        }
+
         /** Remove a child from the authoritative map and every cache. */
         void erase_child(std::string const &key)
         {
-            m_children.erase(key);
             m_children_cache.erase(key);
         }
 
         /** Clear the authoritative map and every cache. */
         void clear_children()
         {
-            m_children.clear();
             m_children_cache.clear();
         }
 
@@ -303,6 +311,9 @@ class Writable final
     template <typename>
     friend class ConvertibleContainer;
     friend class CustomHierarchy;
+    template <typename, typename>
+    friend class internal::ChildView;
+    friend struct internal::ChildFilter;
     template <typename T>
     friend struct traits::GenerationPolicy;
     friend class internal::BaseRecordComponentData;

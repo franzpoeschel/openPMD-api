@@ -172,20 +172,19 @@ namespace internal
     template class internal::ScalarIterator<                                   \
         baserecordtype,                                                        \
         baserecordtype::Data_t,                                                \
-        baserecordtype::T_Container::InternalContainer::iterator>;             \
+        baserecordtype::T_Container::iterator>;                                \
     template class internal::ScalarIterator<                                   \
         baserecordtype const,                                                  \
         baserecordtype::Data_t const,                                          \
-        baserecordtype::T_Container::InternalContainer::const_iterator>;       \
+        baserecordtype::T_Container::const_iterator>;                          \
     template class internal::ScalarIterator<                                   \
         baserecordtype,                                                        \
         baserecordtype::Data_t,                                                \
-        baserecordtype::T_Container::InternalContainer::reverse_iterator>;     \
+        baserecordtype::T_Container::reverse_iterator>;                        \
     template class internal::ScalarIterator<                                   \
         baserecordtype const,                                                  \
         baserecordtype::Data_t const,                                          \
-        baserecordtype::T_Container::InternalContainer::                       \
-            const_reverse_iterator>;
+        baserecordtype::T_Container::const_reverse_iterator>;
 
 #define OPENPMD_INSTANTIATE(recordcomponenttype)                               \
     INSTANTIATE_ITERATORS_FOR_BASERECORD(BaseRecord<recordcomponenttype>)
@@ -282,7 +281,7 @@ auto BaseRecord<T_elem>::rbegin() -> reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().rbegin());
+        return makeReverseIterator(T_Container::rbegin());
     }
 }
 
@@ -295,7 +294,7 @@ auto BaseRecord<T_elem>::rbegin() const -> const_reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().rbegin());
+        return makeReverseIterator(T_Container::rbegin());
     }
 }
 
@@ -308,7 +307,7 @@ auto BaseRecord<T_elem>::crbegin() const -> const_reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().crbegin());
+        return makeReverseIterator(T_Container::crbegin());
     }
 }
 
@@ -321,7 +320,7 @@ auto BaseRecord<T_elem>::rend() -> reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().rend());
+        return makeReverseIterator(T_Container::rend());
     }
 }
 
@@ -334,7 +333,7 @@ auto BaseRecord<T_elem>::rend() const -> const_reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().rend());
+        return makeReverseIterator(T_Container::rend());
     }
 }
 
@@ -347,7 +346,7 @@ auto BaseRecord<T_elem>::crend() const -> const_reverse_iterator
     }
     else
     {
-        return makeReverseIterator(this->container_front().crend());
+        return makeReverseIterator(T_Container::crend());
     }
 }
 
@@ -463,6 +462,11 @@ auto BaseRecord<T_elem>::at(key_type const &key) const -> mapped_type const &
         }
         return static_cast<mapped_type const &>(*this);
     }
+    else if (scalar())
+    {
+        throw std::out_of_range(
+            "[at()] Requested non-scalar entry from a scalar record.");
+    }
     else
     {
         return T_Container::at(key);
@@ -474,7 +478,11 @@ auto BaseRecord<T_elem>::erase(key_type const &key) -> size_type
 {
     bool const keyScalar = (key == RecordComponent::SCALAR);
     size_type res;
-    if (!keyScalar)
+    if (!keyScalar && scalar())
+    {
+        res = 0;
+    }
+    else if (!keyScalar)
         res = Container<T_elem>::erase(key);
     else
     {
@@ -527,7 +535,7 @@ auto BaseRecord<T_elem>::find(key_type const &key) -> iterator
     }
     else
     {
-        return makeIterator(this->container_front().find(key));
+        return makeIterator(T_Container::find(key));
     }
 }
 
@@ -552,7 +560,7 @@ auto BaseRecord<T_elem>::find(key_type const &key) const -> const_iterator
     }
     else
     {
-        return makeIterator(this->container_front().find(key));
+        return makeIterator(T_Container::find(key));
     }
 }
 
@@ -562,6 +570,10 @@ auto BaseRecord<T_elem>::count(key_type const &key) const -> size_type
     if (key == RecordComponent::SCALAR)
     {
         return get().datasetDefined() ? 1 : 0;
+    }
+    else if (scalar())
+    {
+        return 0;
     }
     else
     {
@@ -626,7 +638,7 @@ auto BaseRecord<T_elem>::insert(value_type const &value)
     -> std::pair<iterator, bool>
 {
     detail::verifyNonscalar(this);
-    auto res = this->syncInsertResult(this->container_front().insert(value));
+    auto res = T_Container::insert(value);
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;
@@ -640,8 +652,7 @@ template <typename T_elem>
 auto BaseRecord<T_elem>::insert(value_type &&value) -> std::pair<iterator, bool>
 {
     detail::verifyNonscalar(this);
-    auto res = this->syncInsertResult(
-        this->container_front().insert(std::move(value)));
+    auto res = T_Container::insert(std::move(value));
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;
@@ -660,13 +671,10 @@ auto BaseRecord<T_elem>::insert(const_iterator hint, value_type const &value)
         auxiliary::overloaded{
             [](typename const_iterator::Left left) { return left; },
             [this](typename const_iterator::Right) {
-                return static_cast<BaseRecord<T_elem> const *>(this)
-                    ->container()
-                    .front->begin();
+                return T_Container::cbegin();
             }},
         hint.m_iterator);
-    auto res = this->syncInsertResult(
-        this->container_front().insert(base_hint, value));
+    auto res = T_Container::insert(base_hint, value);
     if (res->first == RecordComponent::SCALAR)
     {
         auto const key = res->first;
@@ -685,13 +693,10 @@ auto BaseRecord<T_elem>::insert(const_iterator hint, value_type &&value)
         auxiliary::overloaded{
             [](typename const_iterator::Left left) { return left; },
             [this](typename const_iterator::Right) {
-                return static_cast<BaseRecord<T_elem> const *>(this)
-                    ->container()
-                    .front->begin();
+                return T_Container::cbegin();
             }},
         hint.m_iterator);
-    auto res = this->syncInsertResult(
-        this->container_front().insert(base_hint, std::move(value)));
+    auto res = T_Container::insert(base_hint, std::move(value));
     if (res->first == RecordComponent::SCALAR)
     {
         auto const key = res->first;

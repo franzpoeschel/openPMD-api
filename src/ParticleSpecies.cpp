@@ -38,8 +38,10 @@ void ParticleSpecies::visitHierarchyImpl(HierarchyVisitor &v, bool recursive)
 
 ParticleSpecies::ParticleSpecies()
 {
+    m_child_filter.excludedKey = "particlePatches";
     particlePatches.writable().ownKeyWithinParent = "particlePatches";
-    container_back()["particlePatches"] = *particlePatches.m_attri;
+    writable().objectType.requireGroup()->children()["particlePatches"] =
+        *particlePatches.m_attri;
 }
 
 void ParticleSpecies::read()

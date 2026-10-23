@@ -219,7 +219,7 @@ void Attributable::customHierarchyFlush(
     Parameter<Operation::CREATE_PATH> pCreate;
 
     data.m_writable.objectType.ifGroup([&](auto &group_metadata) {
-        for (auto const &[name, child] : group_metadata.m_children)
+        for (auto const &[name, child] : group_metadata.children())
         {
             if (!child->managed_as_custom_hierarchy)
             {
@@ -378,7 +378,7 @@ void Attributable::visitHierarchy(HierarchyVisitor &visitor, bool recursive)
     if (recursive)
     {
         writable().objectType.ifGroup([&, recursive](auto &group_info) {
-            for (auto const &[name, child] : group_info.m_children)
+            for (auto const &[name, child] : group_info.children())
             {
                 (void)name;
                 if (!child->managed_as_custom_hierarchy)

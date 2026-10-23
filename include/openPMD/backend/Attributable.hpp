@@ -65,6 +65,8 @@ namespace internal
 {
     class IterationData;
     class SeriesData;
+    template <typename, typename>
+    class ChildView;
     struct HomogenizeExtents;
     struct ConfigAttribute;
     class ScientificDefaults;
@@ -274,6 +276,8 @@ class Attributable
     template <typename T, typename Series_type>
     friend T &internal::makeOwning(T &self, Series_type);
     friend class StatefulSnapshotsContainer;
+    template <typename, typename>
+    friend class internal::ChildView;
     friend class internal::AttributableData;
     friend class Snapshots;
     friend struct internal::HomogenizeExtents;

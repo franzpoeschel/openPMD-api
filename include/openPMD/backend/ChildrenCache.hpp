@@ -40,6 +40,8 @@ class Container;
 
 namespace openPMD::internal
 {
+class SharedAttributableData;
+
 namespace children_cache_detail
 {
     template <typename>
@@ -146,6 +148,8 @@ public:
     using size_type = typename map_type::size_type;
     using iterator = typename map_type::iterator;
     using const_iterator = typename map_type::const_iterator;
+    using reverse_iterator = typename map_type::reverse_iterator;
+    using const_reverse_iterator = typename map_type::const_reverse_iterator;
 
     auto begin() noexcept -> iterator
     {
@@ -162,6 +166,22 @@ public:
     auto end() const noexcept -> const_iterator
     {
         return m_map->end();
+    }
+    auto rbegin() noexcept -> reverse_iterator
+    {
+        return m_map->rbegin();
+    }
+    auto rbegin() const noexcept -> const_reverse_iterator
+    {
+        return m_map->rbegin();
+    }
+    auto rend() noexcept -> reverse_iterator
+    {
+        return m_map->rend();
+    }
+    auto rend() const noexcept -> const_reverse_iterator
+    {
+        return m_map->rend();
     }
 
     [[nodiscard]] auto empty() const noexcept -> bool
@@ -262,6 +282,9 @@ class ChildrenCache
     };
 
 public:
+    using children_map_t =
+        std::map<std::string, std::shared_ptr<SharedAttributableData>>;
+
     ChildrenCache() = default;
     ChildrenCache(ChildrenCache const &) = delete;
     ChildrenCache(ChildrenCache &&) noexcept = default;
@@ -342,14 +365,13 @@ public:
             m_entries.end();
     }
 
-    /** Remove canonicalKey from every materialized map.
-     *
-     * Must be called for every structural child removal, before or together
-     * with the removal from the authoritative child collection.
-     */
+    children_map_t &children();
+    children_map_t const &children() const;
+
+    /** Remove canonicalKey from the authoritative map and every cache. */
     void erase(std::string const &canonicalKey);
 
-    /** Remove all entries from every materialized map. */
+    /** Clear the authoritative map and every cache. */
     void clear();
 
     [[nodiscard]] bool empty() const noexcept;
@@ -359,6 +381,7 @@ public:
     void assert_consistent() const;
 
 private:
+    children_map_t m_children;
     mutable std::map<std::type_index, Entry> m_entries;
 };
 } // namespace openPMD::internal

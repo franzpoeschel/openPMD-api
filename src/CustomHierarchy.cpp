@@ -47,11 +47,8 @@ namespace traits
         }
     }
 
-    void ElementAccessPolicy<CustomHierarchy>::call(CustomHierarchy const &cont)
-    {
-        cont.writable().objectType.ifGroup(
-            [&](auto &group_data) { cont.syncContainers(group_data); });
-    }
+    void ElementAccessPolicy<CustomHierarchy>::call(CustomHierarchy const &)
+    {}
 } // namespace traits
 
 // TODO: Add visitor over real type, using HierarchyVisitor class
@@ -133,14 +130,7 @@ auto ConvertibleContainer<CustomHierarchy>::datasets()
 {
     ConvertibleContainer<CustomDataset> res;
     res.m_attri->cloneFrom(*this->m_attri);
-    auto &container = res.container_front();
-    for (auto &[key, subgroup] : *this)
-    {
-        if (subgroup.isDataset())
-        {
-            container.emplace(key, subgroup.asDataset());
-        }
-    }
+    res.m_child_filter.kind = internal::ChildFilter::Kind::Datasets;
     return res;
 }
 
@@ -157,14 +147,7 @@ auto ConvertibleContainer<MappedType>::subhierarchies()
 {
     ConvertibleContainer<CustomHierarchy> res;
     res.m_attri->cloneFrom(*this->m_attri);
-    auto &container = res.container_front();
-    for (auto &[key, subgroup] : this->container_back())
-    {
-        if (subgroup->m_writable.objectType.isGroup())
-        {
-            container.emplace(key, CustomHierarchy(subgroup));
-        }
-    }
+    res.m_child_filter.kind = internal::ChildFilter::Kind::Groups;
     return res;
 }
 
@@ -280,15 +263,15 @@ auto CustomHierarchy::read(size_t const max_recursion_depth)
 
         for (auto const &path : *pList.paths)
         {
-            auto &subpath =
-                this->bracket_operator_impl(path, /* access_policy = */ false);
+            auto &subpath = this->container().get_or_create(
+                path, /* access_policy = */ false);
             subpath.linkHierarchy(this->writable());
         }
 
         for (auto const &path : *dList.datasets)
         {
-            auto &subpath =
-                this->bracket_operator_impl(path, /* access_policy = */ false);
+            auto &subpath = this->container().get_or_create(
+                path, /* access_policy = */ false);
             subpath.linkHierarchy(this->writable());
 
             subpath.asDataset();
@@ -296,9 +279,9 @@ auto CustomHierarchy::read(size_t const max_recursion_depth)
         }
     }
 
-    auto &container_front_ = container_front();
-
-    for (auto &pair : container_front_)
+    auto view = this->container();
+    view.set_access_policy(false);
+    for (auto &pair : view)
     {
         auto &path = pair.first;
         auto &subpath = pair.second;

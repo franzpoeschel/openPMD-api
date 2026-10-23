@@ -22,8 +22,19 @@
 
 namespace openPMD::internal
 {
+ChildrenCache::children_map_t &ChildrenCache::children()
+{
+    return m_children;
+}
+
+ChildrenCache::children_map_t const &ChildrenCache::children() const
+{
+    return m_children;
+}
+
 void ChildrenCache::erase(std::string const &canonicalKey)
 {
+    m_children.erase(canonicalKey);
     for (auto &[type, entry] : m_entries)
     {
         (void)type;
@@ -40,6 +51,7 @@ void ChildrenCache::erase(std::string const &canonicalKey)
 
 void ChildrenCache::clear()
 {
+    m_children.clear();
     for (auto &[type, entry] : m_entries)
     {
         (void)type;
@@ -93,6 +105,7 @@ void ChildrenCache::assert_consistent() const
         entry.for_each_key([&](std::string const &key) {
             ++counted_size;
             assert(entry.contains(key));
+            assert(m_children.find(key) != m_children.end());
         });
         assert(counted_size == registered_size);
     }

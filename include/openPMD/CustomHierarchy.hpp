@@ -102,18 +102,9 @@ namespace traits
     namespace detail
     {
         template <typename Container, typename Iterator>
-        void emplace_object_as_customly_managed(Container &cont, Iterator &it)
+        void emplace_object_as_customly_managed(Container &, Iterator &it)
         {
             auto &writable = it->second.writable();
-
-            // These should be different
-            auto child_shared_data = &it->second.Attributable::get();
-            auto parent_shared_data = &cont.Attributable::get();
-            if (child_shared_data == parent_shared_data)
-            {
-                throw std::runtime_error(
-                    "Trying to emplace object as its own child");
-            }
 
             // If this frontend instance is the first one for its backend
             // object, the reference graph (Writable::attributable -> frontend
@@ -164,6 +155,8 @@ class CustomHierarchy : public ConvertibleContainer<CustomHierarchy>
     friend class Container;
     template <typename>
     friend class ConvertibleContainer;
+    template <typename>
+    friend struct internal::ChildMaterializer;
 
 private:
     using Parent_t = ConvertibleContainer<CustomHierarchy>;
@@ -230,4 +223,35 @@ private:
 protected:
     void visitHierarchyImpl(HierarchyVisitor &v, bool recursive) override;
 };
+namespace internal
+{
+    template <>
+    struct ChildMaterializer<CustomHierarchy>
+    {
+        static auto materialize(
+            std::string const &,
+            std::shared_ptr<SharedAttributableData> const &child)
+            -> std::optional<CustomHierarchy>
+        {
+            return CustomHierarchy(child);
+        }
+    };
+
+    template <>
+    struct ChildMaterializer<CustomDataset>
+    {
+        static auto materialize(
+            std::string const &,
+            std::shared_ptr<SharedAttributableData> const &child)
+            -> std::optional<CustomDataset>
+        {
+            CustomHierarchy custom{child};
+            if (!custom.isDataset())
+            {
+                return std::nullopt;
+            }
+            return custom.asDataset();
+        }
+    };
+} // namespace internal
 } // namespace openPMD

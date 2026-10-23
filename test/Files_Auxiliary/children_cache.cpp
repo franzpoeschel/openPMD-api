@@ -20,17 +20,29 @@
  */
 #include "AuxiliaryTests.hpp"
 
+#include "openPMD/backend/Attributable.hpp"
 #include "openPMD/backend/ChildrenCache.hpp"
 #include "openPMD/backend/Writable.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <cstdint>
+#include <memory>
 #include <string>
 
 namespace children_cache
 {
 using namespace openPMD;
+
+namespace
+{
+    void add_child(internal::ChildrenCache &cache, std::string key)
+    {
+        cache.children().emplace(
+            std::move(key),
+            std::make_shared<internal::SharedAttributableData>(nullptr));
+    }
+} // namespace
 
 auto children_cache() -> void
 {
@@ -38,6 +50,7 @@ auto children_cache() -> void
     {
         internal::ChildrenCache cache;
         auto first = cache.get_or_create<int, std::string>();
+        add_child(cache, "a");
         first.try_emplace("a", 1);
 
         auto second = cache.get_or_create<int, std::string>();
@@ -53,6 +66,7 @@ auto children_cache() -> void
         internal::ChildrenCache cache;
         auto ints = cache.get_or_create<int, std::string>();
         auto doubles = cache.get_or_create<double, std::string>();
+        add_child(cache, "a");
         ints.try_emplace("a", 1);
         doubles.try_emplace("a", 2.5);
 
@@ -68,6 +82,9 @@ auto children_cache() -> void
         internal::ChildrenCache cache;
         auto strings = cache.get_or_create<int, std::string>();
         auto numbers = cache.get_or_create<int, std::uint64_t>();
+        add_child(cache, "a");
+        add_child(cache, "b");
+        add_child(cache, "42");
         strings.try_emplace("a", 1);
         strings.try_emplace("b", 2);
         numbers.try_emplace(42, 3);
@@ -88,6 +105,8 @@ auto children_cache() -> void
         internal::ChildrenCache cache;
         auto strings = cache.get_or_create<int, std::string>();
         auto numbers = cache.get_or_create<int, std::uint64_t>();
+        add_child(cache, "a");
+        add_child(cache, "42");
         strings.try_emplace("a", 1);
         numbers.try_emplace(42, 3);
         REQUIRE(!cache.empty());
@@ -105,6 +124,8 @@ auto children_cache() -> void
         internal::ChildrenCache cache;
         auto strings = cache.get_or_create<int, std::string>();
         auto numbers = cache.get_or_create<int, std::uint64_t>();
+        add_child(cache, "a");
+        add_child(cache, "42");
         strings.try_emplace("a", 1);
         numbers.try_emplace(42, 1);
 
@@ -113,6 +134,8 @@ auto children_cache() -> void
 
         // Reinserting the same keys must create fresh entries, not revive
         // stale handles from the caches.
+        add_child(cache, "a");
+        add_child(cache, "42");
         strings.try_emplace("a", 2);
         numbers.try_emplace(42, 2);
 
@@ -128,6 +151,7 @@ auto children_cache() -> void
         REQUIRE(!cache.find<int, std::string>().has_value());
 
         auto strings = cache.get_or_create<int, std::string>();
+        add_child(cache, "a");
         strings.try_emplace("a", 1);
 
         REQUIRE(cache.contains<int, std::string>());
@@ -142,6 +166,7 @@ auto children_cache() -> void
         auto ints = group.m_children_cache.get_or_create<int, std::string>();
         auto doubles =
             group.m_children_cache.get_or_create<double, std::string>();
+        add_child(group.m_children_cache, "x");
         ints.try_emplace("x", 1);
         doubles.try_emplace("x", 2.0);
 
@@ -149,6 +174,7 @@ auto children_cache() -> void
         REQUIRE(!ints.contains("x"));
         REQUIRE(!doubles.contains("x"));
 
+        add_child(group.m_children_cache, "y");
         ints.try_emplace("y", 3);
         doubles.try_emplace("y", 4.0);
         group.clear_children();

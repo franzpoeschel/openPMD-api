@@ -248,22 +248,18 @@ public:
     using pointer = typename Container<T_elem>::pointer;
     using const_pointer = typename Container<T_elem>::const_pointer;
 
-    using iterator = internal::ScalarIterator<
-        T_Self,
-        Data_t,
-        typename T_Container::InternalContainer::iterator>;
+    using iterator = internal::
+        ScalarIterator<T_Self, Data_t, typename T_Container::iterator>;
     using const_iterator = internal::ScalarIterator<
         T_Self const,
         Data_t const,
-        typename T_Container::InternalContainer::const_iterator>;
-    using reverse_iterator = internal::ScalarIterator<
-        T_Self,
-        Data_t,
-        typename T_Container::InternalContainer::reverse_iterator>;
+        typename T_Container::const_iterator>;
+    using reverse_iterator = internal::
+        ScalarIterator<T_Self, Data_t, typename T_Container::reverse_iterator>;
     using const_reverse_iterator = internal::ScalarIterator<
         T_Self const,
         Data_t const,
-        typename T_Container::InternalContainer::const_reverse_iterator>;
+        typename T_Container::const_reverse_iterator>;
 
 private:
     template <typename... Arg>
@@ -420,8 +416,7 @@ template <typename... Args>
 auto BaseRecord<T_elem>::emplace(Args &&...args) -> std::pair<iterator, bool>
 {
     detail::verifyNonscalar(this);
-    auto res = this->syncInsertResult(
-        this->container_front().emplace(std::forward<Args>(args)...));
+    auto res = T_Container::emplace(std::forward<Args>(args)...);
     if (res.first->first == RecordComponent::SCALAR)
     {
         auto const key = res.first->first;

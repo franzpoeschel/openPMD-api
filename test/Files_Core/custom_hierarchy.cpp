@@ -164,6 +164,18 @@ void read(
         REQUIRE(custom_data_2.get()[i] == (int)i + 1);
     }
 
+    {
+        auto custom = iteration.customHierarchies()["fully"]["custom"];
+        auto subhierarchies = custom.subhierarchies();
+        REQUIRE(!subhierarchies.contains("dataset"));
+        REQUIRE(subhierarchies.contains("constant_dataset"));
+
+        auto datasets = custom.datasets();
+        REQUIRE(datasets.contains("dataset"));
+        REQUIRE(datasets.contains("dataset2"));
+        REQUIRE(!datasets.contains("constant_dataset"));
+    }
+
     iteration.customHierarchies().read(0).printRecursively();
     auto constant_dataset =
         iteration.customHierarchies()["fully"]["custom"]["constant_dataset"]
@@ -213,6 +225,26 @@ struct test_config
     IterationEncoding encoding;
 };
 
+void iteration_filtering()
+{
+    Series series(
+        "../samples/custom_hierarchy/iteration_filtering.json", Access::CREATE);
+    series.iterations[0];
+    auto custom = series.iterations.customHierarchies();
+    custom["not_an_index"].setAttribute("x", "y");
+
+    REQUIRE(series.iterations.size() == 1);
+    REQUIRE(series.iterations.begin()->first == 0);
+
+    custom["42"].setAttribute("x", "y");
+    REQUIRE(series.iterations.size() == 2);
+    REQUIRE(series.iterations.contains(42));
+    REQUIRE_THROWS_AS(series.iterations.begin(), error::WrongAPIUsage);
+
+    custom.erase("42");
+    custom.erase("not_an_index");
+}
+
 void materialization_error()
 {
     Series series(
@@ -223,16 +255,20 @@ void materialization_error()
     iteration.customHierarchies()["meshes"]["custom_group"].setAttribute(
         "a", "b");
 
-    auto const &group = *iteration.meshes.writable().objectType.requireGroup();
-    REQUIRE_THROWS_AS(
-        iteration.meshes.syncContainers(group), error::WrongAPIUsage);
-
     // Already materialized children and their iterators remain valid.
     REQUIRE(iteration.meshes.contains("E"));
     auto it = iteration.meshes.begin();
     REQUIRE(it != iteration.meshes.end());
     REQUIRE(it->first == "E");
     REQUIRE(&it->second == &iteration.meshes.at("E"));
+
+    // The custom-created group has no Mesh materialization. Dereferencing it
+    // throws, but the iterator remains valid and can still be advanced.
+    ++it;
+    REQUIRE(it != iteration.meshes.end());
+    REQUIRE_THROWS_AS(*it, error::WrongAPIUsage);
+    ++it;
+    REQUIRE(it == iteration.meshes.end());
 }
 
 void custom_hierarchy()
