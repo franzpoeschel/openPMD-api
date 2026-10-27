@@ -160,10 +160,29 @@ auto children_cache() -> void
         REQUIRE(found->at("a") == 1);
     }
 
+    SECTION("integral_keys_must_be_canonical")
+    {
+        using namespace internal::children_cache_detail;
+        using U = std::uint64_t;
+        using I = int;
+
+        REQUIRE(key_from_string<U>("42").value() == 42);
+        REQUIRE(key_from_string<I>("-42").value() == -42);
+        REQUIRE(!key_from_string<U>("042"));
+        REQUIRE(!key_from_string<U>("+42"));
+        REQUIRE(!key_from_string<U>(" 42"));
+        REQUIRE(!key_from_string<U>("-1"));
+        REQUIRE(!key_from_string<I>("042"));
+        REQUIRE(!key_from_string<I>("+42"));
+        REQUIRE(!key_from_string<I>(" 42"));
+        REQUIRE(!key_from_string<I>("-0"));
+    }
+
     SECTION("group_metadata_erase_clears_every_cache")
     {
         internal::object_type::GroupMetaData group;
-        auto ints = group.m_children_cache.get_or_create_cache<int, std::string>();
+        auto ints =
+            group.m_children_cache.get_or_create_cache<int, std::string>();
         auto doubles =
             group.m_children_cache.get_or_create_cache<double, std::string>();
         add_child(group.m_children_cache, "x");

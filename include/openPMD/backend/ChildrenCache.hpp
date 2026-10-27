@@ -73,7 +73,12 @@ namespace children_cache_detail
                     {
                         return std::nullopt;
                     }
-                    return static_cast<Key>(value);
+                    auto const casted = static_cast<Key>(value);
+                    if (std::to_string(casted) != key)
+                    {
+                        return std::nullopt;
+                    }
+                    return casted;
                 }
                 else
                 {
@@ -87,7 +92,12 @@ namespace children_cache_detail
                     {
                         return std::nullopt;
                     }
-                    return static_cast<Key>(value);
+                    auto const casted = static_cast<Key>(value);
+                    if (std::to_string(casted) != key)
+                    {
+                        return std::nullopt;
+                    }
+                    return casted;
                 }
             }
             catch (...)
