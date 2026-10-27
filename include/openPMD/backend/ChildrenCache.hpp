@@ -194,16 +194,74 @@ namespace children_cache_detail
  */
 class ChildrenCache
 {
-    struct Entry
+    struct EntryI
     {
         std::shared_ptr<void> storage;
-        std::function<void(std::string const &)> erase;
-        std::function<void()> clear;
-        std::function<bool(std::string const &)> contains;
-        std::function<void(std::function<void(std::string const &)> const &)>
-            for_each_key;
-        std::function<std::size_t()> size;
+        virtual void erase(std::string const &) = 0;
+        virtual void clear() = 0;
+        virtual auto contains(std::string const &) -> bool = 0;
+        virtual void
+        for_each_key(std::function<void(std::string const &)> const &) = 0;
+        virtual auto size() -> std::size_t = 0;
     };
+
+    template <typename Key, typename T>
+    struct TypedEntry : EntryI
+    {
+        using map_type = std::map<Key, T>;
+        map_type map;
+        void erase(std::string const &key) override
+        {
+            if constexpr (std::is_same_v<Key, std::string>)
+            {
+                map.erase(key);
+            }
+            else
+            {
+                auto const parsed =
+                    children_cache_detail::key_from_string<Key>(key);
+                // A key that cannot be represented by this map cannot be
+                // contained in it. assert_consistent() validates the
+                // round-trip for entries that actually exist.
+                if (parsed)
+                {
+                    map.erase(*parsed);
+                }
+            }
+        }
+        void clear() override
+        {
+            map.clear();
+        }
+        auto contains(std::string const &key) -> bool override
+        {
+            if constexpr (std::is_same_v<Key, std::string>)
+            {
+                return map.find(key) != map.end();
+            }
+            else
+            {
+                auto const parsed =
+                    children_cache_detail::key_from_string<Key>(key);
+                return parsed.has_value() && map.find(*parsed) != map.end();
+            }
+        }
+        void for_each_key(
+            std::function<void(std::string const &)> const &functor) override
+        {
+            for (auto const &[key, value] : map)
+            {
+                (void)value;
+                functor(children_cache_detail::key_to_string(key));
+            }
+        }
+        auto size() -> std::size_t override
+        {
+            return map.size();
+        }
+    };
+
+    using Entry = std::shared_ptr<EntryI>;
 
 public:
     using children_map_t =
@@ -228,64 +286,19 @@ public:
     auto get_or_create_cache() const -> ChildrenCacheMap<T, Key>
     {
         using map_type = std::map<Key, T>;
+        using entry_type = TypedEntry<Key, T>;
         auto const type = std::type_index(typeid(map_type));
         auto it = m_entries.find(type);
         if (it == m_entries.end())
         {
-            auto storage = std::make_shared<map_type>();
-            auto *map = storage.get();
-
-            Entry entry;
-            entry.storage = storage;
-            entry.erase = [map](std::string const &key) {
-                if constexpr (std::is_same_v<Key, std::string>)
-                {
-                    map->erase(key);
-                }
-                else
-                {
-                    auto const parsed =
-                        children_cache_detail::key_from_string<Key>(key);
-                    // A key that cannot be represented by this map cannot be
-                    // contained in it. assert_consistent() validates the
-                    // round-trip for entries that actually exist.
-                    if (parsed)
-                    {
-                        map->erase(*parsed);
-                    }
-                }
-            };
-            entry.clear = [map]() { map->clear(); };
-            entry.contains = [map](std::string const &key) {
-                if constexpr (std::is_same_v<Key, std::string>)
-                {
-                    return map->find(key) != map->end();
-                }
-                else
-                {
-                    auto const parsed =
-                        children_cache_detail::key_from_string<Key>(key);
-                    return parsed.has_value() &&
-                        map->find(*parsed) != map->end();
-                }
-            };
-            entry.for_each_key =
-                [map](std::function<void(std::string const &)> const &functor) {
-                    for (auto const &[key, value] : *map)
-                    {
-                        (void)value;
-                        functor(children_cache_detail::key_to_string(key));
-                    }
-                };
-            entry.size = [map]() { return map->size(); };
-
-            it = m_entries.emplace(type, std::move(entry)).first;
+            auto typed_entry = std::make_shared<entry_type>();
+            it = m_entries.emplace(type, std::move(typed_entry)).first;
             assert_consistent();
         }
 
-        auto *map = static_cast<map_type *>(it->second.storage.get());
-        assert(map != nullptr);
-        return ChildrenCacheMap<T, Key>(*map);
+        auto *typed_entry = static_cast<entry_type *>(it->second.get());
+        assert(typed_entry != nullptr);
+        return ChildrenCacheMap<T, Key>(typed_entry->map);
     }
 
     template <typename T, typename Key>
@@ -293,14 +306,15 @@ public:
         -> std::optional<ChildrenCacheMap<T, Key>>
     {
         using map_type = std::map<Key, T>;
+        using entry_type = TypedEntry<Key, T>;
         auto const it = m_entries.find(std::type_index(typeid(map_type)));
         if (it == m_entries.end())
         {
             return std::nullopt;
         }
-        auto *map = static_cast<map_type *>(it->second.storage.get());
-        assert(map != nullptr);
-        return ChildrenCacheMap<T, Key>(*map);
+        auto *typed_entry = static_cast<entry_type *>(it->second.get());
+        assert(typed_entry != nullptr);
+        return ChildrenCacheMap<T, Key>(typed_entry->map);
     }
 
     template <typename T, typename Key>

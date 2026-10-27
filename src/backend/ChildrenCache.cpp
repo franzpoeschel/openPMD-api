@@ -38,14 +38,13 @@ void ChildrenCache::erase(std::string const &canonicalKey)
     for (auto &[type, entry] : m_entries)
     {
         (void)type;
-        assert(entry.erase);
-        entry.erase(canonicalKey);
+        entry->erase(canonicalKey);
     }
 
     for (auto const &[type, entry] : m_entries)
     {
         (void)type;
-        assert(!entry.contains(canonicalKey));
+        assert(!entry->contains(canonicalKey));
     }
 }
 
@@ -55,14 +54,13 @@ void ChildrenCache::clear()
     for (auto &[type, entry] : m_entries)
     {
         (void)type;
-        assert(entry.clear);
-        entry.clear();
+        entry->clear();
     }
 
     for (auto const &[type, entry] : m_entries)
     {
         (void)type;
-        assert(entry.size && entry.size() == 0);
+        assert(entry->size() == 0);
     }
 
     assert_consistent();
@@ -73,8 +71,7 @@ bool ChildrenCache::empty() const noexcept
     for (auto const &[type, entry] : m_entries)
     {
         (void)type;
-        assert(entry.size);
-        if (entry.size() != 0)
+        if (entry->size() != 0)
         {
             return false;
         }
@@ -93,18 +90,12 @@ void ChildrenCache::assert_consistent() const
     for (auto const &[type, entry] : m_entries)
     {
         (void)type;
-        assert(entry.storage);
-        assert(entry.erase);
-        assert(entry.clear);
-        assert(entry.contains);
-        assert(entry.for_each_key);
-        assert(entry.size);
 
-        std::size_t const registered_size = entry.size();
+        std::size_t const registered_size = entry->size();
         std::size_t counted_size = 0;
-        entry.for_each_key([&](std::string const &key) {
+        entry->for_each_key([&](std::string const &key) {
             ++counted_size;
-            assert(entry.contains(key));
+            assert(entry->contains(key));
             assert(m_children.find(key) != m_children.end());
         });
         assert(counted_size == registered_size);
