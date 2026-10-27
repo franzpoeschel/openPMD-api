@@ -28,6 +28,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <functional>
 #include <iterator>
 #include <map>
 #include <memory>
@@ -146,15 +147,27 @@ auto materialize_child_at(
     return it;
 }
 
+/** Const-independent state shared by mutable and const projected iterators. */
+template <typename T, typename Key>
+struct ProjectedChildIteratorMembers
+{
+    using children_iterator = typename ChildrenCache::children_map_t::iterator;
+
+    ChildrenCache *cache = nullptr;
+    children_iterator iterator;
+    children_iterator end;
+    ChildFilter filter;
+    bool access_policy = true;
+};
+
 template <typename T, typename Key, bool Const>
 class ProjectedChildIterator
 {
 public:
     using children_map_t = ChildrenCache::children_map_t;
-    using children_iterator = std::conditional_t<
-        Const,
-        typename children_map_t::const_iterator,
-        typename children_map_t::iterator>;
+    // Deliberately non-const even for Const iterators: Members must not depend
+    // on Const. Constness is enforced on the returned reference.
+    using children_iterator = typename children_map_t::iterator;
     using typed_map = std::map<Key, T>;
     using typed_iterator = std::conditional_t<
         Const,
@@ -168,9 +181,13 @@ public:
     using difference_type = std::ptrdiff_t;
     using iterator_category = std::bidirectional_iterator_tag;
 
+private:
+    using Members = ProjectedChildIteratorMembers<T, Key>;
+
     template <typename, typename, bool>
     friend class ProjectedChildIterator;
 
+public:
     ProjectedChildIterator() = default;
 
     // Convert a mutable iterator to a const iterator. This is safe because
@@ -181,11 +198,7 @@ public:
     ProjectedChildIterator(
         ProjectedChildIterator<T, Key, OtherConst> const &other,
         std::enable_if_t<Const && !OtherConst, int> = 0)
-        : m_cache(other.m_cache)
-        , m_iterator(other.m_iterator)
-        , m_end(other.m_end)
-        , m_filter(other.m_filter)
-        , m_access_policy(other.m_access_policy)
+        : m_members(other.m_members)
     {}
 
     ProjectedChildIterator(
@@ -194,13 +207,9 @@ public:
         children_iterator end,
         ChildFilter filter,
         bool access_policy)
-        : m_cache(cache)
-        , m_iterator(iterator)
-        , m_end(end)
-        , m_filter(std::move(filter))
-        , m_access_policy(access_policy)
+        : m_members{cache, iterator, end, std::move(filter), access_policy}
     {
-        if (m_iterator != m_end)
+        if (m_members.iterator != m_members.end)
         {
             skip_forward();
         }
@@ -208,13 +217,16 @@ public:
 
     auto key() const -> std::string const &
     {
-        return m_iterator->first;
+        return m_members.iterator->first;
     }
 
     auto operator*() const -> reference
     {
         auto it = materialize_child_at<T, Key>(
-            *m_cache, m_iterator->first, m_iterator->second, m_access_policy);
+            *m_members.cache,
+            m_members.iterator->first,
+            m_members.iterator->second,
+            m_members.access_policy);
         return *typed_iterator(it);
     }
 
@@ -225,7 +237,7 @@ public:
 
     auto operator++() -> ProjectedChildIterator &
     {
-        ++m_iterator;
+        ++m_members.iterator;
         skip_forward();
         return *this;
     }
@@ -238,7 +250,7 @@ public:
 
     auto operator--() -> ProjectedChildIterator &
     {
-        --m_iterator;
+        --m_members.iterator;
         skip_backward();
         return *this;
     }
@@ -251,7 +263,7 @@ public:
 
     auto operator==(ProjectedChildIterator const &other) const -> bool
     {
-        return m_iterator == other.m_iterator;
+        return m_members.iterator == other.m_members.iterator;
     }
     auto operator!=(ProjectedChildIterator const &other) const -> bool
     {
@@ -261,26 +273,24 @@ public:
 private:
     void skip_forward()
     {
-        while (m_iterator != m_end &&
-               !m_filter.accepts(m_iterator->first, *m_iterator->second))
+        while (m_members.iterator != m_members.end &&
+               !m_members.filter.accepts(
+                   m_members.iterator->first, *m_members.iterator->second))
         {
-            ++m_iterator;
+            ++m_members.iterator;
         }
     }
 
     void skip_backward()
     {
-        while (!m_filter.accepts(m_iterator->first, *m_iterator->second))
+        while (!m_members.filter.accepts(
+            m_members.iterator->first, *m_members.iterator->second))
         {
-            --m_iterator;
+            --m_members.iterator;
         }
     }
 
-    ChildrenCache *m_cache = nullptr;
-    children_iterator m_iterator;
-    children_iterator m_end;
-    ChildFilter m_filter;
-    bool m_access_policy = true;
+    Members m_members;
 };
 
 /** Stateless, filtered projection of one group's authoritative children. */
@@ -331,8 +341,10 @@ public:
         CreateChild create_child)
         : m_cache(&cache)
         , m_self(self)
-        , m_filter(&filter)
-        , m_create_child(create_child)
+        , m_filter(std::cref(filter))
+        , m_create_child(
+              create_child ? std::optional<CreateChild>(create_child)
+                           : std::nullopt)
     {}
 
     auto begin() -> iterator
@@ -446,7 +458,7 @@ public:
         auto const &canonical = children_cache_detail::key_to_string(key);
         auto it = m_cache->children().find(canonical);
         if (it == m_cache->children().end() ||
-            !m_filter->accepts(canonical, *it->second))
+            !filter().accepts(canonical, *it->second))
         {
             return end();
         }
@@ -468,7 +480,7 @@ public:
                 m_cache,
                 it,
                 m_cache->children().end(),
-                *m_filter,
+                filter(),
                 m_access_policy);
         }
     }
@@ -477,7 +489,7 @@ public:
         auto const &canonical = children_cache_detail::key_to_string(key);
         auto it = m_cache->children().find(canonical);
         if (it == m_cache->children().end() ||
-            !m_filter->accepts(canonical, *it->second))
+            !filter().accepts(canonical, *it->second))
         {
             return end();
         }
@@ -499,7 +511,7 @@ public:
                 m_cache,
                 it,
                 m_cache->children().end(),
-                *m_filter,
+                filter(),
                 m_access_policy);
         }
     }
@@ -509,7 +521,7 @@ public:
         auto const &canonical = children_cache_detail::key_to_string(key);
         auto it = m_cache->children().find(canonical);
         return it != m_cache->children().end() &&
-            m_filter->accepts(canonical, *it->second);
+            filter().accepts(canonical, *it->second);
     }
 
     auto count(Key const &key) const -> size_type
@@ -551,7 +563,7 @@ public:
 
         if (it != children.end())
         {
-            if (!m_filter->accepts(canonical, *it->second))
+            if (!filter().accepts(canonical, *it->second))
             {
                 throw error::WrongAPIUsage(
                     "Cannot access child '" + canonical +
@@ -564,8 +576,8 @@ public:
 
         check_writable();
         assert(m_self != nullptr);
-        assert(m_create_child != nullptr);
-        T child = m_create_child(key, *m_self);
+        assert(m_create_child.has_value());
+        T child = (*m_create_child)(key, *m_self);
         children.emplace(canonical, child.m_attri->asSharedPtrOfAttributable());
 
         auto typed_view = typed();
@@ -614,7 +626,7 @@ public:
         auto const &canonical = children_cache_detail::key_to_string(key);
         auto it = m_cache->children().find(canonical);
         if (it == m_cache->children().end() ||
-            !m_filter->accepts(canonical, *it->second))
+            !filter().accepts(canonical, *it->second))
         {
             return 0;
         }
@@ -644,10 +656,12 @@ public:
 
     auto filter() const -> ChildFilter const &
     {
-        return *m_filter;
+        assert(m_filter.has_value());
+        return m_filter->get();
     }
     void set_access_policy(bool access_policy) noexcept
     {
+        assert(!non_string);
         m_access_policy = access_policy;
     }
 
@@ -667,7 +681,7 @@ private:
                 m_cache,
                 it,
                 m_cache->children().end(),
-                *m_filter,
+                filter(),
                 m_access_policy);
             return res;
         }
@@ -685,7 +699,7 @@ private:
                 m_cache,
                 m_cache->children().end(),
                 m_cache->children().end(),
-                *m_filter,
+                filter(),
                 m_access_policy);
         }
     }
@@ -727,9 +741,19 @@ private:
         std::string const &canonicalKey,
         SharedAttributableData const &child) const -> bool
     {
-        return m_filter->accepts(canonicalKey, child) &&
-            children_cache_detail::key_from_string<Key>(canonicalKey)
+        if (!filter().accepts(canonicalKey, child))
+        {
+            return false;
+        }
+        if constexpr (std::is_same_v<Key, std::string>)
+        {
+            return true;
+        }
+        else
+        {
+            return children_cache_detail::key_from_string<Key>(canonicalKey)
                 .has_value();
+        }
     }
 
     void check_writable() const
@@ -780,12 +804,12 @@ private:
 
     ChildrenCache *m_cache;
     Writable *m_self;
-    // Points into the owning Container's filter and is therefore valid for the
+    // References the owning Container's filter and is therefore valid for the
     // lifetime of that Container. Iterators copy the (trivial) filter.
-    ChildFilter const *m_filter;
-    bool m_access_policy = true;
+    std::optional<std::reference_wrapper<ChildFilter const>> m_filter;
+    bool m_access_policy = !non_string;
     // Runtime pointer because ChildView is not templated on the container.
-    // It is null for const views; get_or_create() asserts it is set.
-    CreateChild m_create_child;
+    // It is empty for const views; get_or_create() asserts it is set.
+    std::optional<CreateChild> m_create_child;
 };
 } // namespace openPMD::internal

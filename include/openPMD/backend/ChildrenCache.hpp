@@ -48,7 +48,10 @@ namespace children_cache_detail
     {
         if constexpr (std::is_same_v<Key, std::string>)
         {
-            return key;
+            static_assert(
+                !std::is_same_v<Key, std::string>,
+                "key_from_string<std::string>() would copy the key. Use "
+                "key_from_string_or_throw<std::string>() instead.");
         }
         else if constexpr (std::is_integral_v<Key>)
         {
@@ -114,23 +117,15 @@ namespace children_cache_detail
         }
     }
 
-    template <typename Key, typename Enable = void>
-    struct KeyFromStringOrThrow
-    {
-        static auto parse(std::string const &) -> Key
-        {
-            static_assert(
-                auxiliary::dependent_false_v<Key>,
-                "ChildrenCache does not know how to convert this key type "
-                "from its canonical string representation.");
-            return Key{};
-        }
-    };
-
+    /** Parse a canonical key, throwing if it cannot be represented. */
     template <typename Key>
-    struct KeyFromStringOrThrow<Key, std::enable_if_t<std::is_integral_v<Key>>>
+    decltype(auto) key_from_string_or_throw(std::string const &key)
     {
-        static auto parse(std::string const &key) -> Key
+        if constexpr (std::is_same_v<Key, std::string>)
+        {
+            return key;
+        }
+        else if constexpr (std::is_integral_v<Key>)
         {
             auto const parsed = key_from_string<Key>(key);
             if (!parsed)
@@ -138,62 +133,38 @@ namespace children_cache_detail
                 throw std::invalid_argument(
                     "Cannot convert '" + key + "' to the typed key.");
             }
-            return *parsed;
+            // Return by value: returning *parsed with decltype(auto) would
+            // deduce Key& and refer to the local optional.
+            return static_cast<Key>(*parsed);
         }
-    };
-
-    template <>
-    struct KeyFromStringOrThrow<std::string>
-    {
-        static auto parse(std::string const &key) -> std::string const &
-        {
-            return key;
-        }
-    };
-
-    /** Parse a canonical key, throwing if it cannot be represented. */
-    template <typename Key>
-    decltype(auto) key_from_string_or_throw(std::string const &key)
-    {
-        return KeyFromStringOrThrow<Key>::parse(key);
-    }
-
-    template <typename Key, typename Enable = void>
-    struct KeyToStringTraits
-    {
-        static auto convert(Key const &) -> std::string
+        else
         {
             static_assert(
                 auxiliary::dependent_false_v<Key>,
                 "ChildrenCache does not know how to convert this key type "
-                "to its canonical string representation.");
-            return {};
+                "from its canonical string representation.");
         }
-    };
-
-    template <typename Key>
-    struct KeyToStringTraits<Key, std::enable_if_t<std::is_integral_v<Key>>>
-    {
-        static auto convert(Key const &key) -> std::string
-        {
-            return std::to_string(key);
-        }
-    };
-
-    template <>
-    struct KeyToStringTraits<std::string>
-    {
-        static auto convert(std::string const &key) -> std::string const &
-        {
-            return key;
-        }
-    };
+    }
 
     /** Convert a typed key to the canonical string representation. */
     template <typename Key>
     decltype(auto) key_to_string(Key const &key)
     {
-        return KeyToStringTraits<Key>::convert(key);
+        if constexpr (std::is_same_v<Key, std::string>)
+        {
+            return key;
+        }
+        else if constexpr (std::is_integral_v<Key>)
+        {
+            return std::to_string(key);
+        }
+        else
+        {
+            static_assert(
+                auxiliary::dependent_false_v<Key>,
+                "ChildrenCache does not know how to convert this key type "
+                "to its canonical string representation.");
+        }
     }
 } // namespace children_cache_detail
 
@@ -267,21 +238,36 @@ public:
             Entry entry;
             entry.storage = storage;
             entry.erase = [map](std::string const &key) {
-                auto const parsed =
-                    children_cache_detail::key_from_string<Key>(key);
-                // A key that cannot be represented by this map cannot be
-                // contained in it. assert_consistent() validates the
-                // round-trip for entries that actually exist.
-                if (parsed)
+                if constexpr (std::is_same_v<Key, std::string>)
                 {
-                    map->erase(*parsed);
+                    map->erase(key);
+                }
+                else
+                {
+                    auto const parsed =
+                        children_cache_detail::key_from_string<Key>(key);
+                    // A key that cannot be represented by this map cannot be
+                    // contained in it. assert_consistent() validates the
+                    // round-trip for entries that actually exist.
+                    if (parsed)
+                    {
+                        map->erase(*parsed);
+                    }
                 }
             };
             entry.clear = [map]() { map->clear(); };
             entry.contains = [map](std::string const &key) {
-                auto const parsed =
-                    children_cache_detail::key_from_string<Key>(key);
-                return parsed.has_value() && map->find(*parsed) != map->end();
+                if constexpr (std::is_same_v<Key, std::string>)
+                {
+                    return map->find(key) != map->end();
+                }
+                else
+                {
+                    auto const parsed =
+                        children_cache_detail::key_from_string<Key>(key);
+                    return parsed.has_value() &&
+                        map->find(*parsed) != map->end();
+                }
             };
             entry.for_each_key =
                 [map](std::function<void(std::string const &)> const &functor) {
