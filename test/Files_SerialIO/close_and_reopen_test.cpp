@@ -151,7 +151,16 @@ auto run_test_filebased(
             it.close();
             REQUIRE((data == std::vector<int>{0, 1, 2, 3, 4}));
         }
-        REQUIRE(read.iterations.size() == 4);
+        if (mode == Access::READ_RANDOM_ACCESS)
+        {
+            REQUIRE(read.iterations.size() == 4);
+        }
+        else
+        {
+            // In linear read mode, Iterations are materialized lazily as the
+            // iterator visits them.
+            REQUIRE(read.iterations.size() <= 1);
+        }
         {
             auto it = read.snapshots()[1];
             std::vector<int> data(5);

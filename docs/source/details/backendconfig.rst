@@ -103,6 +103,15 @@ Environment variables may alternatively be used for options concerning deferred 
 * Environment variable ``OPENPMD_DEFER_ITERATION_PARSING``: if set to a truthy value (e.g. ``1``), the Series will be opened with deferred iteration parsing as if ``{"defer_iteration_parsing": true}`` had been supplied.
 * Environment variable ``OPENPMD_HINT_LAZY_PARSING_TIMEOUT``: accepts integral values equivalent to the ``hint_lazy_parsing_timeout`` key.
 
+Many Iterations
+^^^^^^^^^^^^^^^
+
+The key ``many_iterations`` (boolean, default ``false``; environment variable ``OPENPMD_MANY_ITERATIONS``) is an optimization for linear access modes (``READ_LINEAR``, ``CREATE_LINEAR``, ``APPEND_LINEAR``) with very many, tiny Iterations.
+It disables all features that require remembering Iterations that have already been processed: processed and closed Iterations are erased from the Series' frontend data structures immediately, and Iterations must be visited in strictly increasing index order, each at most once.
+Re-accessing a previously processed Iteration (including through a stale handle) is an error.
+This keeps the frontend memory footprint bounded by the number of currently open Iterations rather than the total number of Iterations.
+Disable it if you need to revisit closed Iterations or process Iterations out of order.
+
 Examples:
 
 .. code-block:: bash

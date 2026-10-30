@@ -51,6 +51,7 @@
 #include <list>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -284,6 +285,80 @@ TEST_CASE("write_and_read_many_iterations", "[serial]")
         }
         write_and_read_many_iterations(t, intermittentFlushes);
         intermittentFlushes = !intermittentFlushes;
+    }
+}
+
+void many_iterations_linear(std::string const &ext)
+{
+    std::string name = "../samples/many_iterations_linear_%T." + ext;
+    std::string const config = R"({"many_iterations": true})";
+    constexpr size_t nIterations = 20;
+    std::vector<int> data{1, 2, 3, 4};
+
+    {
+        Series write(name, Access::CREATE_LINEAR, config);
+        auto iterations = write.snapshots();
+        std::optional<Iteration> held;
+        for (size_t i = 0; i < nIterations; ++i)
+        {
+            auto &iteration = iterations[i];
+            auto E_x = iteration.meshes["E"]["x"];
+            E_x.resetDataset({Datatype::INT, {4}});
+            E_x.storeChunk(data, {0}, {4});
+            if (i == 0)
+            {
+                held = iteration;
+            }
+            iteration.close();
+        }
+        /*
+         * The Iteration from the beginning has been closed and erased to keep
+         * memory bounded.
+         */
+        REQUIRE(held.has_value());
+        REQUIRE_FALSE(held->valid());
+        REQUIRE(held->stale());
+        REQUIRE_THROWS_AS(held->open(), error::WrongAPIUsage);
+        REQUIRE_THROWS_AS(held->close(), error::WrongAPIUsage);
+        /*
+         * `many_iterations` only supports strictly increasing Iteration
+         * indices; going back is an error.
+         */
+        REQUIRE_THROWS_AS(iterations[0], error::WrongAPIUsage);
+        REQUIRE(write.iterations.size() <= 1);
+    }
+
+    {
+        Series read(name, Access::READ_LINEAR, config);
+        size_t counter = 0;
+        for (auto &[index, iteration] : read.snapshots())
+        {
+            (void)index;
+            auto E_x = iteration.meshes["E"]["x"];
+            auto chunk = E_x.loadChunk<int>({0}, {4});
+            iteration.close();
+            auto array = chunk.get();
+            for (size_t i = 0; i < data.size(); ++i)
+            {
+                REQUIRE(array[i] == data[i]);
+            }
+            ++counter;
+        }
+        REQUIRE(counter == nIterations);
+        REQUIRE(read.iterations.size() <= 1);
+        REQUIRE_THROWS_AS(read.snapshots()[0], error::WrongAPIUsage);
+    }
+}
+
+TEST_CASE("many_iterations_linear", "[serial]")
+{
+    for (auto const &t : testedFileExtensions())
+    {
+        if (t == "bp4" || t == "bp5" || t == "sst" || t == "ssc")
+        {
+            continue;
+        }
+        many_iterations_linear(t);
     }
 }
 
