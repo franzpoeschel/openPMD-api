@@ -118,6 +118,15 @@ using iterator_t = Container<Iteration, Iteration::IterationIndex_t>::iterator;
 
 Iteration &Iteration::close(bool _flush)
 {
+    if (get().m_erased)
+    {
+        throw error::WrongAPIUsage(
+            "[Iteration::close] This Iteration handle (index " +
+            std::to_string(get().m_iterationIndex.value_or(0)) +
+            ") is stale: the Iteration has already been closed and erased "
+            "from its Series. Re-acquire it via Series::snapshots() or "
+            "Series::iterations if needed.");
+    }
     auto &it = get();
     StepStatus flag = getStepStatus();
     // update close status
@@ -173,6 +182,15 @@ Iteration &Iteration::close(bool _flush)
 
 Iteration &Iteration::open()
 {
+    if (get().m_erased)
+    {
+        throw error::WrongAPIUsage(
+            "[Iteration::open] This Iteration handle (index " +
+            std::to_string(get().m_iterationIndex.value_or(0)) +
+            ") is stale: the Iteration has been closed and erased from its "
+            "Series. Re-acquire it via Series::snapshots() or "
+            "Series::iterations instead of reusing an old handle.");
+    }
     Series s = retrieveSeries();
     auto &it = get();
     // figure out my iteration number
@@ -239,6 +257,11 @@ bool Iteration::parsed() const
         return true;
     }
     throw std::runtime_error("Unreachable!");
+}
+
+bool Iteration::valid() const
+{
+    return !get().m_erased;
 }
 
 bool Iteration::closedByWriter() const

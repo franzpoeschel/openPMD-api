@@ -148,6 +148,13 @@ namespace internal
          * Otherwise empty.
          */
         std::optional<DeferredParseAccess> m_deferredParseAccess{};
+
+        /**
+         * Set to true once this Iteration has been erased from its Series in
+         * order to reclaim memory in linear workflows. All handles that still
+         * refer to this Iteration share this flag and are stale from then on.
+         */
+        bool m_erased = false;
     };
 } // namespace internal
 
@@ -286,6 +293,26 @@ public:
      * @return Whether the iteration has been parsed.
      */
     bool parsed() const;
+
+    /**
+     * @brief Is this handle still valid?
+     *
+     * In linear access modes, closed Iterations may be erased from the Series
+     * to reclaim memory. A handle that refers to such an erased Iteration is
+     * stale: it still owns the (detached) data, but it is no longer part of
+     * the Series and cannot be used for further I/O.
+     *
+     * @return false if the Iteration has been erased from its Series.
+     */
+    bool valid() const;
+
+    /**
+     * @brief Inverse of valid().
+     */
+    bool stale() const
+    {
+        return !valid();
+    }
 
     /**
      * @brief Has the iteration been closed by the writer?
