@@ -150,6 +150,17 @@ namespace internal
          * "ON"` is recommended in this case.
          */
         std::unordered_map<IterationIndex_t, std::string> m_iterationFilenames;
+
+        /**
+         * In linear read mode with file-based iteration encoding, the file
+         * system is scanned once and only the Iteration indices are remembered
+         * here. Iteration objects are materialized lazily when the iterator
+         * visits them, so that a Series with millions of Iterations does not
+         * create millions of frontend objects up front.
+         *
+         * Sorted in ascending order. Empty in non-lazy / non-file-based modes.
+         */
+        std::vector<IterationIndex_t> m_fileBasedIterationOrder;
         /**
          * Needed if reading a single iteration of a file-based series.
          * Users may specify the concrete filename of one iteration instead of
@@ -223,6 +234,22 @@ namespace internal
          */
         bool m_parseLazily = false;
         uint64_t m_hintLazyParsingAfterTimeout = 20; // seconds
+
+        /**
+         * Optimization flag for linear access modes (READ_LINEAR /
+         * CREATE_LINEAR / APPEND_LINEAR) with very many, tiny Iterations.
+         *
+         * When enabled, features that require remembering Iterations that
+         * have already been processed are disabled: Iterations may only be
+         * visited in strictly increasing index order and each at most once,
+         * closed Iterations may not be re-acquired, and the bookkeeping for
+         * detecting duplicates/out-of-order Iterations is not kept.
+         *
+         * Configured via the backend-independent JSON/TOML key
+         * `many_iterations` or the environment variable
+         * `OPENPMD_MANY_ITERATIONS`.
+         */
+        bool m_manyIterations = false;
 
         /**
          * In variable-based encoding, all backends except ADIOS2 can only write
@@ -968,6 +995,19 @@ OPENPMD_private
      * into Series::iterations at that place.
      */
     iterations_iterator indexOf(Iteration const &);
+
+    /**
+     * Erase the given (closed) Iteration from Series::iterations in order to
+     * reclaim memory in linear workflows.
+     *
+     * The Iteration is *not* deleted from the backend (no DELETE_PATH is
+     * issued). Handles that still refer to it are marked stale. Pending
+     * DEREGISTER tasks are flushed immediately so that the backend does not
+     * keep dangling references if the Writable's address is reused.
+     *
+     * @return iterator following the erased element.
+     */
+    iterations_iterator eraseIteration(iterations_iterator it);
 
     /**
      * @brief In step-based IO mode, begin or end an IO step for the given

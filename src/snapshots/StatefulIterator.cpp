@@ -301,6 +301,39 @@ namespace
     }
 } // namespace
 
+auto StatefulIterator::track_seen_iterations(
+    std::vector<iteration_index_t> &indexes, size_t step) -> void
+{
+    auto &data = get();
+    if (!data.series.get().m_manyIterations)
+    {
+        restrict_to_unseen_iterations(indexes, data.seen_iterations, step);
+        return;
+    }
+    /*
+     * `many_iterations` mode: Do not remember processed Iterations. Instead,
+     * require strictly increasing iteration indices so that Iterations can
+     * never repeat and therefore never need to be looked up again.
+     */
+    for (auto idx : indexes)
+    {
+        if (data.m_lastSeenIteration.has_value() &&
+            idx <= *data.m_lastSeenIteration)
+        {
+            throw error::WrongAPIUsage(
+                "[StatefulIterator] Iteration " + std::to_string(idx) +
+                " is not strictly larger than the previously processed "
+                "Iteration " +
+                std::to_string(*data.m_lastSeenIteration) +
+                ". The Series was opened with `many_iterations = true`, which "
+                "only supports strictly increasing iteration indices and "
+                "visiting each Iteration at most once. Disable "
+                "`many_iterations` for out-of-order or repeated Iterations.");
+        }
+        data.m_lastSeenIteration = idx;
+    }
+}
+
 auto StatefulIterator::resetCurrentIterationToBegin(
     size_t num_skipped_iterations, std::vector<iteration_index_t> indexes)
     -> void
@@ -309,8 +342,7 @@ auto StatefulIterator::resetCurrentIterationToBegin(
     data.currentStep.map_during_t(
         [&](CurrentStep::During_t &during) {
             during.step_count += num_skipped_iterations;
-            restrict_to_unseen_iterations(
-                indexes, data.seen_iterations, during.step_count);
+            track_seen_iterations(indexes, during.step_count);
             during.available_iterations_in_step = std::move(indexes);
             if (during.available_iterations_in_step.empty())
             {
@@ -327,8 +359,7 @@ auto StatefulIterator::resetCurrentIterationToBegin(
             switch (whereAmI)
             {
             case detail::CurrentStep::AtTheEdge::Begin: {
-                restrict_to_unseen_iterations(
-                    indexes, data.seen_iterations, num_skipped_iterations);
+                track_seen_iterations(indexes, num_skipped_iterations);
                 if (indexes.empty())
                 {
                     return std::nullopt;
@@ -397,6 +428,15 @@ auto StatefulIterator::reparse_possibly_deleted_iteration(iteration_index_t idx)
     auto &data = get();
     if (!data.series.iterations.contains(idx))
     {
+        if (data.series.iterationEncoding() == IterationEncoding::variableBased)
+        {
+            throw error::WrongAPIUsage(
+                "[StatefulIterator] Cannot re-access Iteration " +
+                std::to_string(idx) +
+                ": variable-based encoding relies on IO steps and consumed "
+                "steps can no longer be reparsed. Closed Iterations cannot be "
+                "re-opened in this setup.");
+        }
         withRWAccess(data.series.IOHandler()->m_seriesStatus, [&]() {
             switch (data.series.iterationEncoding())
             {
@@ -657,8 +697,8 @@ std::optional<StatefulIterator *> StatefulIterator::loopBody(Seek const &seek)
             else if (
                 series.IOHandler()->m_frontendAccess == Access::READ_LINEAR)
             {
-                data.series.iterations.container().erase(
-                    *maybe_current_iteration);
+                data.series.eraseIteration(
+                    iterations.find(*maybe_current_iteration));
             }
         }
     }
@@ -792,38 +832,49 @@ void StatefulIterator::initIteratorFilebased()
 {
     auto &data = get();
     auto &series = data.series;
-    if (series.iterations.empty())
+    std::vector<iteration_index_t> indexes;
+    auto const &lazyOrder = series.get().m_fileBasedIterationOrder;
+    if (!lazyOrder.empty())
+    {
+        indexes = lazyOrder;
+    }
+    else
+    {
+        indexes.reserve(series.iterations.size());
+        std::transform(
+            series.iterations.begin(),
+            series.iterations.end(),
+            std::back_inserter(indexes),
+            [](auto const &pair) { return pair.first; });
+    }
+    if (indexes.empty())
     {
         this->turn_into_end_iterator(TypeOfEndIterator::NoMoreIterationsInStep);
         return;
     }
-    std::vector<iteration_index_t> indexes;
-    indexes.reserve(series.iterations.size());
-    std::transform(
-        series.iterations.begin(),
-        series.iterations.end(),
-        std::back_inserter(indexes),
-        [](auto const &pair) { return pair.first; });
-    auto it = series.iterations.begin();
-    auto end = series.iterations.end();
-    for (; it != end; ++it)
+    std::optional<iteration_index_t> firstIteration;
+    for (auto index : indexes)
     {
         try
         {
-            it->second.open();
+            // In lazy file-based mode, the Iteration might not have been
+            // materialized yet.
+            reparse_possibly_deleted_iteration(index);
+            series.iterations.at(index).open();
+            firstIteration = index;
             break;
         }
         catch (error::ReadError const &err)
         {
-            std::cerr << "[StatefulIterator] Cannot read iteration '"
-                      << it->first << "' and will skip it due to read error:\n"
+            std::cerr << "[StatefulIterator] Cannot read iteration '" << index
+                      << "' and will skip it due to read error:\n"
                       << err.what() << std::endl;
         }
     }
-    if (it != end)
+    if (firstIteration.has_value())
     {
         data.currentStep =
-            CurrentStep::During_t{0, it->first, std::move(indexes)};
+            CurrentStep::During_t{0, *firstIteration, std::move(indexes)};
     }
     else
     {

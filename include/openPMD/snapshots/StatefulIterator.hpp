@@ -256,6 +256,13 @@ class StatefulIterator
         std::unordered_map<iteration_index_t, step_index> seen_iterations;
 
         /*
+         * In `many_iterations` mode, seen_iterations is not populated in order
+         * to keep memory bounded. Instead, only the highest index seen so far
+         * is remembered and Iterations are required to be strictly increasing.
+         */
+        std::optional<iteration_index_t> m_lastSeenIteration;
+
+        /*
          * This returns the current value of `During_t::iteration_idx` if that
          * exists.
          */
@@ -396,6 +403,15 @@ private:
     auto peekCurrentlyOpenIteration() -> std::optional<value_type *>;
 
     auto reparse_possibly_deleted_iteration(iteration_index_t) -> void;
+
+    /**
+     * Record the Iterations contained in a step as seen, either in the full
+     * seen_iterations map (default) or via a single watermark in
+     * `many_iterations` mode.
+     */
+    auto
+    track_seen_iterations(std::vector<iteration_index_t> &indexes, size_t step)
+        -> void;
 };
 } // namespace openPMD
 

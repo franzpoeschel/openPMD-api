@@ -1758,11 +1758,46 @@ void Series::readFileBased(
         series.m_filenamePostfix,
         series.m_filenameExtension);
 
+    /*
+     * When lazily re-reading one Iteration that was previously discovered,
+     * use the cached file name instead of scanning the whole directory again.
+     */
+    bool const useCachedDiscovery =
+        read_only_this_single_iteration.has_value() &&
+        !series.m_fileBasedIterationOrder.empty();
+    if (useCachedDiscovery)
+    {
+        auto const index = *read_only_this_single_iteration;
+        if (series.m_iterationFilenames.find(index) ==
+            series.m_iterationFilenames.end())
+        {
+            throw error::ReadError(
+                error::AffectedObject::File,
+                error::Reason::NotFound,
+                {},
+                "Iteration " + std::to_string(index) +
+                    " is not part of this file-based Series.");
+        }
+        Iteration &iteration = series.iterations[index];
+        iteration.deferParseAccess({std::to_string(index), index, true});
+        iteration.get().m_closed = internal::CloseStatus::ParseAccessDeferred;
+        iteration.runDeferredParseAccess();
+        return;
+    }
+
+    bool const lazyDiscovery = series.m_parseLazily &&
+        !read_only_this_single_iteration.has_value() &&
+        IOHandler()->m_frontendAccess == Access::READ_LINEAR;
+    if (lazyDiscovery)
+    {
+        series.m_fileBasedIterationOrder.clear();
+    }
+
     int padding = autoDetectPadding(
         isPartOfSeries,
         IOHandler()->directory,
         // foreach found file with `filename` and `index`:
-        [&series, &read_only_this_single_iteration](
+        [&series, &read_only_this_single_iteration, lazyDiscovery](
             std::string const &filename, Match const &match) {
             auto index = match.iteration;
             if (read_only_this_single_iteration.has_value() &&
@@ -1770,13 +1805,27 @@ void Series::readFileBased(
             {
                 return;
             }
-            Iteration &i = series.iterations[index];
             series.m_iterationFilenames[index] =
                 cleanFilename(filename, series.m_filenameExtension).body;
-            i.deferParseAccess({std::to_string(index), index, true});
+            if (lazyDiscovery)
+            {
+                series.m_fileBasedIterationOrder.push_back(index);
+            }
+            else
+            {
+                Iteration &i = series.iterations[index];
+                i.deferParseAccess({std::to_string(index), index, true});
+            }
         });
 
-    if (series.iterations.empty())
+    if (lazyDiscovery)
+    {
+        auto &order = series.m_fileBasedIterationOrder;
+        std::sort(order.begin(), order.end());
+        order.erase(std::unique(order.begin(), order.end()), order.end());
+    }
+
+    if (series.iterations.empty() && series.m_fileBasedIterationOrder.empty())
     {
         /* Frontend access type might change during Series::read() to allow
          * parameter modification. Backend access type stays unchanged for the
@@ -1821,36 +1870,72 @@ void Series::readFileBased(
     std::vector<decltype(Series::iterations)::key_type> unparseableIterations;
     if (series.m_parseLazily)
     {
-        for (auto &iteration : series.iterations)
-        {
-            iteration.second.get().m_closed =
-                internal::CloseStatus::ParseAccessDeferred;
-        }
         // open the first iteration, just to parse Series attributes
         bool atLeastOneIterationSuccessful = false;
         std::optional<error::ReadError> forwardFirstError;
-        for (auto &pair : series.iterations)
-        {
-            if (read_only_this_single_iteration.has_value() &&
-                *read_only_this_single_iteration != pair.first)
+        auto tryParse =
+            [&readIterationEagerly, &unparseableIterations, &forwardFirstError](
+                Iteration &iteration,
+                decltype(Series::iterations)::key_type const &index) -> bool {
+            iteration.get().m_closed =
+                internal::CloseStatus::ParseAccessDeferred;
+            if (auto error = readIterationEagerly(iteration); error)
             {
-                continue;
-            }
-            if (auto error = readIterationEagerly(pair.second); error)
-            {
-                std::cerr << "Cannot read iteration '" << pair.first
+                std::cerr << "Cannot read iteration '" << index
                           << "' and will skip it due to read error:\n"
                           << error->what() << std::endl;
-                unparseableIterations.push_back(pair.first);
+                unparseableIterations.push_back(index);
                 if (!forwardFirstError.has_value())
                 {
                     forwardFirstError = std::move(error);
                 }
+                return false;
             }
-            else
+            return true;
+        };
+        if (lazyDiscovery)
+        {
+            for (auto index : series.m_fileBasedIterationOrder)
             {
-                atLeastOneIterationSuccessful = true;
-                break;
+                Iteration &iteration = series.iterations[index];
+                iteration.deferParseAccess(
+                    {std::to_string(index), index, true});
+                if (tryParse(iteration, index))
+                {
+                    atLeastOneIterationSuccessful = true;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            for (auto &iteration : series.iterations)
+            {
+                /*
+                 * When re-reading a single Iteration, only reset the close
+                 * status of that Iteration. Sibling Iterations that are still
+                 * present in the Series must not be touched.
+                 */
+                if (read_only_this_single_iteration.has_value() &&
+                    *read_only_this_single_iteration != iteration.first)
+                {
+                    continue;
+                }
+                iteration.second.get().m_closed =
+                    internal::CloseStatus::ParseAccessDeferred;
+            }
+            for (auto &pair : series.iterations)
+            {
+                if (read_only_this_single_iteration.has_value() &&
+                    *read_only_this_single_iteration != pair.first)
+                {
+                    continue;
+                }
+                if (tryParse(pair.second, pair.first))
+                {
+                    atLeastOneIterationSuccessful = true;
+                    break;
+                }
             }
         }
         if (!atLeastOneIterationSuccessful)
@@ -1942,6 +2027,10 @@ void Series::readFileBased(
     for (auto index : unparseableIterations)
     {
         series.iterations.container().erase(index);
+        auto &order = series.m_fileBasedIterationOrder;
+        order.erase(
+            std::remove(order.begin(), order.end(), index), order.end());
+        series.m_iterationFilenames.erase(index);
     }
 
     if (padding > 0)
@@ -2608,9 +2697,8 @@ std::string Series::iterationFilename(IterationIndex_t i)
     {
         return series.m_overrideFilebasedFilename.value();
     }
-    else if (
-        auto iteration = series.m_iterationFilenames.find(i); //
-        iteration != series.m_iterationFilenames.end())
+    else if (auto iteration = series.m_iterationFilenames.find(i); //
+             iteration != series.m_iterationFilenames.end())
     {
         return iteration->second;
     }
@@ -2647,10 +2735,34 @@ Series::iterations_iterator Series::indexOf(Iteration const &iteration)
     }
     else
     {
-        throw error::Internal(
-            "Iteration " + std::to_string(*idx) +
-            " no longer known by the Series?");
+        throw error::WrongAPIUsage(
+            "[Iteration] Handle to Iteration " + std::to_string(*idx) +
+            " is stale: the Iteration was closed and erased from its Series "
+            "to keep linear workflows memory-bounded. Re-acquire it via "
+            "Series::snapshots() or Series::iterations, or use a "
+            "*_RANDOM_ACCESS mode if you need to revisit closed Iterations.");
     }
+}
+
+Series::iterations_iterator Series::eraseIteration(iterations_iterator it)
+{
+    if (it == iterations.end())
+    {
+        return it;
+    }
+    // Mark all handles that share this Iteration's data as stale.
+    it->second.get().m_erased = true;
+    // Memory-only erase: deliberately bypass Container::erase, which would
+    // enqueue a DELETE_PATH operation and delete data from the backend.
+    auto next = iterations.container().erase(it);
+    // Writable::~Writable() enqueues a DEREGISTER task that carries the
+    // Writable's address. Drain it now, before the calling code can allocate a
+    // new Iteration that might reuse that address.
+    if (auto handler = IOHandler(); handler)
+    {
+        handler->flush(internal::defaultFlushParams);
+    }
+    return next;
 }
 
 AdvanceStatus Series::advance(
@@ -3206,6 +3318,11 @@ void Series::parseJsonOptions(TracingJSON &options, ParsedInput &input)
         "hint_lazy_parsing_timeout",
         series.m_hintLazyParsingAfterTimeout,
         "OPENPMD_HINT_LAZY_PARSING_TIMEOUT");
+    getJsonOption<bool>(
+        options,
+        "many_iterations",
+        series.m_manyIterations,
+        "OPENPMD_MANY_ITERATIONS");
     getJsonOption<bool>(
         options,
         "verify_homogeneous_extents",

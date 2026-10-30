@@ -209,6 +209,20 @@ auto StatefulSnapshotsContainer::at(key_type const &key) const
 auto StatefulSnapshotsContainer::at(key_type const &key) -> mapped_type &
 {
     auto base_iterator = get();
+    if (base_iterator->get().series.get().m_manyIterations)
+    {
+        auto current = base_iterator->get().currentIteration();
+        if (!current.has_value() || *current != key)
+        {
+            throw error::WrongAPIUsage(
+                "[StatefulSnapshotsContainer::at] Cannot access Iteration " +
+                std::to_string(key) +
+                ": the Series was opened with `many_iterations = true`, which "
+                "only allows accessing the currently active Iteration in "
+                "strictly increasing order. Disable `many_iterations` to "
+                "revisit Iterations.");
+        }
+    }
     auto &result =
         base_iterator->seek({StatefulIterator::Seek::Seek_Iteration_t{key}});
     if (result.is_end())
@@ -252,22 +266,48 @@ auto StatefulSnapshotsContainer::operator[](key_type const &key)
 
     assert(access::write(access));
 
+    auto const &manyIterations = s.series.get().m_manyIterations;
+    if (manyIterations && s.m_lastSeenIteration.has_value() &&
+        key <= *s.m_lastSeenIteration)
+    {
+        throw error::WrongAPIUsage(
+            "[WriteIterations] Cannot access Iteration " + std::to_string(key) +
+            " after Iteration " + std::to_string(*s.m_lastSeenIteration) +
+            ". The Series was opened with `many_iterations = true`, which "
+            "only supports strictly increasing iteration indices and visiting "
+            "each Iteration at most once. Disable `many_iterations` to "
+            "revisit Iterations.");
+    }
+
+    auto currentIteration = s.currentIteration();
     auto lastIteration = base_iterator->peekCurrentlyOpenIteration();
+    std::optional<Iteration::IterationIndex_t> iterationToErase;
+    if (currentIteration.has_value() && *currentIteration != key)
+    {
+        iterationToErase = *currentIteration;
+    }
     if (lastIteration.has_value())
     {
-        auto lastIteration_v = lastIteration.value();
-        if (lastIteration_v->first == key)
+        auto &lastIteration_v = *lastIteration.value();
+        if (lastIteration_v.first == key)
         {
             return s.series.iterations.at(key);
         }
-        else
-        {
-            lastIteration_v->second.close(); // continue below
-        }
+        iterationToErase = lastIteration_v.first;
+        lastIteration_v.second.close(); // continue below
+    }
+    if (manyIterations && iterationToErase.has_value() &&
+        s.series.iterations.contains(*iterationToErase))
+    {
+        s.series.eraseIteration(s.series.iterations.find(*iterationToErase));
     }
 
     // create new
     auto &res = s.series.iterations[key];
+    if (manyIterations)
+    {
+        s.m_lastSeenIteration = key;
+    }
     Iteration::BeginStepStatus status = [&]() {
         try
         {
@@ -300,12 +340,18 @@ auto StatefulSnapshotsContainer::operator[](key_type const &key)
                     "Backend reported OVER status while trying to create "
                     "new Iteration.");
             }
-            base_iterator->get().seen_iterations[key] = during.step_count;
+            if (!manyIterations)
+            {
+                base_iterator->get().seen_iterations[key] = during.step_count;
+            }
             during.iteration_idx = key;
         },
         [&](detail::CurrentStep::AtTheEdge where_am_i)
             -> detail::CurrentStep::During_t {
-            base_iterator->get().seen_iterations[key] = 0;
+            if (!manyIterations)
+            {
+                base_iterator->get().seen_iterations[key] = 0;
+            }
             switch (where_am_i)
             {
             case detail::CurrentStep::AtTheEdge::Begin:
