@@ -164,9 +164,6 @@ public:
 
     void openPath(Writable *, Parameter<Operation::OPEN_PATH> const &) override;
 
-    void
-    closePath(Writable *, Parameter<Operation::CLOSE_PATH> const &) override;
-
     void openDataset(Writable *, Parameter<Operation::OPEN_DATASET> &) override;
 
     void
